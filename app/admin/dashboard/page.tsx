@@ -12,9 +12,7 @@ import {
   saveProfileBasics,
   saveBio,
   saveExperience,
-  uploadBioFile,
-  uploadExperienceFile,
-  uploadCv,
+  uploadResume,
   savePersona,
   uploadHeadshot,
   rescanSource,
@@ -78,15 +76,15 @@ export default async function Dashboard() {
         </form>
       </div>
 
-      {/* ── Upload CV / resume — one upload fills bio AND experience. ── */}
+      {/* ── Upload resume — drops the resume's raw text into the Bio. ── */}
       <div style={{ border: "1px solid var(--primary)", borderRadius: "var(--radius-md)", padding: 16, marginBottom: 20 }}>
         <strong style={{ fontSize: 14, color: "#fff", display: "block", marginBottom: 6 }}>
-          Upload your CV / resume
+          Upload your resume
         </strong>
         <UploadToGenerate
-          action={uploadCv}
-          buttonLabel="Parse CV → fill bio & experience"
-          hint="Upload a PDF, Word doc, or text CV. Claude reads it and builds your bio and all your experience cards in one step (replaces the current bio and experience)."
+          action={uploadResume}
+          buttonLabel="Add resume text to bio"
+          hint="Upload a PDF, Word doc, or text resume. Its text is placed into the Bio below (replacing it) — no AI, just your own words. Edit it there afterward."
         />
       </div>
 
@@ -118,29 +116,18 @@ export default async function Dashboard() {
         <SaveButton>Save details</SaveButton>
       </form>
 
-      {/* ── Bio ── generate-from-file sits right above the Bio field. */}
+      {/* ── Bio ── plain editable text (resume text lands here). */}
       <div style={{ borderTop: "1px solid var(--border)", margin: "18px 0", paddingTop: 16 }}>
-        <UploadToGenerate
-          action={uploadBioFile}
-          buttonLabel="Generate bio from file"
-          hint="Fill the bio automatically: upload a PDF, Word doc, CSV, or text file and Claude writes it for you."
-          footnote="Voice upload is coming soon (needs a transcription service wired up)."
-        />
-        <form action={saveBio} style={{ marginTop: 12 }}>
+        <form action={saveBio}>
           <Label>Bio</Label>
-          <textarea name="bio" defaultValue={profile.bio} rows={7} style={{ ...field, resize: "vertical" }} />
+          <textarea name="bio" defaultValue={profile.bio} rows={10} style={{ ...field, resize: "vertical" }} />
           <SaveButton>Save bio</SaveButton>
         </form>
       </div>
 
-      {/* ── Experience ── generate-from-file sits right above the list. */}
+      {/* ── Experience ── manual add-one-at-a-time list. */}
       <div style={{ borderTop: "1px solid var(--border)", margin: "18px 0", paddingTop: 16 }}>
-        <UploadToGenerate
-          action={uploadExperienceFile}
-          buttonLabel="Generate experience from file"
-          hint="Add your roles automatically: upload a CSV, PDF, Word doc, or text file and Claude turns it into experience entries."
-        />
-        <form action={saveExperience} style={{ marginTop: 12 }}>
+        <form action={saveExperience}>
           <Label>Experience (add one at a time)</Label>
           <ExperienceEditor initial={experience} />
           <SaveButton>Save experience</SaveButton>

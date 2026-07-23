@@ -12,7 +12,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma, getProfile } from "@/lib/db";
 import { checkPassword, createSession, destroySession, isAuthed } from "@/lib/auth";
-import { extractLink, extractDocument, extractText, writeBioFromText, writeExperienceFromText, writeProfileFromCv, fileToText } from "@/lib/scrape";
+import { extractLink, extractDocument, extractText, fileToText } from "@/lib/scrape";
 import { safeExperience } from "@/lib/knowledge";
 import { saveUpload, saveBytes } from "@/lib/uploads";
 import { describeImage } from "@/lib/vision";
@@ -132,64 +132,19 @@ export async function saveExperience(formData: FormData) {
   revalidateAll();
 }
 
-/** Bio via file upload: PDF, DOCX, CSV, or text/markdown -> Claude writes a bio. */
-export async function uploadBioFile(formData: FormData) {
-  await requireAuth();
-  const file = formData.get("file");
-  if (!isUpload(file) || file.size === 0) return;
-  // Read the file's text, handling pdf / docx / csv / txt / md.
-  const bytes = Buffer.from(await file.arrayBuffer());
-  const { text } = await fileToText(bytes, file.name);
-  const bio = await writeBioFromText(text);
-  if (bio) {
-    await getProfile();
-    await prisma.profile.update({ where: { id: 1 }, data: { bio } });
-  }
-  revalidateAll();
-}
-
 /**
- * Experience via file upload: PDF, DOCX, CSV, or text -> Claude extracts
- * role/company/dates/description entries and APPENDS them to the existing list.
+ * Resume upload: extract the file's raw text (PDF/DOCX/CSV/text) and place it
+ * straight into the Bio — no AI. The admin edits it there afterward.
  */
-export async function uploadExperienceFile(formData: FormData) {
+export async function uploadResume(formData: FormData) {
   await requireAuth();
   const file = formData.get("file");
   if (!isUpload(file) || file.size === 0) return;
   const bytes = Buffer.from(await file.arrayBuffer());
   const { text } = await fileToText(bytes, file.name);
-  const extracted = await writeExperienceFromText(text);
-  if (extracted.length) {
-    const profile = await getProfile();
-    const existing = safeExperience(profile.experience);
-    await prisma.profile.update({
-      where: { id: 1 },
-      data: { experience: JSON.stringify([...existing, ...extracted]) },
-    });
-  }
-  revalidateAll();
-}
-
-/**
- * ONE CV / resume upload -> Claude parses it and REPLACES both the bio and the
- * experience list in a single step. PDF, DOCX, CSV, or text.
- */
-export async function uploadCv(formData: FormData) {
-  await requireAuth();
-  const file = formData.get("file");
-  if (!isUpload(file) || file.size === 0) return;
-  const bytes = Buffer.from(await file.arrayBuffer());
-  const { text } = await fileToText(bytes, file.name);
-  const { bio, experience } = await writeProfileFromCv(text);
-
-  // Only write fields the parse actually produced, so a partial CV doesn't wipe
-  // good existing data with blanks.
-  const data: { bio?: string; experience?: string } = {};
-  if (bio) data.bio = bio;
-  if (experience.length) data.experience = JSON.stringify(experience);
-  if (Object.keys(data).length) {
+  if (text.trim()) {
     await getProfile();
-    await prisma.profile.update({ where: { id: 1 }, data });
+    await prisma.profile.update({ where: { id: 1 }, data: { bio: text.trim() } });
   }
   revalidateAll();
 }
