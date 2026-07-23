@@ -1,0 +1,116 @@
+:root {
+  /* ── Brand tokens (mirror lib/theme.ts) ── */
+  --bg: #0b1020;
+  --bg-soft: #12182e;
+  --surface: #1a2140;
+  --border: #2a335c;
+
+  --text: #e8ecff;
+  --text-muted: #9aa3c7;
+
+  --primary: #7c5cff;
+  --primary-soft: #a48bff;
+  --accent: #ffb84d;
+
+  --success: #4ade80;
+  --danger: #ff6b6b;
+
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
+  --radius-pill: 999px;
+
+  --glow-primary: 0 0 0 1px rgba(124, 92, 255, 0.4), 0 8px 30px rgba(124, 92, 255, 0.25);
+  --glow-accent: 0 0 0 1px rgba(255, 184, 77, 0.4), 0 8px 30px rgba(255, 184, 77, 0.2);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background:
+    radial-gradient(1200px 700px at 15% -10%, rgba(124, 92, 255, 0.18), transparent 60%),
+    radial-gradient(900px 600px at 100% 0%, rgba(255, 184, 77, 0.1), transparent 55%),
+    var(--bg);
+  color: var(--text);
+  font-family: var(--font-body), system-ui, sans-serif;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+.font-heading {
+  font-family: var(--font-heading), system-ui, sans-serif;
+  letter-spacing: -0.02em;
+}
+
+code,
+.mono {
+  font-family: var(--font-mono), ui-monospace, monospace;
+}
+
+a {
+  color: var(--primary-soft);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+input,
+textarea,
+select {
+  font-family: inherit;
+  color: var(--text);
+}
+
+::selection {
+  background: rgba(124, 92, 255, 0.4);
+}
+
+/* Thin custom scrollbar for the chat */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 999px;
+}
+
+/* Utility classes used across pages */
+.container {
+  width: 100%;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.pill {
+  border-radius: var(--radius-pill);
+}
+
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 1;
+  }
+}

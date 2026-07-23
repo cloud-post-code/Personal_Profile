@@ -1,0 +1,72 @@
+// Prisma schema for Blake's personal site.
+// Production/Railway: Postgres. For quick local dev without Postgres you can
+// switch provider to "sqlite" and DATABASE_URL to "file:./dev.db".
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// A scanned external link (LinkedIn post, project page, article...).
+/// The admin adds a URL; we fetch it, extract content, and Claude summarizes it.
+model Link {
+  id        String   @id @default(cuid())
+  url       String   @unique
+  title     String?
+  /// Cleaned main text extracted from the page.
+  rawText   String?  @db.Text
+  /// Claude-generated summary used as chatbot knowledge.
+  summary   String?  @db.Text
+  /// Comma-free JSON array of tags, stored as string.
+  tags      String   @default("[]")
+  /// linkedin | project | article | other
+  kind      String   @default("other")
+  imageUrl  String?
+  status    String   @default("pending") // pending | scanned | failed
+  error     String?  @db.Text
+  featured  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// An uploaded photo (project shots, headshots, etc.).
+model Photo {
+  id        String   @id @default(cuid())
+  /// Stored filename on the upload volume.
+  filename  String
+  caption   String?
+  /// project | profile | gallery
+  kind      String   @default("gallery")
+  createdAt DateTime @default(now())
+}
+
+/// A manually-curated project entry shown by the chatbot / projects view.
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  blurb       String   @db.Text
+  url         String?
+  imageUrl    String?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+/// Free-form "about me" knowledge the chatbot can draw on.
+/// Editable in the admin so Blake can shape how the bot talks about him.
+model Profile {
+  id        Int      @id @default(1)
+  name      String   @default("Blake")
+  tagline   String   @default("")
+  bio       String   @default("") @db.Text
+  /// How the bot should talk about him — voice, worldview, what to emphasize.
+  persona   String   @default("") @db.Text
+  linkedin  String   @default("")
+  email     String   @default("")
+  github    String   @default("")
+  updatedAt DateTime @updatedAt
+}
