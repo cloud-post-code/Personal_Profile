@@ -8,7 +8,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -24,9 +24,9 @@ model Source {
   filename  String?
   title     String?
   /// Cleaned full text extracted from the source.
-  rawText   String? @db.Text
+  rawText   String?
   /// Claude-generated summary used as chatbot knowledge.
-  summary   String? @db.Text
+  summary   String?
   /// JSON array of tags, stored as a string.
   tags      String   @default("[]")
   /// linkedin | project | article | resume | note | other — content category.
@@ -46,7 +46,7 @@ model Photo {
   /// Stored filename on the upload volume.
   filename    String
   /// One-paragraph AI (or manual) description.
-  description String   @default("") @db.Text
+  description String   @default("")
   caption     String?
   /// gallery | project | profile
   kind        String   @default("gallery")
@@ -58,7 +58,7 @@ model Photo {
 model Project {
   id          String   @id @default(cuid())
   name        String
-  blurb       String @db.Text
+  blurb       String
   githubUrl   String?
   liveUrl     String?
   imageUrl    String?
@@ -74,7 +74,7 @@ model Contact {
   id        String   @id @default(cuid())
   name      String
   email     String
-  message   String @db.Text
+  message   String
   handled   Boolean  @default(false)
   createdAt DateTime @default(now())
 }
@@ -94,16 +94,16 @@ model Profile {
   github    String   @default("")
 
   // ── Bio (fillable via file upload: CSV / text) ──
-  bio       String   @default("") @db.Text
+  bio       String   @default("")
 
   // ── Persona & brand ──
   tagline   String   @default("")
   /// How the bot should talk — voice, worldview, opinions.
-  persona   String   @default("") @db.Text
-  overview  String   @default("") @db.Text
-  values    String   @default("") @db.Text
-  aesthetic String   @default("") @db.Text
-  tone      String   @default("") @db.Text
+  persona   String   @default("")
+  overview  String   @default("")
+  values    String   @default("")
+  aesthetic String   @default("")
+  tone      String   @default("")
   headshot  String?  // /api/uploads/<file>
 
   // ── Theme (drives the live site's CSS variables) ──

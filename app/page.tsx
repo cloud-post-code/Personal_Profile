@@ -11,6 +11,7 @@ export default async function Home() {
     <Chat
       name={profile.name}
       tagline={profile.tagline}
+      headshot={profile.headshot}
       starters={starterQuestions}
     />
   );

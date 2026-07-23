@@ -19,5 +19,5 @@ export function claude(): Anthropic {
 }
 
 export function claudeModel(): string {
-  return process.env.CLAUDE_MODEL || "claude-sonnet-5";
+  return process.env.CLAUDE_MODEL || "claude-haiku-4-5-20251001";
 }

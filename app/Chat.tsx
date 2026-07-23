@@ -22,13 +22,23 @@ function shortLabel(q: string): string {
   return map[q] ?? q.split(" ").slice(0, 2).join(" ");
 }
 
+/** The four quick actions shown above the chat, each sending a question. */
+const QUICK_ACTIONS: { label: string; q: string }[] = [
+  { label: "Background", q: "What's your background and past experience?" },
+  { label: "About me", q: "Tell me about yourself and how you see the world." },
+  { label: "Connect", q: "How can I connect with you?" },
+  { label: "Projects", q: "What are your recent projects?" },
+];
+
 export default function Chat({
   name,
   tagline,
+  headshot,
   starters,
 }: {
   name: string;
   tagline: string;
+  headshot?: string | null;
   starters: Starter[];
 }) {
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -134,6 +144,25 @@ export default function Chat({
         </section>
       ) : (
         <section style={styles.chatWrap}>
+          <div style={styles.chatHeader}>
+            {headshot ? (
+              <img src={headshot} alt={name} style={styles.headerAvatar} />
+            ) : (
+              <div style={styles.headerAvatarFallback}>{name.slice(0, 1)}</div>
+            )}
+            <div style={styles.quickActions}>
+              {QUICK_ACTIONS.map((a) => (
+                <button
+                  key={a.label}
+                  style={styles.quickBtn}
+                  onClick={() => send(a.q)}
+                  title={a.q}
+                >
+                  {a.label}
+                </button>
+              ))}
+            </div>
+          </div>
           <div ref={scrollRef} style={styles.thread}>
             {messages.map((m, i) => (
               <Bubble
@@ -308,6 +337,44 @@ const styles: Record<string, React.CSSProperties> = {
     margin: "0 auto",
     padding: "0 16px 16px",
     minHeight: 0,
+  },
+  chatHeader: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 12,
+    padding: "16px 0 8px",
+  },
+  headerAvatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 999,
+    objectFit: "cover",
+    border: "2px solid var(--border)",
+    boxShadow: "var(--glow-primary)",
+  },
+  headerAvatarFallback: {
+    width: 72,
+    height: 72,
+    borderRadius: 999,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: 30,
+    fontWeight: 600,
+    color: "white",
+    background: "linear-gradient(90deg, var(--primary), var(--primary-soft))",
+    border: "2px solid var(--border)",
+  },
+  quickActions: { display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" },
+  quickBtn: {
+    background: "var(--bg-soft)",
+    border: "1px solid var(--border)",
+    color: "var(--text)",
+    borderRadius: 999,
+    padding: "8px 16px",
+    fontSize: 14,
+    fontWeight: 500,
   },
   thread: { flex: 1, overflowY: "auto", padding: "12px 4px", display: "flex", flexDirection: "column", gap: 14 },
   row: { display: "flex", width: "100%" },
