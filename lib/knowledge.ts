@@ -64,6 +64,9 @@ ${profile.overview ? `Overview: ${profile.overview}` : ""}
 ${profile.values ? `Values: ${profile.values}` : ""}
 ${profile.location ? `Based in: ${profile.location}` : ""}
 
+EXPERIENCE:
+${experienceBlock(profile.experience)}
+
 HOW TO CONNECT:
 ${connectBlock(profile)}
 
@@ -105,6 +108,19 @@ function connectBlock(p: {
   return lines.length ? lines.join("\n") : "(No contact info added yet.)";
 }
 
+function experienceBlock(raw: string): string {
+  const items = safeExperience(raw);
+  if (!items.length) return "(No experience added yet.)";
+  return items
+    .map((e) => {
+      const head = [e.role, e.company].filter(Boolean).join(" @ ");
+      const when = e.dates ? ` (${e.dates})` : "";
+      const desc = e.description ? ` — ${e.description}` : "";
+      return `- ${head}${when}${desc}`;
+    })
+    .join("\n");
+}
+
 export function safeSocials(raw: string): { label: string; url: string }[] {
   try {
     const v = JSON.parse(raw);
@@ -120,6 +136,25 @@ export function safeTags(raw: string): string[] {
   try {
     const v = JSON.parse(raw);
     return Array.isArray(v) ? v.map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
+export type Experience = { role: string; company: string; dates: string; description: string };
+
+export function safeExperience(raw: string): Experience[] {
+  try {
+    const v = JSON.parse(raw);
+    if (!Array.isArray(v)) return [];
+    return v
+      .map((x) => ({
+        role: String(x?.role ?? "").trim(),
+        company: String(x?.company ?? "").trim(),
+        dates: String(x?.dates ?? "").trim(),
+        description: String(x?.description ?? "").trim(),
+      }))
+      .filter((x) => x.role || x.company || x.description);
   } catch {
     return [];
   }

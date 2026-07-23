@@ -13,6 +13,7 @@ import { redirect } from "next/navigation";
 import { prisma, getProfile } from "@/lib/db";
 import { checkPassword, createSession, destroySession, isAuthed } from "@/lib/auth";
 import { extractLink, extractDocument, extractText, writeBioFromText, fileToText } from "@/lib/scrape";
+import { safeExperience } from "@/lib/knowledge";
 import { saveUpload, saveBytes } from "@/lib/uploads";
 import { describeImage } from "@/lib/vision";
 import path from "node:path";
@@ -105,6 +106,10 @@ export async function saveProfileBasics(formData: FormData) {
     .map((label, i) => ({ label: label.trim(), url: (urls[i] ?? "").trim() }))
     .filter((s) => s.label && s.url);
 
+  // Experience arrives as one JSON string from the ExperienceEditor; re-parse
+  // and normalize through safeExperience so only clean entries are stored.
+  const experience = safeExperience(String(formData.get("experience") ?? "[]"));
+
   await prisma.profile.update({
     where: { id: 1 },
     data: {
@@ -115,6 +120,7 @@ export async function saveProfileBasics(formData: FormData) {
       github: String(formData.get("github") ?? ""),
       socials: JSON.stringify(socials),
       bio: String(formData.get("bio") ?? ""),
+      experience: JSON.stringify(experience),
     },
   });
   revalidateAll();

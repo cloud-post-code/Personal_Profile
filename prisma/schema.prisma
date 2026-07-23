@@ -95,6 +95,8 @@ model Profile {
 
   // ── Bio (fillable via file upload: CSV / text) ──
   bio       String   @default("") @db.Text
+  /// JSON array of {role, company, dates, description} experience entries.
+  experience String  @default("[]") @db.Text
 
   // ── Persona & brand ──
   tagline   String   @default("")

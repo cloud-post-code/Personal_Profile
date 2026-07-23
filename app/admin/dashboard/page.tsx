@@ -1,11 +1,12 @@
 import { redirect } from "next/navigation";
 import { isAuthed } from "@/lib/auth";
 import { prisma, getProfile } from "@/lib/db";
-import { safeTags, safeSocials } from "@/lib/knowledge";
+import { safeTags, safeSocials, safeExperience } from "@/lib/knowledge";
 import { safeJson } from "@/lib/util";
 import { FONT_OPTIONS, BODY_FONT_OPTIONS } from "@/lib/fonts";
 import { RADIUS_OPTIONS } from "@/lib/theme";
 import { SocialsEditor } from "../SocialsEditor";
+import { ExperienceEditor } from "../ExperienceEditor";
 import {
   logout,
   saveProfileBasics,
@@ -51,6 +52,7 @@ export default async function Dashboard() {
       ? [{ label: "LinkedIn", url: profile.linkedin }, ...savedSocials]
       : savedSocials;
   const colors = safeJson<{ bg?: string; primary?: string; accent?: string }>(profile.themeColors, {});
+  const experience = safeExperience(profile.experience);
 
   // ── PROFILE TAB (Details + Bio merged) ──
   const profileTab = (
@@ -100,6 +102,11 @@ export default async function Dashboard() {
         <div style={{ borderTop: "1px solid var(--border)", margin: "16px 0", paddingTop: 16 }}>
           <Label>Bio</Label>
           <textarea name="bio" defaultValue={profile.bio} rows={7} style={{ ...field, resize: "vertical" }} />
+        </div>
+
+        <div style={{ borderTop: "1px solid var(--border)", margin: "16px 0", paddingTop: 16 }}>
+          <Label>Experience (add one at a time)</Label>
+          <ExperienceEditor initial={experience} />
         </div>
 
         <SaveButton>Save profile</SaveButton>
