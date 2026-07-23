@@ -12,7 +12,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma, getProfile } from "@/lib/db";
 import { checkPassword, createSession, destroySession, isAuthed } from "@/lib/auth";
-import { extractLink, extractPdf, extractText, writeBioFromText } from "@/lib/scrape";
+import { extractLink, extractDocument, extractText, writeBioFromText, fileToText } from "@/lib/scrape";
 import { saveUpload, saveBytes } from "@/lib/uploads";
 import { describeImage } from "@/lib/vision";
 import path from "node:path";
@@ -93,13 +93,41 @@ export async function saveBio(formData: FormData) {
   revalidateAll();
 }
 
-/** Bio via file upload: CSV or text/markdown -> Claude writes a bio. */
+// ── Combined Details + Bio (single "Save profile" on the merged tab) ──
+export async function saveProfileBasics(formData: FormData) {
+  await requireAuth();
+  await getProfile();
+
+  // Socials arrive as parallel label[]/url[] arrays; zip into JSON.
+  const labels = formData.getAll("social_label").map(String);
+  const urls = formData.getAll("social_url").map(String);
+  const socials = labels
+    .map((label, i) => ({ label: label.trim(), url: (urls[i] ?? "").trim() }))
+    .filter((s) => s.label && s.url);
+
+  await prisma.profile.update({
+    where: { id: 1 },
+    data: {
+      name: String(formData.get("name") ?? "Blake"),
+      location: String(formData.get("location") ?? ""),
+      email: String(formData.get("email") ?? ""),
+      linkedin: String(formData.get("linkedin") ?? ""),
+      github: String(formData.get("github") ?? ""),
+      socials: JSON.stringify(socials),
+      bio: String(formData.get("bio") ?? ""),
+    },
+  });
+  revalidateAll();
+}
+
+/** Bio via file upload: PDF, DOCX, CSV, or text/markdown -> Claude writes a bio. */
 export async function uploadBioFile(formData: FormData) {
   await requireAuth();
   const file = formData.get("file");
   if (!isUpload(file) || file.size === 0) return;
-  // Read the file as text (works for csv, txt, md).
-  const text = await file.text();
+  // Read the file's text, handling pdf / docx / csv / txt / md.
+  const bytes = Buffer.from(await file.arrayBuffer());
+  const { text } = await fileToText(bytes, file.name);
   const bio = await writeBioFromText(text);
   if (bio) {
     await getProfile();
@@ -176,15 +204,16 @@ export async function addSource(formData: FormData) {
         data: { status: "failed", error: err(e) },
       });
     }
-  } else if (type === "pdf") {
+  } else if (type === "pdf" || type === "doc") {
     const file = formData.get("file");
     if (!isUpload(file) || file.size === 0) return;
     const bytes = Buffer.from(await file.arrayBuffer());
+    const isWord = /\.docx$/i.test(file.name);
     const src = await prisma.source.create({
-      data: { type: "pdf", filename: file.name, status: "pending" },
+      data: { type: isWord ? "doc" : "pdf", filename: file.name, status: "pending" },
     });
     try {
-      const r = await extractPdf(bytes, file.name);
+      const r = await extractDocument(bytes, file.name);
       await prisma.source.update({
         where: { id: src.id },
         data: { ...toData(r), status: "scanned", error: null },

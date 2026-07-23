@@ -8,8 +8,7 @@ import { RADIUS_OPTIONS } from "@/lib/theme";
 import { SocialsEditor } from "../SocialsEditor";
 import {
   logout,
-  saveDetails,
-  saveBio,
+  saveProfileBasics,
   uploadBioFile,
   savePersona,
   uploadHeadshot,
@@ -26,6 +25,8 @@ import {
 } from "../actions";
 import { Extractor } from "../Extractor";
 import { Tabs } from "../Tabs";
+import { SaveButton } from "../SaveButton";
+import { AutoUploadFile } from "../AutoUploadFile";
 import { panel, field, btn, btnGhost, btnDanger, SectionTitle, Label } from "../ui";
 
 export const dynamic = "force-dynamic";
@@ -50,11 +51,27 @@ export default async function Dashboard() {
       : savedSocials;
   const colors = safeJson<{ bg?: string; primary?: string; accent?: string }>(profile.themeColors, {});
 
-  // ── DETAILS TAB ──
-  const detailsTab = (
+  // ── PROFILE TAB (Details + Bio merged) ──
+  const profileTab = (
     <section style={panel}>
-      <SectionTitle>Details</SectionTitle>
-      <form action={saveDetails}>
+      <SectionTitle>Profile</SectionTitle>
+
+      {/* Headshot — auto-uploads the moment a file is chosen. */}
+      <div style={{ display: "flex", gap: 16, alignItems: "center", marginBottom: 20 }}>
+        {profile.headshot ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={profile.headshot} alt="headshot" style={{ width: 72, height: 72, borderRadius: 999, objectFit: "cover", border: "1px solid var(--border)" }} />
+        ) : (
+          <div style={{ width: 72, height: 72, borderRadius: 999, background: "var(--bg-soft)", border: "1px solid var(--border)" }} />
+        )}
+        <form action={uploadHeadshot}>
+          <Label>Headshot</Label>
+          <AutoUploadFile name="file" accept="image/*" hint="Pick a photo — it uploads automatically." />
+        </form>
+      </div>
+
+      {/* Identity + contact + socials + bio — one combined save. */}
+      <form action={saveProfileBasics}>
         <div style={grid2}>
           <div>
             <Label>Name</Label>
@@ -79,46 +96,27 @@ export default async function Dashboard() {
         <Label>Social media (add one at a time)</Label>
         <SocialsEditor initial={socials} />
 
-        <button style={btn}>Save details</button>
+        <div style={{ borderTop: "1px solid var(--border)", margin: "16px 0", paddingTop: 16 }}>
+          <Label>Bio</Label>
+          <textarea name="bio" defaultValue={profile.bio} rows={7} style={{ ...field, resize: "vertical" }} />
+        </div>
+
+        <SaveButton>Save profile</SaveButton>
       </form>
-    </section>
-  );
 
-  // ── BIO TAB ──
-  const bioTab = (
-    <section style={panel}>
-      <SectionTitle>Bio</SectionTitle>
-
-      {/* Headshot lives with the bio */}
-      <div style={{ display: "flex", gap: 16, alignItems: "center", marginBottom: 18 }}>
-        {profile.headshot ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={profile.headshot} alt="headshot" style={{ width: 72, height: 72, borderRadius: 999, objectFit: "cover", border: "1px solid var(--border)" }} />
-        ) : (
-          <div style={{ width: 72, height: 72, borderRadius: 999, background: "var(--bg-soft)", border: "1px solid var(--border)" }} />
-        )}
-        <form action={uploadHeadshot} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <input type="file" name="file" accept="image/*" required style={{ ...field, marginBottom: 0, maxWidth: 240 }} />
-          <button style={btnGhost as React.CSSProperties}>Upload headshot</button>
+      {/* Bio-from-file lives below — it runs a separate Claude action. */}
+      <div style={{ borderTop: "1px solid var(--border)", marginTop: 20, paddingTop: 16 }}>
+        <p style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 10 }}>
+          Or fill the bio automatically: upload a PDF, Word doc, CSV, or text file and Claude writes it for you.
+        </p>
+        <form action={uploadBioFile} style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <input type="file" name="file" accept=".pdf,.docx,.csv,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/*" required style={{ ...field, marginBottom: 0, flex: 1, minWidth: 240 }} />
+          <button style={btn}>Generate bio from file</button>
         </form>
+        <p style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 8 }}>
+          Voice upload is coming soon (needs a transcription service wired up).
+        </p>
       </div>
-
-      <p style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 14 }}>
-        Fill your bio by uploading a CSV or text file — Claude turns it into a bio — or write it
-        directly below.
-      </p>
-      <form action={uploadBioFile} style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-        <input type="file" name="file" accept=".csv,.txt,.md,text/*" required style={{ ...field, marginBottom: 0, flex: 1, minWidth: 240 }} />
-        <button style={btn}>Generate bio from file</button>
-      </form>
-      <p style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 16 }}>
-        Voice upload is coming soon (needs a transcription service wired up).
-      </p>
-      <form action={saveBio}>
-        <Label>Bio (editable)</Label>
-        <textarea name="bio" defaultValue={profile.bio} rows={7} style={{ ...field, resize: "vertical" }} />
-        <button style={btn}>Save bio</button>
-      </form>
     </section>
   );
 
@@ -195,7 +193,7 @@ export default async function Dashboard() {
           </p>
         </div>
 
-        <button style={btn}>Save persona & theme</button>
+        <SaveButton>Save persona & theme</SaveButton>
       </form>
     </section>
   );
@@ -391,8 +389,7 @@ export default async function Dashboard() {
 
       <Tabs
         tabs={[
-          { key: "details", label: "Details", content: detailsTab },
-          { key: "bio", label: "Bio", content: bioTab },
+          { key: "profile", label: "Profile", content: profileTab },
           { key: "persona", label: "Persona & Theme", content: personaTab },
           { key: "projects", label: "Projects", content: projectsTab },
           { key: "knowledge", label: "Knowledge", content: knowledgeTab },

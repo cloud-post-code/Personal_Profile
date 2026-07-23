@@ -135,24 +135,96 @@ export async function extractLink(url: string): Promise<ExtractResult> {
   return { title, rawText: text, imageUrl, summary, tags, kind };
 }
 
-/** Extract a PDF source from its bytes. */
-export async function extractPdf(
+/**
+ * Pull plain text out of a PDF's bytes.
+ *
+ * IMPORTANT: import `pdf-parse/lib/pdf-parse.js` directly. The package's index
+ * (`pdf-parse`) runs debug code at import that tries to read a bundled test PDF
+ * and throws ENOENT in production — which is why PDF extraction silently failed.
+ * The lib entry skips that harness.
+ */
+async function pdfToText(bytes: Buffer): Promise<{ text: string; title: string | null }> {
+  const pdfParse = (await import("pdf-parse/lib/pdf-parse.js")).default;
+  const data = await pdfParse(bytes);
+  const text = (data.text || "").replace(/\s+/g, " ").trim();
+  const title = data.info?.Title ? String(data.info.Title) : null;
+  return { text, title };
+}
+
+/** Pull plain text out of a .docx (Word) file's bytes via mammoth. */
+async function docxToText(bytes: Buffer): Promise<string> {
+  const mammoth = await import("mammoth");
+  const { value } = await mammoth.extractRawText({ buffer: bytes });
+  return (value || "").replace(/\s+/g, " ").trim();
+}
+
+/** True for filenames we know how to read as a Word document. */
+function isDocx(filename: string): boolean {
+  return /\.docx$/i.test(filename);
+}
+
+/**
+ * Extract plain text from an uploaded document (PDF, DOCX, or plain text/CSV/MD)
+ * by sniffing the filename. Returns text plus an optional title. Used by both
+ * the Knowledge ingest and the Bio-from-file flow so they accept the same set
+ * of formats. Throws if the parser itself fails, so callers can report the real
+ * error instead of a misleading "empty content" message.
+ */
+export async function fileToText(
+  bytes: Buffer,
+  filename: string,
+): Promise<{ text: string; title: string | null }> {
+  if (/\.pdf$/i.test(filename)) {
+    const { text, title } = await pdfToText(bytes);
+    return { text: text.slice(0, 12000), title: title ?? filename.replace(/\.pdf$/i, "") };
+  }
+  if (isDocx(filename)) {
+    const text = await docxToText(bytes);
+    return { text: text.slice(0, 12000), title: filename.replace(/\.docx$/i, "") };
+  }
+  // csv / txt / md / anything else: treat the bytes as UTF-8 text.
+  const text = bytes.toString("utf8").replace(/\r/g, "").trim().slice(0, 12000);
+  return { text, title: filename.replace(/\.[^.]+$/, "") };
+}
+
+/** Extract a document source (PDF or DOCX) from its bytes. */
+export async function extractDocument(
   bytes: Buffer,
   filename: string,
 ): Promise<ExtractResult> {
   let text = "";
-  let title: string | null = filename.replace(/\.pdf$/i, "");
+  let title: string | null = filename.replace(/\.[^.]+$/, "");
+  let parseError: string | null = null;
   try {
-    // pdf-parse is CJS; import lazily so it doesn't run at module load.
-    const pdfParse = (await import("pdf-parse")).default;
-    const data = await pdfParse(bytes);
-    text = (data.text || "").replace(/\s+/g, " ").trim().slice(0, 12000);
-    if (data.info?.Title) title = String(data.info.Title);
+    const r = await fileToText(bytes, filename);
+    text = r.text;
+    if (r.title) title = r.title;
   } catch (e) {
-    text = "";
+    parseError = e instanceof Error ? e.message : String(e);
   }
-  const { summary, tags } = await summarize(`PDF: ${filename}`, title, text);
+
+  // If the parser failed outright, tell the admin what actually happened.
+  if (parseError && !text) {
+    return {
+      title,
+      rawText: "",
+      imageUrl: null,
+      summary:
+        `Couldn't read this file automatically (${parseError}). It may be a ` +
+        `scanned/image-only PDF or an unsupported format. Add a summary manually.`,
+      tags: [],
+      kind: "resume",
+    };
+  }
+
+  const label = isDocx(filename) ? `DOC: ${filename}` : `PDF: ${filename}`;
+  const { summary, tags } = await summarize(label, title, text);
   return { title, rawText: text, imageUrl: null, summary, tags, kind: "resume" };
+}
+
+/** @deprecated use extractDocument — kept for any existing callers. */
+export async function extractPdf(bytes: Buffer, filename: string): Promise<ExtractResult> {
+  return extractDocument(bytes, filename);
 }
 
 /**

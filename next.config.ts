@@ -14,6 +14,9 @@ const nextConfig: NextConfig = {
   // This project has its own lockfile; pin the tracing root to silence the
   // "multiple lockfiles" workspace-root inference warning.
   outputFileTracingRoot: path.join(__dirname),
+  // Keep these Node/CJS parsers external (not bundled) on the server. Bundling
+  // pdf-parse in particular breaks it (it reads files relative to its package).
+  serverExternalPackages: ["pdf-parse", "mammoth"],
   // Allow serving uploaded images from the local/Railway volume path.
   images: {
     remotePatterns: [{ protocol: "https", hostname: "**" }],

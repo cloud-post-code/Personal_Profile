@@ -21,6 +21,7 @@
     "@anthropic-ai/sdk": "^0.32.1",
     "@prisma/client": "^6.1.0",
     "cheerio": "^1.0.0",
+    "mammoth": "^1.12.0",
     "next": "^15.5.21",
     "pdf-parse": "^1.1.1",
     "react": "^19.0.0",

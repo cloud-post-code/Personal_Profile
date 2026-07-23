@@ -30,7 +30,7 @@ export function Extractor() {
     <div>
       <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
         {tab("link", "🔗 Link")}
-        {tab("pdf", "📄 PDF")}
+        {tab("pdf", "📄 PDF / Doc")}
         {tab("text", "✍️ Text / paste")}
       </div>
 
@@ -48,15 +48,15 @@ export function Extractor() {
 
       {mode === "pdf" && (
         <form action={addSource} style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <input type="hidden" name="type" value="pdf" />
+          <input type="hidden" name="type" value="doc" />
           <input
             type="file"
             name="file"
-            accept="application/pdf,.pdf"
+            accept="application/pdf,.pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             required
             style={{ ...field, marginBottom: 0, flex: 1, minWidth: 240 }}
           />
-          <button style={btn}>Extract PDF</button>
+          <button style={btn}>Extract</button>
         </form>
       )}
 
