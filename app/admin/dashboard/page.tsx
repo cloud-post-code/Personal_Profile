@@ -27,6 +27,7 @@ import { Extractor } from "../Extractor";
 import { Tabs } from "../Tabs";
 import { SaveButton } from "../SaveButton";
 import { AutoUploadFile } from "../AutoUploadFile";
+import { ThemePicker } from "../ThemePicker";
 import { panel, field, btn, btnGhost, btnDanger, SectionTitle, Label } from "../ui";
 
 export const dynamic = "force-dynamic";
@@ -150,47 +151,22 @@ export default async function Dashboard() {
         <textarea name="aesthetic" defaultValue={profile.aesthetic} rows={2} style={{ ...field, resize: "vertical" }} />
 
         <div style={{ borderTop: "1px solid var(--border)", margin: "16px 0", paddingTop: 16 }}>
-          <strong style={{ fontSize: 14 }}>Theme — this restyles the live site</strong>
-          <div style={{ ...grid2, marginTop: 10 }}>
-            <div>
-              <Label>Headline font</Label>
-              <select name="themeFont" defaultValue={profile.themeFont} style={field}>
-                {FONT_OPTIONS.map((f) => (
-                  <option key={f.key} value={f.key}>
-                    {f.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <Label>Text font</Label>
-              <select name="themeBodyFont" defaultValue={profile.themeBodyFont} style={field}>
-                {BODY_FONT_OPTIONS.map((f) => (
-                  <option key={f.key} value={f.key}>
-                    {f.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div>
-            <Label>Corners (roundness)</Label>
-            <select name="themeRadius" defaultValue={profile.themeRadius} style={field}>
-              {RADIUS_OPTIONS.map((r) => (
-                <option key={r.key} value={r.key}>
-                  {r.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-            <ColorField name="color_bg" label="Background" value={colors.bg} placeholder="#0B1020" />
-            <ColorField name="color_primary" label="Primary" value={colors.primary} placeholder="#7C5CFF" />
-            <ColorField name="color_accent" label="Accent" value={colors.accent} placeholder="#FFB84D" />
-          </div>
-          <p style={{ color: "var(--text-muted)", fontSize: 12 }}>
-            Leave a color blank to keep the default. Changes apply site-wide after saving.
-          </p>
+          <strong style={{ fontSize: 14, display: "block", marginBottom: 12 }}>
+            Theme — this restyles the live site
+          </strong>
+          <ThemePicker
+            fontOptions={FONT_OPTIONS}
+            bodyFontOptions={BODY_FONT_OPTIONS}
+            radiusOptions={RADIUS_OPTIONS}
+            initial={{
+              themeFont: profile.themeFont,
+              themeBodyFont: profile.themeBodyFont,
+              themeRadius: profile.themeRadius,
+              bg: colors.bg ?? "",
+              primary: colors.primary ?? "",
+              accent: colors.accent ?? "",
+            }}
+          />
         </div>
 
         <SaveButton>Save persona & theme</SaveButton>
@@ -398,15 +374,6 @@ export default async function Dashboard() {
         ]}
       />
     </main>
-  );
-}
-
-function ColorField({ name, label, value, placeholder }: { name: string; label: string; value?: string; placeholder: string }) {
-  return (
-    <div>
-      <Label>{label}</Label>
-      <input name={name} defaultValue={value ?? ""} placeholder={placeholder} style={{ ...field, fontFamily: "var(--font-mono)" }} />
-    </div>
   );
 }
 

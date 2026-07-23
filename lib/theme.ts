@@ -87,10 +87,12 @@ export const RADIUS_PRESETS = {
 
 export type RadiusKey = keyof typeof RADIUS_PRESETS;
 
-/** Options for the admin corner-roundness dropdown. */
+/** Options for the admin corner-roundness picker (with a preview radius). */
 export const RADIUS_OPTIONS = (Object.keys(RADIUS_PRESETS) as RadiusKey[]).map((key) => ({
   key,
   label: RADIUS_PRESETS[key].label,
+  // The card-level radius, used to render the corner-preview box.
+  preview: RADIUS_PRESETS[key].md,
 }));
 
 /**
