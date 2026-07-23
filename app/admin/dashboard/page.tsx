@@ -20,6 +20,7 @@ import {
   updateSourceSummary,
   deleteSource,
   addProject,
+  importGithub,
   deleteProject,
   uploadPhoto,
   updatePhoto,
@@ -203,6 +204,27 @@ export default async function Dashboard() {
   const projectsTab = (
     <section style={panel}>
       <SectionTitle>Projects (GitHub + Live links)</SectionTitle>
+
+      {/* ── Import all repos from a GitHub profile link. ── */}
+      <div style={{ border: "1px solid var(--primary)", borderRadius: "var(--radius-md)", padding: 16, marginBottom: 18 }}>
+        <strong style={{ fontSize: 14, color: "#fff", display: "block", marginBottom: 6 }}>
+          Import from GitHub
+        </strong>
+        <p style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 10 }}>
+          Paste your GitHub profile link — your top public repos become project cards
+          (name, description, and live link). Re-running skips ones already imported.
+        </p>
+        <form action={importGithub} style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <input
+            name="profile"
+            placeholder="https://github.com/your-username"
+            required
+            style={{ ...field, marginBottom: 0, flex: 1, minWidth: 240 }}
+          />
+          <button style={btn}>Import repos</button>
+        </form>
+      </div>
+
       <form action={addProject}>
         <div style={grid2}>
           <input name="name" placeholder="Project name" style={field} />

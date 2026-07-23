@@ -14,6 +14,7 @@ import { prisma, getProfile } from "@/lib/db";
 import { checkPassword, createSession, destroySession, isAuthed } from "@/lib/auth";
 import { extractLink, extractDocument, extractText, fileToText, writeProfileFromResume } from "@/lib/scrape";
 import { safeExperience, safeSocials } from "@/lib/knowledge";
+import { fetchGithubProjects } from "@/lib/github";
 import { saveUpload, saveBytes } from "@/lib/uploads";
 import { describeImage } from "@/lib/vision";
 import path from "node:path";
@@ -384,6 +385,43 @@ export async function deleteProject(formData: FormData) {
   await requireAuth();
   const id = String(formData.get("id") ?? "");
   if (id) await prisma.project.delete({ where: { id } }).catch(() => {});
+  revalidateAll();
+}
+
+/**
+ * Import a GitHub user's public repos as projects. Paste a profile URL (or
+ * username); each top repo becomes a Project. Skips repos already imported
+ * (matched by githubUrl) so re-running is safe.
+ */
+export async function importGithub(formData: FormData) {
+  await requireAuth();
+  const input = String(formData.get("profile") ?? "").trim();
+  if (!input) return;
+
+  const repos = await fetchGithubProjects(input).catch(() => []);
+  if (!repos.length) {
+    revalidateAll();
+    return;
+  }
+
+  // Avoid duplicates: skip repos whose githubUrl is already a project.
+  const existing = await prisma.project.findMany({ select: { githubUrl: true } });
+  const seen = new Set(existing.map((p) => p.githubUrl).filter(Boolean));
+  const fresh = repos.filter((r) => !seen.has(r.githubUrl));
+
+  if (fresh.length) {
+    // Most-starred first (fetch already sorted); order them after existing.
+    const base = await prisma.project.count();
+    await prisma.project.createMany({
+      data: fresh.map((r, i) => ({
+        name: r.name,
+        blurb: r.blurb,
+        githubUrl: r.githubUrl,
+        liveUrl: r.liveUrl,
+        order: base + i,
+      })),
+    });
+  }
   revalidateAll();
 }
 

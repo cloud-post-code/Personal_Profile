@@ -15,8 +15,8 @@
     {
       "id": "github-profile-import",
       "title": "Import all projects from a GitHub profile link",
-      "status": "todo",
-      "notes": "Admin pastes a GitHub profile URL (e.g. github.com/username); the app fetches the user's public repos via the GitHub API and creates a Project per repo (name, description->blurb, html_url->githubUrl, homepage->liveUrl). Consider: sort by stars/updated, cap count, skip forks, let admin pick which to keep."
+      "status": "done",
+      "notes": "Projects tab 'Import from GitHub': paste a profile URL, fetches public non-fork repos via GitHub API (lib/github.ts), creates a Project per repo (name, description->blurb, html_url->githubUrl, homepage->liveUrl), most-starred first, capped at 12, skips already-imported (deduped by githubUrl). Verified live against a real profile. Live."
     }
   ]
 }
