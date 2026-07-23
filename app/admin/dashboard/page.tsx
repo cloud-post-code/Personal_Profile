@@ -32,6 +32,7 @@ import { Tabs } from "../Tabs";
 import { SaveButton } from "../SaveButton";
 import { AutoUploadFile } from "../AutoUploadFile";
 import { ThemePicker } from "../ThemePicker";
+import type { ThemeColors } from "@/lib/theme";
 import { panel, field, btn, btnGhost, btnDanger, SectionTitle, Label } from "../ui";
 
 export const dynamic = "force-dynamic";
@@ -54,7 +55,7 @@ export default async function Dashboard() {
     profile.linkedin && !savedSocials.some((s) => s.url === profile.linkedin)
       ? [{ label: "LinkedIn", url: profile.linkedin }, ...savedSocials]
       : savedSocials;
-  const colors = safeJson<{ bg?: string; primary?: string; accent?: string }>(profile.themeColors, {});
+  const colors = safeJson<ThemeColors>(profile.themeColors, {});
   const experience = safeExperience(profile.experience);
 
   // ── PROFILE TAB (Details + Bio merged) ──
@@ -176,9 +177,9 @@ export default async function Dashboard() {
               themeFont: profile.themeFont,
               themeBodyFont: profile.themeBodyFont,
               themeRadius: profile.themeRadius,
-              bg: colors.bg ?? "",
-              primary: colors.primary ?? "",
-              accent: colors.accent ?? "",
+              themeFontSize: profile.themeFontSize,
+              themeHeadingWeight: profile.themeHeadingWeight,
+              colors,
             }}
           />
         </div>

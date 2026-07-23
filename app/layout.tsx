@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Space_Grotesk, Inter, JetBrains_Mono } from "next/font/google";
-import { brand, themeOverrideCss } from "@/lib/theme";
+import { brand, themeOverrideCss, type ThemeColors } from "@/lib/theme";
 import { headingFamily, bodyFamily } from "@/lib/fonts";
 import { getProfile } from "@/lib/db";
 import { safeJson } from "@/lib/util";
@@ -24,14 +24,13 @@ export const dynamic = "force-dynamic";
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // Read the admin-controlled theme so the whole site restyles from the DB.
   const profile = await getProfile().catch(() => null);
-  const colors = safeJson<{ bg?: string; primary?: string; accent?: string }>(
-    profile?.themeColors ?? "{}",
-    {},
-  );
+  const colors = safeJson<ThemeColors>(profile?.themeColors ?? "{}", {});
   const override = themeOverrideCss({
     headingFamily: headingFamily(profile?.themeFont ?? "space-grotesk"),
     bodyFamily: bodyFamily(profile?.themeBodyFont ?? "inter"),
     radius: profile?.themeRadius ?? "rounded",
+    fontSize: profile?.themeFontSize ?? "",
+    headingWeight: profile?.themeHeadingWeight ?? "",
     colors,
   });
 

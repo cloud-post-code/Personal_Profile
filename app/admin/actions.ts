@@ -175,8 +175,13 @@ export async function savePersona(formData: FormData) {
   await requireAuth();
   await getProfile();
 
+  // Full color set — every role the design panel exposes.
   const colors = {
     bg: String(formData.get("color_bg") ?? "").trim(),
+    surface: String(formData.get("color_surface") ?? "").trim(),
+    border: String(formData.get("color_border") ?? "").trim(),
+    text: String(formData.get("color_text") ?? "").trim(),
+    textMuted: String(formData.get("color_textMuted") ?? "").trim(),
     primary: String(formData.get("color_primary") ?? "").trim(),
     accent: String(formData.get("color_accent") ?? "").trim(),
   };
@@ -193,6 +198,8 @@ export async function savePersona(formData: FormData) {
       themeFont: String(formData.get("themeFont") ?? "space-grotesk"),
       themeBodyFont: String(formData.get("themeBodyFont") ?? "inter"),
       themeRadius: String(formData.get("themeRadius") ?? "rounded"),
+      themeFontSize: String(formData.get("themeFontSize") ?? "").trim(),
+      themeHeadingWeight: String(formData.get("themeHeadingWeight") ?? "").trim(),
       themeColors: JSON.stringify(colors),
     },
   });

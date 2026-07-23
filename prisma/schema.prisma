@@ -113,10 +113,14 @@ model Profile {
   themeFont String   @default("space-grotesk")
   /// Curated body/text font key (see lib/fonts).
   themeBodyFont String @default("inter")
-  /// JSON {bg, primary, accent} hex overrides; empty = brand defaults.
+  /// JSON {bg, surface, border, text, textMuted, primary, accent} hex overrides.
   themeColors String @default("{}")
   /// Corner roundness preset: sharp | rounded | pill.
   themeRadius String @default("rounded")
+  /// Base font size in px (body text scale). Empty = default 16.
+  themeFontSize String @default("")
+  /// Heading font weight: 500 | 600 | 700 | 800. Empty = default.
+  themeHeadingWeight String @default("")
 
   updatedAt DateTime @updatedAt
 }

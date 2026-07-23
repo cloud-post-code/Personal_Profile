@@ -96,24 +96,59 @@ export const RADIUS_OPTIONS = (Object.keys(RADIUS_PRESETS) as RadiusKey[]).map((
 }));
 
 /**
- * Build a CSS-variable override string from admin-chosen theme values, so the
- * live site restyles from the DB. Only overrides what's provided; everything
- * else falls back to globals.css defaults. Colors are validated hex.
+ * The full set of admin-controllable colors. Every role the site uses maps to
+ * a CSS token, so the whole design follows from here — nothing is hardcoded.
  */
-export function themeOverrideCss(opts: {
+export type ThemeColors = {
+  bg?: string;
+  surface?: string;
+  border?: string;
+  text?: string;
+  textMuted?: string;
+  primary?: string;
+  accent?: string;
+};
+
+/** The color roles shown in the admin design panel (order = display order). */
+export const COLOR_ROLES: { key: keyof ThemeColors; label: string; fallback: string }[] = [
+  { key: "bg", label: "Background", fallback: "#0B1020" },
+  { key: "surface", label: "Surface / cards", fallback: "#1A2140" },
+  { key: "border", label: "Border", fallback: "#2A335C" },
+  { key: "text", label: "Text", fallback: "#E8ECFF" },
+  { key: "textMuted", label: "Muted text", fallback: "#9AA3C7" },
+  { key: "primary", label: "Primary", fallback: "#7C5CFF" },
+  { key: "accent", label: "Accent", fallback: "#FFB84D" },
+];
+
+/** Heading weight options for the design panel. */
+export const HEADING_WEIGHTS = [
+  { key: "500", label: "Medium" },
+  { key: "600", label: "Semibold" },
+  { key: "700", label: "Bold" },
+  { key: "800", label: "Extra bold" },
+];
+
+const hex = (v?: string) => (v && /^#[0-9a-fA-F]{3,8}$/.test(v) ? v : null);
+
+/**
+ * Build the CSS-variable declarations (the inner body of a :root block) from
+ * admin-chosen theme values. Shared by the live-site <style> injector and the
+ * admin live-preview box so both render identically. Only sets what's provided;
+ * everything else falls back to globals.css defaults.
+ */
+export function themeVarLines(opts: {
   headingFamily: string;
   bodyFamily: string;
   radius?: string;
-  colors: { bg?: string; primary?: string; accent?: string };
+  fontSize?: string;
+  headingWeight?: string;
+  colors: ThemeColors;
 }): string {
-  const hex = (v?: string) => (v && /^#[0-9a-fA-F]{3,8}$/.test(v) ? v : null);
   const lines: string[] = [];
 
-  // Fonts always set (from the curated allowlist).
   lines.push(`--font-heading:${opts.headingFamily};`);
   lines.push(`--font-body:${opts.bodyFamily};`);
 
-  // Corner roundness preset (from the curated allowlist; unknown = no override).
   const preset = RADIUS_PRESETS[opts.radius as RadiusKey];
   if (preset) {
     lines.push(`--radius-sm:${preset.sm};`);
@@ -121,20 +156,54 @@ export function themeOverrideCss(opts: {
     lines.push(`--radius-lg:${preset.lg};`);
   }
 
-  const bg = hex(opts.colors.bg);
-  const primary = hex(opts.colors.primary);
-  const accent = hex(opts.colors.accent);
-  if (bg) lines.push(`--bg:${bg};`);
+  // Base font size (px) and heading weight.
+  const size = Number(opts.fontSize);
+  if (Number.isFinite(size) && size >= 12 && size <= 24) {
+    lines.push(`--font-size-base:${size}px;`);
+  }
+  if (opts.headingWeight && /^(400|500|600|700|800|900)$/.test(opts.headingWeight)) {
+    lines.push(`--heading-weight:${opts.headingWeight};`);
+  }
+
+  // Full color set — every role, so the whole site follows.
+  const c = opts.colors;
+  const bg = hex(c.bg);
+  const surface = hex(c.surface);
+  const border = hex(c.border);
+  const text = hex(c.text);
+  const textMuted = hex(c.textMuted);
+  const primary = hex(c.primary);
+  const accent = hex(c.accent);
+  if (bg) {
+    lines.push(`--bg:${bg};`);
+    lines.push(`--bg-soft:${bg};`);
+  }
+  if (surface) lines.push(`--surface:${surface};`);
+  if (border) lines.push(`--border:${border};`);
+  if (text) lines.push(`--text:${text};`);
+  if (textMuted) lines.push(`--text-muted:${textMuted};`);
   if (primary) {
     lines.push(`--primary:${primary};`);
     lines.push(`--primary-soft:${primary};`);
   }
   if (accent) lines.push(`--accent:${accent};`);
 
-  // Repeat :root to raise specificity (0,2,0) above globals.css's single
-  // `:root` (0,1,0), so these DB-backed overrides reliably win regardless of
-  // stylesheet source order. A plain `html` selector (0,0,1) would lose.
-  return `:root:root{${lines.join("")}}`;
+  return lines.join("");
+}
+
+/**
+ * Build the DB-backed override <style> body. Repeats :root to raise specificity
+ * (0,2,0) above globals.css's single `:root` (0,1,0) so overrides reliably win.
+ */
+export function themeOverrideCss(opts: {
+  headingFamily: string;
+  bodyFamily: string;
+  radius?: string;
+  fontSize?: string;
+  headingWeight?: string;
+  colors: ThemeColors;
+}): string {
+  return `:root:root{${themeVarLines(opts)}}`;
 }
 
 /** The starter questions shown as chips under the chat box. No emojis. */
