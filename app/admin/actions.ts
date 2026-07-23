@@ -13,6 +13,22 @@ async function requireAuth() {
   if (!(await isAuthed())) redirect("/admin");
 }
 
+/**
+ * Duck-typed uploaded-file check. We avoid `instanceof File` because the `File`
+ * global isn't defined during Next's build-time page-data collection on some
+ * Node runtimes (Railway), which throws a ReferenceError at build. A real
+ * FormData upload is a Blob-like with arrayBuffer()/size/name.
+ */
+type UploadLike = { arrayBuffer: () => Promise<ArrayBuffer>; size: number; name: string; type: string };
+function isUpload(v: FormDataEntryValue | null): v is File {
+  return (
+    typeof v === "object" &&
+    v !== null &&
+    typeof (v as UploadLike).arrayBuffer === "function" &&
+    typeof (v as UploadLike).size === "number"
+  );
+}
+
 function revalidateAll() {
   revalidatePath("/admin/dashboard");
   revalidatePath("/projects");
@@ -78,7 +94,7 @@ export async function addSource(formData: FormData) {
     }
   } else if (type === "pdf") {
     const file = formData.get("file");
-    if (!(file instanceof File) || file.size === 0) return;
+    if (!isUpload(file) || file.size === 0) return;
     const bytes = Buffer.from(await file.arrayBuffer());
     const src = await prisma.source.create({
       data: { type: "pdf", filename: file.name, status: "pending" },
@@ -162,7 +178,7 @@ export async function addProject(formData: FormData) {
 
   let imageUrl: string | null = null;
   const file = formData.get("image");
-  if (file instanceof File && file.size > 0) {
+  if (isUpload(file) && file.size > 0) {
     imageUrl = `/api/uploads/${await saveUpload(file)}`;
   }
 
@@ -190,7 +206,7 @@ export async function deleteProject(formData: FormData) {
 export async function uploadPhoto(formData: FormData) {
   await requireAuth();
   const file = formData.get("file");
-  if (!(file instanceof File) || file.size === 0) return;
+  if (!isUpload(file) || file.size === 0) return;
 
   const bytes = Buffer.from(await file.arrayBuffer());
   const filename = await saveBytes(bytes, file.type);
