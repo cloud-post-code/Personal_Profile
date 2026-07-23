@@ -4,6 +4,7 @@ import { prisma, getProfile } from "@/lib/db";
 import { safeTags, safeSocials } from "@/lib/knowledge";
 import { safeJson } from "@/lib/util";
 import { FONT_OPTIONS, BODY_FONT_OPTIONS } from "@/lib/fonts";
+import { RADIUS_OPTIONS } from "@/lib/theme";
 import { SocialsEditor } from "../SocialsEditor";
 import {
   logout,
@@ -173,6 +174,16 @@ export default async function Dashboard() {
                 ))}
               </select>
             </div>
+          </div>
+          <div>
+            <Label>Corners (roundness)</Label>
+            <select name="themeRadius" defaultValue={profile.themeRadius} style={field}>
+              {RADIUS_OPTIONS.map((r) => (
+                <option key={r.key} value={r.key}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
             <ColorField name="color_bg" label="Background" value={colors.bg} placeholder="#0B1020" />

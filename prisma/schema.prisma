@@ -113,6 +113,8 @@ model Profile {
   themeBodyFont String @default("inter")
   /// JSON {bg, primary, accent} hex overrides; empty = brand defaults.
   themeColors String @default("{}")
+  /// Corner roundness preset: sharp | rounded | pill.
+  themeRadius String @default("rounded")
 
   updatedAt DateTime @updatedAt
 }

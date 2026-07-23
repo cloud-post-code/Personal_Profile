@@ -110,12 +110,6 @@ export default function Chat({
 
   return (
     <main style={styles.shell}>
-      <div style={styles.topbar}>
-        <a href="/" style={styles.brand}>
-          <span style={styles.dot} /> {name}
-        </a>
-      </div>
-
       {!started ? (
         <section style={styles.hero}>
           <h1 style={styles.h1}>
@@ -124,8 +118,6 @@ export default function Chat({
           </h1>
           <p style={styles.sub}>{tagline}</p>
 
-          <Composer input={input} setInput={setInput} onSend={() => send(input)} loading={loading} big />
-
           <div style={styles.starters}>
             {starters.map((s) => (
               <button key={s.q} style={styles.chip} onClick={() => send(s.q)}>
@@ -133,6 +125,8 @@ export default function Chat({
               </button>
             ))}
           </div>
+
+          <Composer input={input} setInput={setInput} onSend={() => send(input)} loading={loading} big />
           <p style={styles.footnote}>
             This whole site is a conversation. An AI host answers as {name}, using only what
             he&apos;s shared — and can show you cards, projects, and galleries right here.
@@ -242,33 +236,6 @@ function Bubble({
 
 const styles: Record<string, React.CSSProperties> = {
   shell: { minHeight: "100dvh", display: "flex", flexDirection: "column" },
-  topbar: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: "18px 24px",
-    maxWidth: 980,
-    width: "100%",
-    margin: "0 auto",
-  },
-  brand: {
-    fontFamily: "var(--font-heading)",
-    fontWeight: 700,
-    fontSize: 18,
-    color: "var(--text)",
-    textDecoration: "none",
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-  },
-  dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 999,
-    background: "var(--accent)",
-    boxShadow: "0 0 12px var(--accent)",
-    display: "inline-block",
-  },
   hero: {
     flex: 1,
     display: "flex",
@@ -299,7 +266,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: "100%",
     boxShadow: "var(--glow-primary)",
   },
-  composerBig: { maxWidth: 560, marginBottom: 28 },
+  composerBig: { maxWidth: 560, marginTop: 28 },
   input: {
     flex: 1,
     background: "transparent",
@@ -326,6 +293,9 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 999,
     padding: "10px 16px",
     fontSize: 14,
+    width: 340,
+    maxWidth: "100%",
+    textAlign: "center",
   },
   footnote: { color: "var(--text-muted)", fontSize: 13, marginTop: 32, maxWidth: 460 },
 

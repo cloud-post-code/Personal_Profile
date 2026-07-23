@@ -17,6 +17,10 @@ export const metadata: Metadata = {
   description: `Blake's personal website. Chat with an AI host about his projects, background, and recent work.`,
 };
 
+// The <head> theme override is DB-driven and wraps every route, so always
+// render it fresh — a stale layout cache would leave the whole site mis-themed.
+export const dynamic = "force-dynamic";
+
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // Read the admin-controlled theme so the whole site restyles from the DB.
   const profile = await getProfile().catch(() => null);
@@ -27,6 +31,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const override = themeOverrideCss({
     headingFamily: headingFamily(profile?.themeFont ?? "space-grotesk"),
     bodyFamily: bodyFamily(profile?.themeBodyFont ?? "inter"),
+    radius: profile?.themeRadius ?? "rounded",
     colors,
   });
 

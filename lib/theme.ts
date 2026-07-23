@@ -75,6 +75,25 @@ export function themeCssVars(): string {
 }
 
 /**
+ * Corner-roundness presets. Each drives the --radius-* CSS tokens so the whole
+ * site (buttons, cards, inputs) shares one curvature. `pill` stays capped so
+ * cards/inputs don't collapse into lozenges. Shown in the admin "Corners" picker.
+ */
+export const RADIUS_PRESETS = {
+  sharp: { label: "Sharp", sm: "2px", md: "3px", lg: "4px" },
+  rounded: { label: "Rounded (default)", sm: "8px", md: "14px", lg: "22px" },
+  pill: { label: "Pill (extra soft)", sm: "14px", md: "22px", lg: "32px" },
+} as const;
+
+export type RadiusKey = keyof typeof RADIUS_PRESETS;
+
+/** Options for the admin corner-roundness dropdown. */
+export const RADIUS_OPTIONS = (Object.keys(RADIUS_PRESETS) as RadiusKey[]).map((key) => ({
+  key,
+  label: RADIUS_PRESETS[key].label,
+}));
+
+/**
  * Build a CSS-variable override string from admin-chosen theme values, so the
  * live site restyles from the DB. Only overrides what's provided; everything
  * else falls back to globals.css defaults. Colors are validated hex.
@@ -82,6 +101,7 @@ export function themeCssVars(): string {
 export function themeOverrideCss(opts: {
   headingFamily: string;
   bodyFamily: string;
+  radius?: string;
   colors: { bg?: string; primary?: string; accent?: string };
 }): string {
   const hex = (v?: string) => (v && /^#[0-9a-fA-F]{3,8}$/.test(v) ? v : null);
@@ -90,6 +110,14 @@ export function themeOverrideCss(opts: {
   // Fonts always set (from the curated allowlist).
   lines.push(`--font-heading:${opts.headingFamily};`);
   lines.push(`--font-body:${opts.bodyFamily};`);
+
+  // Corner roundness preset (from the curated allowlist; unknown = no override).
+  const preset = RADIUS_PRESETS[opts.radius as RadiusKey];
+  if (preset) {
+    lines.push(`--radius-sm:${preset.sm};`);
+    lines.push(`--radius-md:${preset.md};`);
+    lines.push(`--radius-lg:${preset.lg};`);
+  }
 
   const bg = hex(opts.colors.bg);
   const primary = hex(opts.colors.primary);
@@ -101,9 +129,10 @@ export function themeOverrideCss(opts: {
   }
   if (accent) lines.push(`--accent:${accent};`);
 
-  // `html` selector has higher specificity than :root, so this reliably wins
-  // over globals.css defaults and the next/font variable class.
-  return `html{${lines.join("")}}`;
+  // Repeat :root to raise specificity (0,2,0) above globals.css's single
+  // `:root` (0,1,0), so these DB-backed overrides reliably win regardless of
+  // stylesheet source order. A plain `html` selector (0,0,1) would lose.
+  return `:root:root{${lines.join("")}}`;
 }
 
 /** The starter questions shown as chips under the chat box. No emojis. */
