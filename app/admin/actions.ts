@@ -4,19 +4,25 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma, getProfile } from "@/lib/db";
 import { checkPassword, createSession, destroySession, isAuthed } from "@/lib/auth";
-import { scanLink } from "@/lib/scrape";
-import { saveUpload } from "@/lib/uploads";
+import { extractLink, extractPdf, extractText } from "@/lib/scrape";
+import { saveUpload, saveBytes } from "@/lib/uploads";
+import { describeImage } from "@/lib/vision";
+import path from "node:path";
 
 async function requireAuth() {
   if (!(await isAuthed())) redirect("/admin");
 }
 
+function revalidateAll() {
+  revalidatePath("/admin/dashboard");
+  revalidatePath("/projects");
+  revalidatePath("/");
+}
+
 // ── Auth ──
 export async function login(formData: FormData) {
   const pw = String(formData.get("password") ?? "");
-  if (!checkPassword(pw)) {
-    redirect("/admin?error=1");
-  }
+  if (!checkPassword(pw)) redirect("/admin?error=1");
   await createSession();
   redirect("/admin/dashboard");
 }
@@ -29,7 +35,7 @@ export async function logout() {
 // ── Profile / persona ──
 export async function saveProfile(formData: FormData) {
   await requireAuth();
-  await getProfile(); // ensure row exists
+  await getProfile();
   await prisma.profile.update({
     where: { id: 1 },
     data: {
@@ -42,138 +48,225 @@ export async function saveProfile(formData: FormData) {
       github: String(formData.get("github") ?? ""),
     },
   });
-  revalidatePath("/admin/dashboard");
-  revalidatePath("/");
+  revalidateAll();
 }
 
-// ── Projects ──
+// ── Sources (unified extraction: link / pdf / text) ──
+export async function addSource(formData: FormData) {
+  await requireAuth();
+  const type = String(formData.get("type") ?? "link");
+
+  if (type === "link") {
+    const url = String(formData.get("url") ?? "").trim();
+    if (!url || !/^https?:\/\//i.test(url)) return;
+    const src = await prisma.source.upsert({
+      where: { url },
+      update: { status: "pending", error: null, type: "link" },
+      create: { url, type: "link", status: "pending" },
+    });
+    try {
+      const r = await extractLink(url);
+      await prisma.source.update({
+        where: { id: src.id },
+        data: { ...toData(r), status: "scanned", error: null },
+      });
+    } catch (e) {
+      await prisma.source.update({
+        where: { id: src.id },
+        data: { status: "failed", error: err(e) },
+      });
+    }
+  } else if (type === "pdf") {
+    const file = formData.get("file");
+    if (!(file instanceof File) || file.size === 0) return;
+    const bytes = Buffer.from(await file.arrayBuffer());
+    const src = await prisma.source.create({
+      data: { type: "pdf", filename: file.name, status: "pending" },
+    });
+    try {
+      const r = await extractPdf(bytes, file.name);
+      await prisma.source.update({
+        where: { id: src.id },
+        data: { ...toData(r), status: "scanned", error: null },
+      });
+    } catch (e) {
+      await prisma.source.update({
+        where: { id: src.id },
+        data: { status: "failed", error: err(e) },
+      });
+    }
+  } else if (type === "text") {
+    const text = String(formData.get("text") ?? "").trim();
+    const title = String(formData.get("title") ?? "").trim() || null;
+    if (text.length < 2) return;
+    const src = await prisma.source.create({
+      data: { type: "text", title, status: "pending" },
+    });
+    try {
+      const r = await extractText(text, title);
+      await prisma.source.update({
+        where: { id: src.id },
+        data: { ...toData(r), status: "scanned", error: null },
+      });
+    } catch (e) {
+      await prisma.source.update({
+        where: { id: src.id },
+        data: { status: "failed", error: err(e) },
+      });
+    }
+  }
+  revalidateAll();
+}
+
+export async function rescanSource(formData: FormData) {
+  await requireAuth();
+  const id = String(formData.get("id") ?? "");
+  const src = await prisma.source.findUnique({ where: { id } });
+  if (!src || src.type !== "link" || !src.url) return;
+  try {
+    const r = await extractLink(src.url);
+    await prisma.source.update({
+      where: { id: src.id },
+      data: { ...toData(r), status: "scanned", error: null },
+    });
+  } catch (e) {
+    await prisma.source.update({ where: { id: src.id }, data: { status: "failed", error: err(e) } });
+  }
+  revalidateAll();
+}
+
+export async function updateSourceSummary(formData: FormData) {
+  await requireAuth();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+  await prisma.source.update({
+    where: { id },
+    data: { summary: String(formData.get("summary") ?? ""), status: "scanned" },
+  });
+  revalidateAll();
+}
+
+export async function deleteSource(formData: FormData) {
+  await requireAuth();
+  const id = String(formData.get("id") ?? "");
+  if (id) await prisma.source.delete({ where: { id } }).catch(() => {});
+  revalidateAll();
+}
+
+// ── Projects (github + live links) ──
 export async function addProject(formData: FormData) {
   await requireAuth();
   const name = String(formData.get("name") ?? "").trim();
   const blurb = String(formData.get("blurb") ?? "").trim();
   if (!name || !blurb) return;
+
+  let imageUrl: string | null = null;
+  const file = formData.get("image");
+  if (file instanceof File && file.size > 0) {
+    imageUrl = `/api/uploads/${await saveUpload(file)}`;
+  }
+
   await prisma.project.create({
     data: {
       name,
       blurb,
-      url: String(formData.get("url") ?? "").trim() || null,
+      githubUrl: String(formData.get("githubUrl") ?? "").trim() || null,
+      liveUrl: String(formData.get("liveUrl") ?? "").trim() || null,
+      imageUrl,
       order: Number(formData.get("order") ?? 0) || 0,
     },
   });
-  revalidatePath("/admin/dashboard");
-  revalidatePath("/projects");
+  revalidateAll();
 }
 
 export async function deleteProject(formData: FormData) {
   await requireAuth();
   const id = String(formData.get("id") ?? "");
   if (id) await prisma.project.delete({ where: { id } }).catch(() => {});
-  revalidatePath("/admin/dashboard");
-  revalidatePath("/projects");
+  revalidateAll();
 }
 
-// ── Links (scanned) ──
-export async function addLink(formData: FormData) {
-  await requireAuth();
-  const url = String(formData.get("url") ?? "").trim();
-  if (!url || !/^https?:\/\//i.test(url)) return;
-
-  // Create as pending, then scan. We scan inline so the admin sees the result;
-  // for slow pages this takes a few seconds.
-  const link = await prisma.link.upsert({
-    where: { url },
-    update: { status: "pending", error: null },
-    create: { url, status: "pending" },
-  });
-
-  try {
-    const r = await scanLink(url);
-    await prisma.link.update({
-      where: { id: link.id },
-      data: {
-        title: r.title,
-        rawText: r.rawText,
-        summary: r.summary,
-        tags: JSON.stringify(r.tags),
-        kind: r.kind,
-        imageUrl: r.imageUrl,
-        status: "scanned",
-        error: null,
-      },
-    });
-  } catch (e) {
-    await prisma.link.update({
-      where: { id: link.id },
-      data: { status: "failed", error: e instanceof Error ? e.message : "scan failed" },
-    });
-  }
-
-  revalidatePath("/admin/dashboard");
-  revalidatePath("/projects");
-  revalidatePath("/");
-}
-
-export async function rescanLink(formData: FormData) {
-  await requireAuth();
-  const id = String(formData.get("id") ?? "");
-  const link = await prisma.link.findUnique({ where: { id } });
-  if (!link) return;
-  await addLink(new FormDataFrom({ url: link.url }));
-}
-
-export async function updateLinkSummary(formData: FormData) {
-  await requireAuth();
-  const id = String(formData.get("id") ?? "");
-  if (!id) return;
-  await prisma.link.update({
-    where: { id },
-    data: {
-      summary: String(formData.get("summary") ?? ""),
-      status: "scanned",
-    },
-  });
-  revalidatePath("/admin/dashboard");
-  revalidatePath("/");
-}
-
-export async function deleteLink(formData: FormData) {
-  await requireAuth();
-  const id = String(formData.get("id") ?? "");
-  if (id) await prisma.link.delete({ where: { id } }).catch(() => {});
-  revalidatePath("/admin/dashboard");
-  revalidatePath("/projects");
-  revalidatePath("/");
-}
-
-// ── Photos ──
+// ── Photos (vision auto-caption) ──
 export async function uploadPhoto(formData: FormData) {
   await requireAuth();
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) return;
-  const filename = await saveUpload(file);
+
+  const bytes = Buffer.from(await file.arrayBuffer());
+  const filename = await saveBytes(bytes, file.type);
+
+  // Ask Claude vision for a one-paragraph description (best-effort).
+  const ext = path.extname(filename);
+  const description = await describeImage(bytes, ext);
+
   await prisma.photo.create({
     data: {
       filename,
+      description,
       caption: String(formData.get("caption") ?? ""),
       kind: String(formData.get("kind") ?? "gallery"),
+      order: Number(formData.get("order") ?? 0) || 0,
     },
   });
-  revalidatePath("/admin/dashboard");
-  revalidatePath("/projects");
+  revalidateAll();
+}
+
+export async function updatePhoto(formData: FormData) {
+  await requireAuth();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+  await prisma.photo.update({
+    where: { id },
+    data: {
+      description: String(formData.get("description") ?? ""),
+      caption: String(formData.get("caption") ?? ""),
+    },
+  });
+  revalidateAll();
 }
 
 export async function deletePhoto(formData: FormData) {
   await requireAuth();
   const id = String(formData.get("id") ?? "");
   if (id) await prisma.photo.delete({ where: { id } }).catch(() => {});
-  revalidatePath("/admin/dashboard");
-  revalidatePath("/projects");
+  revalidateAll();
 }
 
-/** Tiny helper to build a FormData from an object (for rescan reuse). */
-class FormDataFrom extends FormData {
-  constructor(obj: Record<string, string>) {
-    super();
-    for (const [k, v] of Object.entries(obj)) this.set(k, v);
-  }
+// ── Contacts (submissions from the in-chat contact form) ──
+export async function toggleContactHandled(formData: FormData) {
+  await requireAuth();
+  const id = String(formData.get("id") ?? "");
+  const handled = String(formData.get("handled") ?? "") === "true";
+  if (id) await prisma.contact.update({ where: { id }, data: { handled: !handled } }).catch(() => {});
+  revalidatePath("/admin/dashboard");
+}
+
+export async function deleteContact(formData: FormData) {
+  await requireAuth();
+  const id = String(formData.get("id") ?? "");
+  if (id) await prisma.contact.delete({ where: { id } }).catch(() => {});
+  revalidatePath("/admin/dashboard");
+}
+
+// ── helpers ──
+function toData(r: {
+  title: string | null;
+  rawText: string;
+  imageUrl: string | null;
+  summary: string;
+  tags: string[];
+  kind: string;
+}) {
+  return {
+    title: r.title,
+    rawText: r.rawText,
+    imageUrl: r.imageUrl,
+    summary: r.summary,
+    tags: JSON.stringify(r.tags),
+    kind: r.kind,
+  };
+}
+
+function err(e: unknown): string {
+  return e instanceof Error ? e.message : "operation failed";
 }

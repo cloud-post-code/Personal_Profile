@@ -2,70 +2,92 @@ import { prisma, getProfile } from "./db";
 
 /**
  * Assembles everything the chatbot knows about Blake into a system prompt:
- * the editable profile/persona, curated projects, and scanned links.
- * The admin controls all of this content, so the bot only speaks from it.
+ * the editable profile/persona, curated projects (with GitHub + live links),
+ * photos, and extracted sources (links/PDFs/notes). The admin controls all of
+ * this content, so the bot only speaks from it.
+ *
+ * The prompt also tells Claude HOW to use the A2UI tools (show_projects,
+ * show_project, show_gallery) so it can render rich cards in chat.
  */
 export async function buildSystemPrompt(): Promise<string> {
-  const [profile, projects, links] = await Promise.all([
+  const [profile, projects, sources, photos] = await Promise.all([
     getProfile(),
     prisma.project.findMany({ orderBy: { order: "asc" } }),
-    prisma.link.findMany({
+    prisma.source.findMany({
       where: { status: "scanned" },
       orderBy: { createdAt: "desc" },
-      take: 40,
+      take: 60,
     }),
+    prisma.photo.findMany({ orderBy: { order: "asc" } }),
   ]);
 
   const projectBlock = projects.length
     ? projects
-        .map(
-          (p) =>
-            `- ${p.name}${p.url ? ` (${p.url})` : ""}: ${p.blurb}`,
-        )
+        .map((p) => {
+          const links = [
+            p.githubUrl ? `GitHub: ${p.githubUrl}` : null,
+            p.liveUrl ? `Live: ${p.liveUrl}` : null,
+          ]
+            .filter(Boolean)
+            .join(" | ");
+          return `- (id:${p.id}) ${p.name}: ${p.blurb}${links ? ` [${links}]` : ""}`;
+        })
         .join("\n")
     : "(No projects added yet.)";
 
-  const linkBlock = links.length
-    ? links
-        .map((l) => {
-          const tags = safeTags(l.tags);
-          return `- [${l.kind}] ${l.title ?? l.url} — ${l.summary}${
+  const sourceBlock = sources.length
+    ? sources
+        .map((s) => {
+          const tags = safeTags(s.tags);
+          const ref = s.url ?? s.filename ?? s.title ?? "(source)";
+          return `- [${s.kind}/${s.type}] ${s.title ?? ref} — ${s.summary}${
             tags.length ? ` (tags: ${tags.join(", ")})` : ""
-          }\n  ${l.url}`;
+          }${s.url ? `\n  ${s.url}` : ""}`;
         })
         .join("\n")
-    : "(No links scanned yet.)";
+    : "(No sources extracted yet.)";
+
+  const photoBlock = photos.length
+    ? `${photos.length} photo(s) available. Use show_gallery to display them.`
+    : "(No photos uploaded yet.)";
 
   return `You are the personal AI host for ${profile.name}'s website. You speak on Blake's behalf to visitors — friendly, curious, and genuine, never corporate. Refer to Blake in the first person ("I", "my") as if you are him, unless a visitor asks something you have no information about.
 
 VOICE & WORLDVIEW:
 ${profile.persona || "Warm, curious, a builder at heart. Enthusiastic about making useful things. Speaks plainly, with a bit of playful energy."}
 
-ABOUT BLAKE:
+ABOUT BLAKE (history & background):
 ${profile.bio || "(Bio not filled in yet — be honest that details are still being added.)"}
 ${profile.tagline ? `Tagline: ${profile.tagline}` : ""}
 
 HOW TO CONNECT:
 ${connectBlock(profile)}
 
-PROJECTS:
+PROJECTS (each has an id, and up to two links — GitHub and Live):
 ${projectBlock}
 
-RECENT LINKS / POSTS (LinkedIn, articles, project pages):
-${linkBlock}
+PHOTOS:
+${photoBlock}
+
+KNOWLEDGE SOURCES (extracted from links, PDFs, and notes — this is where Blake's opinions, history, and detail live):
+${sourceBlock}
+
+USING RICH CARDS (A2UI):
+You have tools that render visual cards in the chat. Prefer them over plain text lists:
+- When asked about projects generally, call show_projects (renders all project cards).
+- When focused on ONE project, call show_project with its id.
+- When asked to see photos / a gallery / pictures, call show_gallery. Choose layout "carousel" for a slideshow feel, or "filmstrip" for a browsable strip with a lightbox.
+- When someone wants to connect, reach out, get in touch, hire, or collaborate, call show_contact_form so they can leave their details — then also mention the direct contact info above.
+Always add a short spoken sentence alongside a card — the card supplements your words, it doesn't replace them.
 
 RULES:
 - Only state facts present above. If you don't know, say so warmly and point them to how they can connect with Blake directly.
-- Keep answers concise and conversational — a few short paragraphs at most.
-- When relevant, share the actual URLs above so visitors can click through.
+- For questions about Blake's history, background, or opinions, synthesize naturally from the ABOUT and KNOWLEDGE SOURCES sections.
+- Keep answers concise and conversational.
 - Never invent projects, jobs, dates, or credentials.`;
 }
 
-function connectBlock(p: {
-  email: string;
-  linkedin: string;
-  github: string;
-}): string {
+function connectBlock(p: { email: string; linkedin: string; github: string }): string {
   const lines: string[] = [];
   if (p.email) lines.push(`Email: ${p.email}`);
   if (p.linkedin) lines.push(`LinkedIn: ${p.linkedin}`);

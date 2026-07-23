@@ -74,11 +74,11 @@ export function themeCssVars(): string {
   `.trim();
 }
 
-/** The 4–5 starter questions shown as chips under the chat box. */
+/** The starter questions shown as chips under the chat box. No emojis. */
 export const starterQuestions = [
-  { q: "What are some of your projects?", icon: "🛠️" },
-  { q: "What's your background and past experience?", icon: "🧭" },
-  { q: "Tell me about yourself and how you see the world.", icon: "🌍" },
-  { q: "How can I connect with you?", icon: "🤝" },
-  { q: "What are your recent LinkedIn posts and projects?", icon: "📡" },
+  { q: "What's your background and past experience?" },
+  { q: "Tell me about yourself and how you see the world." },
+  { q: "How can I connect with you?" },
+  { q: "What are your recent projects?" },
+  { q: "Show me a bit about your life?" },
 ];

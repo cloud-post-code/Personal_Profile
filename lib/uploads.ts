@@ -22,14 +22,19 @@ const EXT: Record<string, string> = {
 };
 
 export async function saveUpload(file: File): Promise<string> {
-  if (!ALLOWED.has(file.type)) {
-    throw new Error(`Unsupported file type: ${file.type}`);
+  const bytes = Buffer.from(await file.arrayBuffer());
+  return saveBytes(bytes, file.type);
+}
+
+/** Save already-read bytes with a known content type. Returns the filename. */
+export async function saveBytes(bytes: Buffer, contentType: string): Promise<string> {
+  if (!ALLOWED.has(contentType)) {
+    throw new Error(`Unsupported file type: ${contentType}`);
   }
   const dir = uploadDir();
   if (!existsSync(dir)) await mkdir(dir, { recursive: true });
 
-  const filename = `${randomUUID()}${EXT[file.type]}`;
-  const bytes = Buffer.from(await file.arrayBuffer());
+  const filename = `${randomUUID()}${EXT[contentType]}`;
   await writeFile(path.join(dir, filename), bytes);
   return filename;
 }

@@ -1,9 +1,26 @@
 "use client";
 
 import { useRef, useState, useEffect } from "react";
+import { Cards, type UiBlock } from "./cards/Cards";
 
-type Msg = { role: "user" | "assistant"; content: string };
-type Starter = { q: string; icon: string };
+type Msg = {
+  role: "user" | "assistant";
+  content: string;
+  cards?: UiBlock[];
+};
+type Starter = { q: string };
+
+/** A couple of short words from a question, for the compact chip row. */
+function shortLabel(q: string): string {
+  const map: Record<string, string> = {
+    "What's your background and past experience?": "Background",
+    "Tell me about yourself and how you see the world.": "About me",
+    "How can I connect with you?": "Connect",
+    "What are your recent projects?": "Projects",
+    "Show me a bit about your life?": "My life",
+  };
+  return map[q] ?? q.split(" ").slice(0, 2).join(" ");
+}
 
 export default function Chat({
   name,
@@ -31,30 +48,49 @@ export default function Chat({
     const next: Msg[] = [...messages, { role: "user", content: q }];
     setMessages(next);
     setLoading(true);
-
-    // Placeholder assistant message we stream tokens into.
-    setMessages((m) => [...m, { role: "assistant", content: "" }]);
+    setMessages((m) => [...m, { role: "assistant", content: "", cards: [] }]);
 
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: next }),
+        body: JSON.stringify({
+          messages: next.map(({ role, content }) => ({ role, content })),
+        }),
       });
       if (!res.ok || !res.body) throw new Error(await res.text());
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
+      let buffer = "";
       let acc = "";
+      const cards: UiBlock[] = [];
+
+      const flush = (chunk: string) => {
+        buffer += chunk;
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const l of lines) {
+          if (!l.trim()) continue;
+          try {
+            const obj = JSON.parse(l);
+            if (obj.t === "text") acc += obj.v;
+            else if (obj.t === "card") cards.push(obj.v);
+          } catch {
+            /* partial line — ignore */
+          }
+        }
+        setMessages((m) => {
+          const copy = [...m];
+          copy[copy.length - 1] = { role: "assistant", content: acc, cards: [...cards] };
+          return copy;
+        });
+      };
+
       for (;;) {
         const { done, value } = await reader.read();
         if (done) break;
-        acc += decoder.decode(value, { stream: true });
-        setMessages((m) => {
-          const copy = [...m];
-          copy[copy.length - 1] = { role: "assistant", content: acc };
-          return copy;
-        });
+        flush(decoder.decode(value, { stream: true }));
       }
     } catch {
       setMessages((m) => {
@@ -63,6 +99,7 @@ export default function Chat({
           role: "assistant",
           content:
             "Hmm, I hit a snag reaching my brain (the API). Try again in a moment — or reach out to Blake directly.",
+          cards: [],
         };
         return copy;
       });
@@ -77,63 +114,49 @@ export default function Chat({
         <a href="/" style={styles.brand}>
           <span style={styles.dot} /> {name}
         </a>
-        <nav style={styles.nav}>
-          <a href="/projects" style={styles.navLink}>
-            Projects
-          </a>
-          <a href="/admin" style={styles.navLink}>
-            Admin
-          </a>
-        </nav>
       </div>
 
       {!started ? (
         <section style={styles.hero}>
-          <div style={styles.badge}>● live · ask me anything</div>
           <h1 style={styles.h1}>
             Hey, I&apos;m {name}.<br />
             <span style={styles.h1accent}>Talk to me.</span>
           </h1>
           <p style={styles.sub}>{tagline}</p>
 
-          <Composer
-            input={input}
-            setInput={setInput}
-            onSend={() => send(input)}
-            loading={loading}
-            big
-          />
+          <Composer input={input} setInput={setInput} onSend={() => send(input)} loading={loading} big />
 
           <div style={styles.starters}>
             {starters.map((s) => (
               <button key={s.q} style={styles.chip} onClick={() => send(s.q)}>
-                <span aria-hidden>{s.icon}</span> {s.q}
+                {s.q}
               </button>
             ))}
           </div>
           <p style={styles.footnote}>
-            This whole site is a conversation. An AI host answers as {name},
-            using only what he&apos;s shared.
+            This whole site is a conversation. An AI host answers as {name}, using only what
+            he&apos;s shared — and can show you cards, projects, and galleries right here.
           </p>
         </section>
       ) : (
         <section style={styles.chatWrap}>
           <div ref={scrollRef} style={styles.thread}>
             {messages.map((m, i) => (
-              <Bubble key={i} role={m.role} content={m.content} loading={loading && i === messages.length - 1} />
+              <Bubble
+                key={i}
+                role={m.role}
+                content={m.content}
+                cards={m.cards}
+                loading={loading && i === messages.length - 1}
+              />
             ))}
           </div>
           <div style={styles.composerDock}>
-            <Composer
-              input={input}
-              setInput={setInput}
-              onSend={() => send(input)}
-              loading={loading}
-            />
+            <Composer input={input} setInput={setInput} onSend={() => send(input)} loading={loading} />
             <div style={styles.startersRow}>
               {starters.slice(0, 5).map((s) => (
-                <button key={s.q} style={styles.chipSmall} onClick={() => send(s.q)}>
-                  {s.icon}
+                <button key={s.q} style={styles.chipSmall} onClick={() => send(s.q)} title={s.q}>
+                  {shortLabel(s.q)}
                 </button>
               ))}
             </div>
@@ -181,26 +204,38 @@ function Composer({
 function Bubble({
   role,
   content,
+  cards,
   loading,
 }: {
   role: "user" | "assistant";
   content: string;
+  cards?: UiBlock[];
   loading: boolean;
 }) {
   const isUser = role === "user";
+  const hasCards = !!cards && cards.length > 0;
   return (
-    <div style={{ ...styles.row, justifyContent: isUser ? "flex-end" : "flex-start" }}>
-      <div style={isUser ? styles.userBubble : styles.botBubble}>
-        {content ? (
-          <span style={{ whiteSpace: "pre-wrap" }}>{content}</span>
-        ) : loading ? (
-          <span style={styles.typing}>
-            <i style={{ ...styles.tdot, animationDelay: "0ms" }} />
-            <i style={{ ...styles.tdot, animationDelay: "150ms" }} />
-            <i style={{ ...styles.tdot, animationDelay: "300ms" }} />
-          </span>
-        ) : null}
-      </div>
+    <div style={{ ...styles.row, flexDirection: "column", alignItems: isUser ? "flex-end" : "flex-start" }}>
+      {(content || !hasCards) && (
+        <div style={isUser ? styles.userBubble : styles.botBubble}>
+          {content ? (
+            <span style={{ whiteSpace: "pre-wrap" }}>{content}</span>
+          ) : loading ? (
+            <span style={styles.typing}>
+              <i style={{ ...styles.tdot, animationDelay: "0ms" }} />
+              <i style={{ ...styles.tdot, animationDelay: "150ms" }} />
+              <i style={{ ...styles.tdot, animationDelay: "300ms" }} />
+            </span>
+          ) : null}
+        </div>
+      )}
+      {hasCards && (
+        <div style={{ width: "100%", marginTop: 8 }}>
+          {cards!.map((c, i) => (
+            <Cards key={i} block={c} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -234,9 +269,6 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: "0 0 12px var(--accent)",
     display: "inline-block",
   },
-  nav: { display: "flex", gap: 18 },
-  navLink: { color: "var(--text-muted)", fontSize: 14 },
-
   hero: {
     flex: 1,
     display: "flex",
@@ -248,16 +280,6 @@ const styles: Record<string, React.CSSProperties> = {
     maxWidth: 720,
     margin: "0 auto",
     width: "100%",
-  },
-  badge: {
-    fontSize: 12,
-    letterSpacing: "0.08em",
-    textTransform: "uppercase",
-    color: "var(--accent)",
-    border: "1px solid var(--border)",
-    borderRadius: 999,
-    padding: "6px 14px",
-    marginBottom: 24,
   },
   h1: { fontSize: "clamp(40px, 8vw, 68px)", lineHeight: 1.02, marginBottom: 16 },
   h1accent: {
@@ -305,7 +327,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "10px 16px",
     fontSize: 14,
   },
-  footnote: { color: "var(--text-muted)", fontSize: 13, marginTop: 32, maxWidth: 440 },
+  footnote: { color: "var(--text-muted)", fontSize: 13, marginTop: 32, maxWidth: 460 },
 
   chatWrap: {
     flex: 1,
@@ -346,13 +368,14 @@ const styles: Record<string, React.CSSProperties> = {
   },
 
   composerDock: { paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 },
-  startersRow: { display: "flex", gap: 8, justifyContent: "center" },
+  startersRow: { display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" },
   chipSmall: {
     background: "var(--bg-soft)",
     border: "1px solid var(--border)",
+    color: "var(--text-muted)",
     borderRadius: 999,
-    padding: "6px 10px",
-    fontSize: 16,
-    lineHeight: 1,
+    padding: "6px 12px",
+    fontSize: 13,
+    lineHeight: 1.2,
   },
 };

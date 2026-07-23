@@ -2,9 +2,11 @@
 CREATE SCHEMA IF NOT EXISTS "public";
 
 -- CreateTable
-CREATE TABLE "Link" (
+CREATE TABLE "Source" (
     "id" TEXT NOT NULL,
-    "url" TEXT NOT NULL,
+    "type" TEXT NOT NULL DEFAULT 'link',
+    "url" TEXT,
+    "filename" TEXT,
     "title" TEXT,
     "rawText" TEXT,
     "summary" TEXT,
@@ -17,15 +19,17 @@ CREATE TABLE "Link" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "Link_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "Source_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "Photo" (
     "id" TEXT NOT NULL,
     "filename" TEXT NOT NULL,
+    "description" TEXT NOT NULL DEFAULT '',
     "caption" TEXT,
     "kind" TEXT NOT NULL DEFAULT 'gallery',
+    "order" INTEGER NOT NULL DEFAULT 0,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Photo_pkey" PRIMARY KEY ("id")
@@ -36,13 +40,27 @@ CREATE TABLE "Project" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "blurb" TEXT NOT NULL,
-    "url" TEXT,
+    "githubUrl" TEXT,
+    "liveUrl" TEXT,
     "imageUrl" TEXT,
+    "tags" TEXT NOT NULL DEFAULT '[]',
     "order" INTEGER NOT NULL DEFAULT 0,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Project_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Contact" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "message" TEXT NOT NULL,
+    "handled" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "Contact_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -61,5 +79,5 @@ CREATE TABLE "Profile" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Link_url_key" ON "Link"("url");
+CREATE UNIQUE INDEX "Source_url_key" ON "Source"("url");
 

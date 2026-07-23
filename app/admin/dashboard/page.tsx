@@ -5,15 +5,18 @@ import { safeTags } from "@/lib/knowledge";
 import {
   logout,
   saveProfile,
+  rescanSource,
+  updateSourceSummary,
+  deleteSource,
   addProject,
   deleteProject,
-  addLink,
-  rescanLink,
-  updateLinkSummary,
-  deleteLink,
   uploadPhoto,
+  updatePhoto,
   deletePhoto,
+  toggleContactHandled,
+  deleteContact,
 } from "../actions";
+import { Extractor } from "../Extractor";
 import { panel, field, btn, btnGhost, btnDanger, SectionTitle, Label } from "../ui";
 
 export const dynamic = "force-dynamic";
@@ -21,21 +24,21 @@ export const dynamic = "force-dynamic";
 export default async function Dashboard() {
   if (!(await isAuthed())) redirect("/admin");
 
-  const [profile, projects, links, photos] = await Promise.all([
+  const [profile, projects, sources, photos, contacts] = await Promise.all([
     getProfile(),
     prisma.project.findMany({ orderBy: { order: "asc" } }),
-    prisma.link.findMany({ orderBy: { createdAt: "desc" } }),
-    prisma.photo.findMany({ orderBy: { createdAt: "desc" } }),
+    prisma.source.findMany({ orderBy: { createdAt: "desc" } }),
+    prisma.photo.findMany({ orderBy: { order: "asc" } }),
+    prisma.contact.findMany({ orderBy: { createdAt: "desc" } }),
   ]);
+  const unhandled = contacts.filter((c) => !c.handled).length;
 
   return (
     <main style={{ maxWidth: 820, margin: "0 auto", padding: "24px 20px 80px" }}>
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 28 }}>
         <div>
           <h1 style={{ fontSize: 26 }}>Control room</h1>
-          <p style={{ color: "var(--text-muted)", fontSize: 14 }}>
-            Everything here feeds the chatbot & site.
-          </p>
+          <p style={{ color: "var(--text-muted)", fontSize: 14 }}>Everything here feeds the chatbot & site.</p>
         </div>
         <div style={{ display: "flex", gap: 10 }}>
           <a href="/" style={btnGhost as React.CSSProperties}>
@@ -46,6 +49,53 @@ export default async function Dashboard() {
           </form>
         </div>
       </header>
+
+      {/* ── CONTACT SUBMISSIONS ── */}
+      <section style={panel}>
+        <SectionTitle>
+          Contact submissions{unhandled > 0 ? ` · ${unhandled} new` : ""}
+        </SectionTitle>
+        {contacts.length === 0 && <Empty>No submissions yet. They arrive via the in-chat contact form.</Empty>}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {contacts.map((c) => (
+            <div
+              key={c.id}
+              style={{
+                border: `1px solid ${c.handled ? "var(--border)" : "var(--primary)"}`,
+                borderRadius: 10,
+                padding: 14,
+                opacity: c.handled ? 0.6 : 1,
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start" }}>
+                <div style={{ minWidth: 0 }}>
+                  <strong style={{ fontSize: 14 }}>{c.name}</strong>{" "}
+                  <a href={`mailto:${c.email}`} style={{ fontSize: 13 }}>
+                    {c.email}
+                  </a>
+                  <p style={{ color: "var(--text)", fontSize: 14, marginTop: 6, whiteSpace: "pre-wrap" }}>{c.message}</p>
+                  <span style={{ color: "var(--text-muted)", fontSize: 11 }}>
+                    {c.createdAt.toISOString().slice(0, 16).replace("T", " ")} UTC
+                  </span>
+                </div>
+                <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                  <form action={toggleContactHandled}>
+                    <input type="hidden" name="id" value={c.id} />
+                    <input type="hidden" name="handled" value={String(c.handled)} />
+                    <button style={btnGhost as React.CSSProperties}>
+                      {c.handled ? "Reopen" : "Mark handled"}
+                    </button>
+                  </form>
+                  <form action={deleteContact}>
+                    <input type="hidden" name="id" value={c.id} />
+                    <button style={btnDanger as React.CSSProperties}>Delete</button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* ── PROFILE / PERSONA ── */}
       <section style={panel}>
@@ -61,9 +111,9 @@ export default async function Dashboard() {
               <input name="tagline" defaultValue={profile.tagline} style={field} />
             </div>
           </div>
-          <Label>Bio (facts the bot can state about you)</Label>
+          <Label>Bio / history (facts the bot can state about you)</Label>
           <textarea name="bio" defaultValue={profile.bio} rows={4} style={{ ...field, resize: "vertical" }} />
-          <Label>Persona (how the bot should talk — voice, worldview)</Label>
+          <Label>Persona (how the bot should talk — voice, worldview, opinions)</Label>
           <textarea name="persona" defaultValue={profile.persona} rows={3} style={{ ...field, resize: "vertical" }} />
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
             <div>
@@ -83,86 +133,84 @@ export default async function Dashboard() {
         </form>
       </section>
 
-      {/* ── LINKS ── */}
+      {/* ── EXTRACTION INGEST ── */}
       <section style={panel}>
-        <SectionTitle>Links — scanned & summarized by Claude</SectionTitle>
-        <form action={addLink} style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-          <input
-            name="url"
-            placeholder="https://linkedin.com/posts/…  or any URL"
-            style={{ ...field, marginBottom: 0, flex: 1 }}
-          />
-          <button style={btn}>Scan link</button>
-        </form>
-        <p style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 16 }}>
-          Fetches the page, extracts text, and asks Claude for a summary + tags. LinkedIn often
-          blocks bots — if a scan is thin, edit the summary manually below.
-        </p>
+        <SectionTitle>Add knowledge — link, PDF, or text</SectionTitle>
+        <Extractor />
 
-        {links.length === 0 && <Empty>No links yet.</Empty>}
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {links.map((l) => (
-            <div key={l.id} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 14 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start" }}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 4 }}>
-                    <StatusPill status={l.status} />
-                    <strong style={{ fontSize: 14 }}>{l.title || l.url}</strong>
+        {sources.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 18 }}>
+            {sources.map((s) => (
+              <div key={s.id} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 14 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start" }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 4, flexWrap: "wrap" }}>
+                      <TypePill t={s.type} />
+                      <StatusPill status={s.status} />
+                      <strong style={{ fontSize: 14 }}>{s.title || s.filename || s.url || "(untitled)"}</strong>
+                    </div>
+                    {s.url && (
+                      <a href={s.url} target="_blank" rel="noreferrer" style={{ fontSize: 12, wordBreak: "break-all" }}>
+                        {s.url}
+                      </a>
+                    )}
                   </div>
-                  <a href={l.url} target="_blank" rel="noreferrer" style={{ fontSize: 12, wordBreak: "break-all" }}>
-                    {l.url}
-                  </a>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    {s.type === "link" && (
+                      <form action={rescanSource}>
+                        <input type="hidden" name="id" value={s.id} />
+                        <button style={btnGhost as React.CSSProperties}>Rescan</button>
+                      </form>
+                    )}
+                    <form action={deleteSource}>
+                      <input type="hidden" name="id" value={s.id} />
+                      <button style={btnDanger as React.CSSProperties}>Delete</button>
+                    </form>
+                  </div>
                 </div>
-                <div style={{ display: "flex", gap: 6 }}>
-                  <form action={rescanLink}>
-                    <input type="hidden" name="id" value={l.id} />
-                    <button style={btnGhost as React.CSSProperties}>Rescan</button>
-                  </form>
-                  <form action={deleteLink}>
-                    <input type="hidden" name="id" value={l.id} />
-                    <button style={btnDanger as React.CSSProperties}>Delete</button>
-                  </form>
-                </div>
+                {s.error && <p style={{ color: "var(--danger)", fontSize: 12, marginTop: 6 }}>{s.error}</p>}
+                <form action={updateSourceSummary} style={{ marginTop: 10 }}>
+                  <input type="hidden" name="id" value={s.id} />
+                  <textarea
+                    name="summary"
+                    defaultValue={s.summary ?? ""}
+                    rows={2}
+                    placeholder="Summary the chatbot will use…"
+                    style={{ ...field, marginBottom: 8, resize: "vertical" }}
+                  />
+                  {safeTags(s.tags).length > 0 && (
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+                      {safeTags(s.tags).map((t) => (
+                        <span key={t} style={{ fontSize: 11, color: "var(--primary-soft)" }}>
+                          #{t}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <button style={btnGhost as React.CSSProperties}>Save summary</button>
+                </form>
               </div>
-              {l.error && <p style={{ color: "var(--danger)", fontSize: 12, marginTop: 6 }}>{l.error}</p>}
-              <form action={updateLinkSummary} style={{ marginTop: 10 }}>
-                <input type="hidden" name="id" value={l.id} />
-                <textarea
-                  name="summary"
-                  defaultValue={l.summary ?? ""}
-                  rows={2}
-                  placeholder="Summary the chatbot will use…"
-                  style={{ ...field, marginBottom: 8, resize: "vertical" }}
-                />
-                {safeTags(l.tags).length > 0 && (
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
-                    {safeTags(l.tags).map((t) => (
-                      <span key={t} style={{ fontSize: 11, color: "var(--primary-soft)" }}>
-                        #{t}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                <button style={btnGhost as React.CSSProperties}>Save summary</button>
-              </form>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* ── PROJECTS ── */}
       <section style={panel}>
-        <SectionTitle>Projects</SectionTitle>
+        <SectionTitle>Projects (GitHub + Live links)</SectionTitle>
         <form action={addProject}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             <input name="name" placeholder="Project name" style={field} />
-            <input name="url" placeholder="URL (optional)" style={field} />
+            <input name="order" type="number" placeholder="Order (0 = first)" style={field} />
           </div>
           <textarea name="blurb" placeholder="Short description" rows={2} style={{ ...field, resize: "vertical" }} />
-          <input name="order" type="number" placeholder="Order (0 = first)" style={{ ...field, maxWidth: 160 }} />
-          <div>
-            <button style={btn}>Add project</button>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <input name="githubUrl" placeholder="GitHub URL (optional)" style={field} />
+            <input name="liveUrl" placeholder="Live URL (optional)" style={field} />
           </div>
+          <Label>Cover image (optional)</Label>
+          <input type="file" name="image" accept="image/*" style={field} />
+          <button style={btn}>Add project</button>
         </form>
         <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
           {projects.length === 0 && <Empty>No projects yet.</Empty>}
@@ -176,11 +224,24 @@ export default async function Dashboard() {
                 border: "1px solid var(--border)",
                 borderRadius: 10,
                 padding: "10px 14px",
+                gap: 10,
               }}
             >
-              <div>
+              <div style={{ minWidth: 0 }}>
                 <strong style={{ fontSize: 14 }}>{p.name}</strong>
                 <p style={{ color: "var(--text-muted)", fontSize: 13 }}>{p.blurb}</p>
+                <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
+                  {p.githubUrl && (
+                    <a href={p.githubUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>
+                      GitHub
+                    </a>
+                  )}
+                  {p.liveUrl && (
+                    <a href={p.liveUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>
+                      Live
+                    </a>
+                  )}
+                </div>
               </div>
               <form action={deleteProject}>
                 <input type="hidden" name="id" value={p.id} />
@@ -193,10 +254,10 @@ export default async function Dashboard() {
 
       {/* ── PHOTOS ── */}
       <section style={panel}>
-        <SectionTitle>Photos</SectionTitle>
+        <SectionTitle>Photos (auto-described by Claude vision)</SectionTitle>
         <form action={uploadPhoto} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
           <input type="file" name="file" accept="image/*" required style={{ ...field, marginBottom: 0, maxWidth: 260 }} />
-          <input name="caption" placeholder="Caption (optional)" style={{ ...field, marginBottom: 0, flex: 1 }} />
+          <input name="caption" placeholder="Short caption (optional)" style={{ ...field, marginBottom: 0, flex: 1 }} />
           <select name="kind" style={{ ...field, marginBottom: 0, maxWidth: 140 }}>
             <option value="gallery">Gallery</option>
             <option value="project">Project</option>
@@ -204,34 +265,39 @@ export default async function Dashboard() {
           </select>
           <button style={btn}>Upload</button>
         </form>
-        <div
-          style={{
-            marginTop: 16,
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
-            gap: 10,
-          }}
-        >
+        <p style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 8 }}>
+          On upload, Claude vision writes a one-paragraph description — edit it below.
+        </p>
+
+        <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12 }}>
           {photos.length === 0 && <Empty>No photos yet.</Empty>}
           {photos.map((ph) => (
-            <div key={ph.id} style={{ position: "relative" }}>
+            <div key={ph.id} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 10 }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={`/api/uploads/${ph.filename}`}
-                alt={ph.caption || "photo"}
-                style={{ width: "100%", borderRadius: 10, border: "1px solid var(--border)", display: "block" }}
+                alt={ph.description || "photo"}
+                style={{ width: "100%", borderRadius: 8, display: "block", marginBottom: 8 }}
               />
-              <form action={deletePhoto} style={{ position: "absolute", top: 6, right: 6 }}>
+              <form action={updatePhoto}>
                 <input type="hidden" name="id" value={ph.id} />
-                <button
-                  style={{
-                    ...btnDanger,
-                    padding: "2px 8px",
-                    background: "rgba(11,16,32,0.8)",
-                  } as React.CSSProperties}
-                >
-                  ✕
-                </button>
+                <textarea
+                  name="description"
+                  defaultValue={ph.description}
+                  rows={3}
+                  placeholder="One-paragraph description…"
+                  style={{ ...field, marginBottom: 6, fontSize: 13, resize: "vertical" }}
+                />
+                <input
+                  name="caption"
+                  defaultValue={ph.caption ?? ""}
+                  placeholder="Caption"
+                  style={{ ...field, marginBottom: 8, fontSize: 13 }}
+                />
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button style={btnGhost as React.CSSProperties}>Save</button>
+                  <FormDelete id={ph.id} />
+                </div>
               </form>
             </div>
           ))}
@@ -241,8 +307,26 @@ export default async function Dashboard() {
   );
 }
 
+function FormDelete({ id }: { id: string }) {
+  return (
+    <form action={deletePhoto}>
+      <input type="hidden" name="id" value={id} />
+      <button style={btnDanger as React.CSSProperties}>Delete</button>
+    </form>
+  );
+}
+
 function Empty({ children }: { children: React.ReactNode }) {
   return <p style={{ color: "var(--text-muted)", fontSize: 14 }}>{children}</p>;
+}
+
+function TypePill({ t }: { t: string }) {
+  const icon = t === "pdf" ? "📄" : t === "text" ? "✍️" : "🔗";
+  return (
+    <span style={{ fontSize: 11, color: "var(--text-muted)", border: "1px solid var(--border)", borderRadius: 999, padding: "1px 7px" }}>
+      {icon} {t}
+    </span>
+  );
 }
 
 function StatusPill({ status }: { status: string }) {

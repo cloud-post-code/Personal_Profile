@@ -1,6 +1,7 @@
 // Prisma schema for Blake's personal site.
-// Production/Railway: Postgres. For quick local dev without Postgres you can
-// switch provider to "sqlite" and DATABASE_URL to "file:./dev.db".
+// Production/Railway: Postgres. This file is currently in SQLite mode for local
+// dev. At push/deploy time, run `node scripts/use-postgres.mjs` to switch the
+// provider to "postgresql" and re-add long-text annotations.
 
 generator client {
   provider = "prisma-client-js"
@@ -11,49 +12,71 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// A scanned external link (LinkedIn post, project page, article...).
-/// The admin adds a URL; we fetch it, extract content, and Claude summarizes it.
-model Link {
+/// A unit of knowledge the chatbot can cite. Created from the unified
+/// "extraction" ingest: a URL, an uploaded PDF, or pasted text/markdown.
+model Source {
   id        String   @id @default(cuid())
-  url       String   @unique
+  /// link | pdf | text
+  type      String   @default("link")
+  /// For link sources; unique so re-adding the same URL updates it.
+  url       String?  @unique
+  /// Original filename for pdf/uploaded sources.
+  filename  String?
   title     String?
-  /// Cleaned main text extracted from the page.
-  rawText   String?  @db.Text
+  /// Cleaned full text extracted from the source.
+  rawText   String? @db.Text
   /// Claude-generated summary used as chatbot knowledge.
-  summary   String?  @db.Text
-  /// Comma-free JSON array of tags, stored as string.
+  summary   String? @db.Text
+  /// JSON array of tags, stored as a string.
   tags      String   @default("[]")
-  /// linkedin | project | article | other
+  /// linkedin | project | article | resume | note | other — content category.
   kind      String   @default("other")
   imageUrl  String?
   status    String   @default("pending") // pending | scanned | failed
-  error     String?  @db.Text
+  error     String?
   featured  Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
-/// An uploaded photo (project shots, headshots, etc.).
+/// An uploaded photo. On upload we ask Claude vision for a one-paragraph
+/// description; it's editable afterward. Exposed individually or in galleries.
 model Photo {
-  id        String   @id @default(cuid())
+  id          String   @id @default(cuid())
   /// Stored filename on the upload volume.
-  filename  String
-  caption   String?
-  /// project | profile | gallery
-  kind      String   @default("gallery")
-  createdAt DateTime @default(now())
+  filename    String
+  /// One-paragraph AI (or manual) description.
+  description String   @default("") @db.Text
+  caption     String?
+  /// gallery | project | profile
+  kind        String   @default("gallery")
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
 }
 
-/// A manually-curated project entry shown by the chatbot / projects view.
+/// A curated project. Each has up to two links: a GitHub repo and a live URL.
 model Project {
   id          String   @id @default(cuid())
   name        String
-  blurb       String   @db.Text
-  url         String?
+  blurb       String @db.Text
+  githubUrl   String?
+  liveUrl     String?
   imageUrl    String?
+  /// JSON array of tags, stored as a string.
+  tags        String   @default("[]")
   order       Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+/// A contact submission captured by the in-chat A2UI contact form.
+model Contact {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  message   String @db.Text
+  handled   Boolean  @default(false)
+  createdAt DateTime @default(now())
 }
 
 /// Free-form "about me" knowledge the chatbot can draw on.
