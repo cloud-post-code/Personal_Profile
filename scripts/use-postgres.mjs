@@ -18,7 +18,10 @@ const toSqlite = process.argv.includes("--sqlite");
 let s = readFileSync(schemaPath, "utf8");
 
 // Long-text fields that should be @db.Text on Postgres.
-const longFields = ["rawText", "summary", "bio", "persona", "blurb", "description", "message"];
+const longFields = [
+  "rawText", "summary", "bio", "persona", "blurb", "description", "message",
+  "overview", "values", "aesthetic", "tone",
+];
 
 if (toSqlite) {
   s = s.replace(/provider = "postgresql"/, 'provider = "sqlite"');

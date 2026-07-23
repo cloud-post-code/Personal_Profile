@@ -55,10 +55,14 @@ export async function buildSystemPrompt(): Promise<string> {
 
 VOICE & WORLDVIEW:
 ${profile.persona || "Warm, curious, a builder at heart. Enthusiastic about making useful things. Speaks plainly, with a bit of playful energy."}
+${profile.tone ? `Tone: ${profile.tone}` : ""}
 
 ABOUT BLAKE (history & background):
 ${profile.bio || "(Bio not filled in yet — be honest that details are still being added.)"}
 ${profile.tagline ? `Tagline: ${profile.tagline}` : ""}
+${profile.overview ? `Overview: ${profile.overview}` : ""}
+${profile.values ? `Values: ${profile.values}` : ""}
+${profile.location ? `Based in: ${profile.location}` : ""}
 
 HOW TO CONNECT:
 ${connectBlock(profile)}
@@ -87,12 +91,29 @@ RULES:
 - Never invent projects, jobs, dates, or credentials.`;
 }
 
-function connectBlock(p: { email: string; linkedin: string; github: string }): string {
+function connectBlock(p: {
+  email: string;
+  linkedin: string;
+  github: string;
+  socials: string;
+}): string {
   const lines: string[] = [];
   if (p.email) lines.push(`Email: ${p.email}`);
   if (p.linkedin) lines.push(`LinkedIn: ${p.linkedin}`);
   if (p.github) lines.push(`GitHub: ${p.github}`);
+  for (const s of safeSocials(p.socials)) lines.push(`${s.label}: ${s.url}`);
   return lines.length ? lines.join("\n") : "(No contact info added yet.)";
+}
+
+export function safeSocials(raw: string): { label: string; url: string }[] {
+  try {
+    const v = JSON.parse(raw);
+    return Array.isArray(v)
+      ? v.filter((x) => x && x.label && x.url).map((x) => ({ label: String(x.label), url: String(x.url) }))
+      : [];
+  } catch {
+    return [];
+  }
 }
 
 export function safeTags(raw: string): string[] {

@@ -12,7 +12,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma, getProfile } from "@/lib/db";
 import { checkPassword, createSession, destroySession, isAuthed } from "@/lib/auth";
-import { extractLink, extractPdf, extractText } from "@/lib/scrape";
+import { extractLink, extractPdf, extractText, writeBioFromText } from "@/lib/scrape";
 import { saveUpload, saveBytes } from "@/lib/uploads";
 import { describeImage } from "@/lib/vision";
 import path from "node:path";
@@ -56,21 +56,95 @@ export async function logout() {
   redirect("/admin");
 }
 
-// ── Profile / persona ──
-export async function saveProfile(formData: FormData) {
+// ── Details (identity + contact + socials) ──
+export async function saveDetails(formData: FormData) {
   await requireAuth();
   await getProfile();
+
+  // Socials arrive as parallel label[]/url[] arrays; zip into JSON.
+  const labels = formData.getAll("social_label").map(String);
+  const urls = formData.getAll("social_url").map(String);
+  const socials = labels
+    .map((label, i) => ({ label: label.trim(), url: (urls[i] ?? "").trim() }))
+    .filter((s) => s.label && s.url);
+
   await prisma.profile.update({
     where: { id: 1 },
     data: {
       name: String(formData.get("name") ?? "Blake"),
-      tagline: String(formData.get("tagline") ?? ""),
-      bio: String(formData.get("bio") ?? ""),
-      persona: String(formData.get("persona") ?? ""),
+      location: String(formData.get("location") ?? ""),
       email: String(formData.get("email") ?? ""),
       linkedin: String(formData.get("linkedin") ?? ""),
       github: String(formData.get("github") ?? ""),
+      socials: JSON.stringify(socials),
     },
+  });
+  revalidateAll();
+}
+
+// ── Bio (manual text) ──
+export async function saveBio(formData: FormData) {
+  await requireAuth();
+  await getProfile();
+  await prisma.profile.update({
+    where: { id: 1 },
+    data: { bio: String(formData.get("bio") ?? "") },
+  });
+  revalidateAll();
+}
+
+/** Bio via file upload: CSV or text/markdown -> Claude writes a bio. */
+export async function uploadBioFile(formData: FormData) {
+  await requireAuth();
+  const file = formData.get("file");
+  if (!isUpload(file) || file.size === 0) return;
+  // Read the file as text (works for csv, txt, md).
+  const text = await file.text();
+  const bio = await writeBioFromText(text);
+  if (bio) {
+    await getProfile();
+    await prisma.profile.update({ where: { id: 1 }, data: { bio } });
+  }
+  revalidateAll();
+}
+
+// ── Persona & brand/theme ──
+export async function savePersona(formData: FormData) {
+  await requireAuth();
+  await getProfile();
+
+  const colors = {
+    bg: String(formData.get("color_bg") ?? "").trim(),
+    primary: String(formData.get("color_primary") ?? "").trim(),
+    accent: String(formData.get("color_accent") ?? "").trim(),
+  };
+
+  await prisma.profile.update({
+    where: { id: 1 },
+    data: {
+      tagline: String(formData.get("tagline") ?? ""),
+      persona: String(formData.get("persona") ?? ""),
+      overview: String(formData.get("overview") ?? ""),
+      values: String(formData.get("values") ?? ""),
+      aesthetic: String(formData.get("aesthetic") ?? ""),
+      tone: String(formData.get("tone") ?? ""),
+      themeFont: String(formData.get("themeFont") ?? "space-grotesk"),
+      themeColors: JSON.stringify(colors),
+    },
+  });
+  revalidateAll();
+}
+
+/** Headshot image upload. */
+export async function uploadHeadshot(formData: FormData) {
+  await requireAuth();
+  const file = formData.get("file");
+  if (!isUpload(file) || file.size === 0) return;
+  const filename = await saveUpload(file);
+  await getProfile();
+  await prisma.profile.update({
+    where: { id: 1 },
+    data: { headshot: `/api/uploads/${filename}` },
   });
   revalidateAll();
 }
@@ -181,8 +255,28 @@ export async function deleteSource(formData: FormData) {
 export async function addProject(formData: FormData) {
   await requireAuth();
   const name = String(formData.get("name") ?? "").trim();
-  const blurb = String(formData.get("blurb") ?? "").trim();
-  if (!name || !blurb) return;
+  let blurb = String(formData.get("blurb") ?? "").trim();
+  const githubUrl = String(formData.get("githubUrl") ?? "").trim() || null;
+  const liveUrl = String(formData.get("liveUrl") ?? "").trim() || null;
+  if (!name) return;
+
+  // Auto-generate the short description from the GitHub/Live URL when the
+  // admin left it blank. Scrape the page + summarize into one line.
+  if (!blurb) {
+    const src = liveUrl || githubUrl;
+    if (src) {
+      try {
+        const r = await extractLink(src);
+        blurb =
+          (r.summary || "").split(/(?<=\.)\s/)[0]?.slice(0, 200).trim() ||
+          `${name} — see the link.`;
+      } catch {
+        blurb = `${name} — see the link.`;
+      }
+    } else {
+      blurb = name;
+    }
+  }
 
   let imageUrl: string | null = null;
   const file = formData.get("image");
@@ -194,8 +288,8 @@ export async function addProject(formData: FormData) {
     data: {
       name,
       blurb,
-      githubUrl: String(formData.get("githubUrl") ?? "").trim() || null,
-      liveUrl: String(formData.get("liveUrl") ?? "").trim() || null,
+      githubUrl,
+      liveUrl,
       imageUrl,
       order: Number(formData.get("order") ?? 0) || 0,
     },

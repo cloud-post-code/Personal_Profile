@@ -155,6 +155,32 @@ export async function extractPdf(
   return { title, rawText: text, imageUrl: null, summary, tags, kind: "resume" };
 }
 
+/**
+ * Turn uploaded raw material (CSV rows, a text/markdown dump) into a polished
+ * first-person bio for the site. Used by the Bio section's file upload.
+ */
+export async function writeBioFromText(raw: string): Promise<string> {
+  const clean = raw.replace(/\r/g, "").trim().slice(0, 12000);
+  if (clean.length < 10) return "";
+
+  const prompt =
+    `The following is raw material about Blake (it may be CSV rows, notes, or ` +
+    `a resume dump). Write a warm, first-person bio for his personal website — ` +
+    `2 short paragraphs, natural and specific, no buzzwords, only using facts ` +
+    `present in the material. Return ONLY the bio prose, no preamble.\n\n${clean}`;
+
+  const msg = await claude().messages.create({
+    model: claudeModel(),
+    max_tokens: 600,
+    messages: [{ role: "user", content: prompt }],
+  });
+  return msg.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join("")
+    .trim();
+}
+
 /** Extract a pasted text / markdown source. */
 export async function extractText(
   text: string,

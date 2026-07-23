@@ -74,6 +74,36 @@ export function themeCssVars(): string {
   `.trim();
 }
 
+/**
+ * Build a CSS-variable override string from admin-chosen theme values, so the
+ * live site restyles from the DB. Only overrides what's provided; everything
+ * else falls back to globals.css defaults. Colors are validated hex.
+ */
+export function themeOverrideCss(opts: {
+  headingFamily: string;
+  colors: { bg?: string; primary?: string; accent?: string };
+}): string {
+  const hex = (v?: string) => (v && /^#[0-9a-fA-F]{3,8}$/.test(v) ? v : null);
+  const lines: string[] = [];
+
+  // Heading font always set (from the curated allowlist).
+  lines.push(`--font-heading:${opts.headingFamily};`);
+
+  const bg = hex(opts.colors.bg);
+  const primary = hex(opts.colors.primary);
+  const accent = hex(opts.colors.accent);
+  if (bg) lines.push(`--bg:${bg};`);
+  if (primary) {
+    lines.push(`--primary:${primary};`);
+    lines.push(`--primary-soft:${primary};`);
+  }
+  if (accent) lines.push(`--accent:${accent};`);
+
+  // `html` selector has higher specificity than :root, so this reliably wins
+  // over globals.css defaults and the next/font variable class.
+  return `html{${lines.join("")}}`;
+}
+
 /** The starter questions shown as chips under the chat box. No emojis. */
 export const starterQuestions = [
   { q: "What's your background and past experience?" },

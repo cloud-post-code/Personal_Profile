@@ -79,17 +79,38 @@ model Contact {
   createdAt DateTime @default(now())
 }
 
-/// Free-form "about me" knowledge the chatbot can draw on.
-/// Editable in the admin so Blake can shape how the bot talks about him.
+/// The single editable profile: identity, bio, persona, brand/theme, contact.
+/// Everything the chatbot knows about Blake plus what drives the site's look.
 model Profile {
   id        Int      @id @default(1)
+
+  // ── Details ──
   name      String   @default("Blake")
-  tagline   String   @default("")
-  bio       String   @default("") @db.Text
-  /// How the bot should talk about him — voice, worldview, what to emphasize.
-  persona   String   @default("") @db.Text
-  linkedin  String   @default("")
+  location  String   @default("")
+  /// JSON array of {label, url} social links.
+  socials   String   @default("[]")
   email     String   @default("")
+  linkedin  String   @default("")
   github    String   @default("")
+
+  // ── Bio (fillable via file upload: CSV / text) ──
+  bio       String   @default("") @db.Text
+
+  // ── Persona & brand ──
+  tagline   String   @default("")
+  /// How the bot should talk — voice, worldview, opinions.
+  persona   String   @default("") @db.Text
+  overview  String   @default("") @db.Text
+  values    String   @default("") @db.Text
+  aesthetic String   @default("") @db.Text
+  tone      String   @default("") @db.Text
+  headshot  String?  // /api/uploads/<file>
+
+  // ── Theme (drives the live site's CSS variables) ──
+  /// One of the curated font keys (see lib/fonts).
+  themeFont String   @default("space-grotesk")
+  /// JSON {bg, primary, accent} hex overrides; empty = brand defaults.
+  themeColors String @default("{}")
+
   updatedAt DateTime @updatedAt
 }
