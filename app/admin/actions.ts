@@ -12,8 +12,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma, getProfile } from "@/lib/db";
 import { checkPassword, createSession, destroySession, isAuthed } from "@/lib/auth";
-import { extractLink, extractDocument, extractText, fileToText } from "@/lib/scrape";
-import { safeExperience } from "@/lib/knowledge";
+import { extractLink, extractDocument, extractText, fileToText, writeProfileFromResume } from "@/lib/scrape";
+import { safeExperience, safeSocials } from "@/lib/knowledge";
 import { saveUpload, saveBytes } from "@/lib/uploads";
 import { describeImage } from "@/lib/vision";
 import path from "node:path";
@@ -132,9 +132,23 @@ export async function saveExperience(formData: FormData) {
   revalidateAll();
 }
 
+// ── Other (education / skills / awards — everything else) ──
+export async function saveOther(formData: FormData) {
+  await requireAuth();
+  await getProfile();
+  await prisma.profile.update({
+    where: { id: 1 },
+    data: { other: String(formData.get("other") ?? "") },
+  });
+  revalidateAll();
+}
+
 /**
- * Resume upload: extract the file's raw text (PDF/DOCX/CSV/text) and place it
- * straight into the Bio — no AI. The admin edits it there afterward.
+ * Resume upload: Claude parses the file and splits it into every Profile
+ * destination — bio, experience cards, an "everything else" block, plus
+ * name/location/email/socials. Only fills fields the resume actually contains;
+ * never overwrites existing values with blanks. Socials are merged (deduped by
+ * url) with any already saved.
  */
 export async function uploadResume(formData: FormData) {
   await requireAuth();
@@ -142,9 +156,27 @@ export async function uploadResume(formData: FormData) {
   if (!isUpload(file) || file.size === 0) return;
   const bytes = Buffer.from(await file.arrayBuffer());
   const { text } = await fileToText(bytes, file.name);
-  if (text.trim()) {
-    await getProfile();
-    await prisma.profile.update({ where: { id: 1 }, data: { bio: text.trim() } });
+  const parsed = await writeProfileFromResume(text);
+
+  const profile = await getProfile();
+  const data: Record<string, string> = {};
+  if (parsed.bio) data.bio = parsed.bio;
+  if (parsed.experience.length) data.experience = JSON.stringify(parsed.experience);
+  if (parsed.other) data.other = parsed.other;
+  if (parsed.name) data.name = parsed.name;
+  if (parsed.location) data.location = parsed.location;
+  if (parsed.email) data.email = parsed.email;
+
+  // Merge socials with existing (keep existing; add new urls not already there).
+  if (parsed.socials.length) {
+    const existing = safeSocials(profile.socials);
+    const seen = new Set(existing.map((s) => s.url));
+    const merged = [...existing, ...parsed.socials.filter((s) => !seen.has(s.url))];
+    data.socials = JSON.stringify(merged);
+  }
+
+  if (Object.keys(data).length) {
+    await prisma.profile.update({ where: { id: 1 }, data });
   }
   revalidateAll();
 }

@@ -227,6 +227,97 @@ export async function extractPdf(bytes: Buffer, filename: string): Promise<Extra
   return extractDocument(bytes, filename);
 }
 
+export type ResumeParse = {
+  bio: string;
+  experience: { role: string; company: string; dates: string; description: string }[];
+  other: string;
+  name: string;
+  location: string;
+  email: string;
+  socials: { label: string; url: string }[];
+};
+
+/**
+ * Parse a whole resume in ONE Claude call and split it into every destination
+ * the Profile tab has: a bio, structured experience entries, an "everything
+ * else" block, and contact fields (name / location / email / socials). Fields
+ * come back "" / [] when the resume doesn't mention them, so the caller can
+ * fill only what's present.
+ */
+export async function writeProfileFromResume(raw: string): Promise<ResumeParse> {
+  const empty: ResumeParse = {
+    bio: "",
+    experience: [],
+    other: "",
+    name: "",
+    location: "",
+    email: "",
+    socials: [],
+  };
+  const clean = raw.replace(/\r/g, "").trim().slice(0, 14000);
+  if (clean.length < 10) return empty;
+
+  const prompt =
+    `The following is a person's resume (extracted text — may be messy or ` +
+    `multi-column). Split it into a single STRICT JSON object with exactly ` +
+    `these keys:\n` +
+    `- "name": their full name (or "").\n` +
+    `- "location": city/region (or "").\n` +
+    `- "email": their email (or "").\n` +
+    `- "socials": array of {label, url} for any LinkedIn/GitHub/Twitter/site ` +
+    `links found (or []).\n` +
+    `- "bio": a warm first-person professional summary, 2 short paragraphs, ` +
+    `only facts present (or "").\n` +
+    `- "experience": array of roles, each {role, company, dates, description} ` +
+    `(1-2 sentence description), most recent first (or []).\n` +
+    `- "other": a plain-text block of EVERYTHING else — education, skills, ` +
+    `certifications, awards, projects — that isn't the bio or a job (or "").\n` +
+    `Use only facts present. Return ONLY the JSON object, no prose or fences.\n\n${clean}`;
+
+  const msg = await claude().messages.create({
+    model: claudeModel(),
+    max_tokens: 2500,
+    messages: [{ role: "user", content: prompt }],
+  });
+  const rawOut = msg.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join("");
+
+  try {
+    const obj = JSON.parse(rawOut.slice(rawOut.indexOf("{"), rawOut.lastIndexOf("}") + 1));
+    const experience = Array.isArray(obj?.experience)
+      ? obj.experience
+          .map((x: Record<string, unknown>) => ({
+            role: String(x?.role ?? "").trim(),
+            company: String(x?.company ?? "").trim(),
+            dates: String(x?.dates ?? "").trim(),
+            description: String(x?.description ?? "").trim(),
+          }))
+          .filter((x: { role: string; company: string; description: string }) => x.role || x.company || x.description)
+      : [];
+    const socials = Array.isArray(obj?.socials)
+      ? obj.socials
+          .map((s: Record<string, unknown>) => ({
+            label: String(s?.label ?? "").trim(),
+            url: String(s?.url ?? "").trim(),
+          }))
+          .filter((s: { label: string; url: string }) => s.label && s.url)
+      : [];
+    return {
+      bio: String(obj?.bio ?? "").trim(),
+      experience,
+      other: String(obj?.other ?? "").trim(),
+      name: String(obj?.name ?? "").trim(),
+      location: String(obj?.location ?? "").trim(),
+      email: String(obj?.email ?? "").trim(),
+      socials,
+    };
+  } catch {
+    return empty;
+  }
+}
+
 /** Extract a pasted text / markdown source. */
 export async function extractText(
   text: string,

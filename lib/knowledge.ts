@@ -66,6 +66,7 @@ ${profile.location ? `Based in: ${profile.location}` : ""}
 
 EXPERIENCE:
 ${experienceBlock(profile.experience)}
+${profile.other ? `\nEDUCATION / SKILLS / OTHER:\n${profile.other}` : ""}
 
 HOW TO CONNECT:
 ${connectBlock(profile)}

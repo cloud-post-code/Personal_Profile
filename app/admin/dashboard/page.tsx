@@ -12,6 +12,7 @@ import {
   saveProfileBasics,
   saveBio,
   saveExperience,
+  saveOther,
   uploadResume,
   savePersona,
   uploadHeadshot,
@@ -83,8 +84,8 @@ export default async function Dashboard() {
         </strong>
         <UploadToGenerate
           action={uploadResume}
-          buttonLabel="Add resume text to bio"
-          hint="Upload a PDF, Word doc, or text resume. Its text is placed into the Bio below (replacing it) — no AI, just your own words. Edit it there afterward."
+          buttonLabel="Parse resume → fill everything"
+          hint="Upload a PDF, Word doc, or text resume. It's split into your Bio, Experience cards, and an 'Other' section, and fills your name, location, email, and any social links found. Review and edit below."
         />
       </div>
 
@@ -131,6 +132,15 @@ export default async function Dashboard() {
           <Label>Experience (add one at a time)</Label>
           <ExperienceEditor initial={experience} />
           <SaveButton>Save experience</SaveButton>
+        </form>
+      </div>
+
+      {/* ── Other ── everything else from the resume (education, skills, etc.). */}
+      <div style={{ borderTop: "1px solid var(--border)", margin: "18px 0", paddingTop: 16 }}>
+        <form action={saveOther}>
+          <Label>Other (education, skills, awards — everything else)</Label>
+          <textarea name="other" defaultValue={profile.other} rows={7} style={{ ...field, resize: "vertical" }} />
+          <SaveButton>Save other</SaveButton>
         </form>
       </div>
     </section>
