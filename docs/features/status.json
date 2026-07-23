@@ -3,8 +3,14 @@
     {
       "id": "theme-visual-picker",
       "title": "Visual theme picker: color swatches + pickers, in-font font menus, corner preview boxes",
-      "status": "in_progress",
-      "notes": "Colors as clickable swatch boxes with color picker + hex entry; font menus render each option in its own font (expanded curated Google Fonts library); corners as 3 preview boxes in different colors. Implemented in app/admin/ThemePicker.tsx; wired into Persona & Theme tab."
+      "status": "done",
+      "notes": "Colors as swatch boxes open by default with color picker + hex entry (Colors above Corners); font menus render each option in its own white-text font (expanded curated Google Fonts library); corners as 3 preview boxes in different colors. app/admin/ThemePicker.tsx. Live."
+    },
+    {
+      "id": "profile-experience-list",
+      "title": "Experience list on Profile tab (add-one-at-a-time, animated boxes)",
+      "status": "done",
+      "notes": "ExperienceEditor: role/company/dates/description entries added one at a time, each box animates in like a chat message. Stored on Profile.experience (JSON) and fed into the chatbot system prompt. Live."
     },
     {
       "id": "github-profile-import",
