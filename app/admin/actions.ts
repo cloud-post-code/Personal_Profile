@@ -1,5 +1,13 @@
 "use server";
 
+// Ensure the `File` global exists even during Next's build-time page-data
+// collection on Node runtimes where it isn't defined (Railway). Node 20+ ships
+// File in node:buffer; we pull it onto globalThis as a safety net.
+import { File as NodeFile } from "node:buffer";
+if (typeof (globalThis as { File?: unknown }).File === "undefined") {
+  (globalThis as { File?: unknown }).File = NodeFile;
+}
+
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma, getProfile } from "@/lib/db";
