@@ -10,7 +10,10 @@ import { ExperienceEditor } from "../ExperienceEditor";
 import {
   logout,
   saveProfileBasics,
+  saveBio,
+  saveExperience,
   uploadBioFile,
+  uploadExperienceFile,
   savePersona,
   uploadHeadshot,
   rescanSource,
@@ -73,7 +76,7 @@ export default async function Dashboard() {
         </form>
       </div>
 
-      {/* Identity + contact + socials + bio — one combined save. */}
+      {/* Identity + contact + socials — combined save (bio + experience too). */}
       <form action={saveProfileBasics}>
         <div style={grid2}>
           <div>
@@ -98,32 +101,36 @@ export default async function Dashboard() {
 
         <Label>Social media (add one at a time)</Label>
         <SocialsEditor initial={socials} />
-
-        <div style={{ borderTop: "1px solid var(--border)", margin: "16px 0", paddingTop: 16 }}>
-          <Label>Bio</Label>
-          <textarea name="bio" defaultValue={profile.bio} rows={7} style={{ ...field, resize: "vertical" }} />
-        </div>
-
-        <div style={{ borderTop: "1px solid var(--border)", margin: "16px 0", paddingTop: 16 }}>
-          <Label>Experience (add one at a time)</Label>
-          <ExperienceEditor initial={experience} />
-        </div>
-
-        <SaveButton>Save profile</SaveButton>
+        <SaveButton>Save details</SaveButton>
       </form>
 
-      {/* Bio-from-file lives below — it runs a separate Claude action. */}
-      <div style={{ borderTop: "1px solid var(--border)", marginTop: 20, paddingTop: 16 }}>
-        <p style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 10 }}>
-          Or fill the bio automatically: upload a PDF, Word doc, CSV, or text file and Claude writes it for you.
-        </p>
-        <form action={uploadBioFile} style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <input type="file" name="file" accept=".pdf,.docx,.csv,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/*" required style={{ ...field, marginBottom: 0, flex: 1, minWidth: 240 }} />
-          <button style={btn}>Generate bio from file</button>
+      {/* ── Bio ── generate-from-file sits right above the Bio field. */}
+      <div style={{ borderTop: "1px solid var(--border)", margin: "18px 0", paddingTop: 16 }}>
+        <UploadToGenerate
+          action={uploadBioFile}
+          buttonLabel="Generate bio from file"
+          hint="Fill the bio automatically: upload a PDF, Word doc, CSV, or text file and Claude writes it for you."
+          footnote="Voice upload is coming soon (needs a transcription service wired up)."
+        />
+        <form action={saveBio} style={{ marginTop: 12 }}>
+          <Label>Bio</Label>
+          <textarea name="bio" defaultValue={profile.bio} rows={7} style={{ ...field, resize: "vertical" }} />
+          <SaveButton>Save bio</SaveButton>
         </form>
-        <p style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 8 }}>
-          Voice upload is coming soon (needs a transcription service wired up).
-        </p>
+      </div>
+
+      {/* ── Experience ── generate-from-file sits right above the list. */}
+      <div style={{ borderTop: "1px solid var(--border)", margin: "18px 0", paddingTop: 16 }}>
+        <UploadToGenerate
+          action={uploadExperienceFile}
+          buttonLabel="Generate experience from file"
+          hint="Add your roles automatically: upload a CSV, PDF, Word doc, or text file and Claude turns it into experience entries."
+        />
+        <form action={saveExperience} style={{ marginTop: 12 }}>
+          <Label>Experience (add one at a time)</Label>
+          <ExperienceEditor initial={experience} />
+          <SaveButton>Save experience</SaveButton>
+        </form>
       </div>
     </section>
   );
@@ -390,6 +397,38 @@ function FormDelete({ id }: { id: string }) {
       <input type="hidden" name="id" value={id} />
       <button style={btnDanger as React.CSSProperties}>Delete</button>
     </form>
+  );
+}
+
+/** A "pick a file → Claude generates content" upload block, its own form. */
+function UploadToGenerate({
+  action,
+  buttonLabel,
+  hint,
+  footnote,
+}: {
+  action: (formData: FormData) => void | Promise<void>;
+  buttonLabel: string;
+  hint: string;
+  footnote?: string;
+}) {
+  return (
+    <div>
+      <p style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 10 }}>{hint}</p>
+      <form action={action} style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <input
+          type="file"
+          name="file"
+          accept=".pdf,.docx,.csv,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/*"
+          required
+          style={{ ...field, marginBottom: 0, flex: 1, minWidth: 240 }}
+        />
+        <button style={btn}>{buttonLabel}</button>
+      </form>
+      {footnote && (
+        <p style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 8 }}>{footnote}</p>
+      )}
+    </div>
   );
 }
 

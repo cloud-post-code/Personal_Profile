@@ -12,7 +12,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma, getProfile } from "@/lib/db";
 import { checkPassword, createSession, destroySession, isAuthed } from "@/lib/auth";
-import { extractLink, extractDocument, extractText, writeBioFromText, fileToText } from "@/lib/scrape";
+import { extractLink, extractDocument, extractText, writeBioFromText, writeExperienceFromText, fileToText } from "@/lib/scrape";
 import { safeExperience } from "@/lib/knowledge";
 import { saveUpload, saveBytes } from "@/lib/uploads";
 import { describeImage } from "@/lib/vision";
@@ -94,7 +94,7 @@ export async function saveBio(formData: FormData) {
   revalidateAll();
 }
 
-// ── Combined Details + Bio (single "Save profile" on the merged tab) ──
+// ── Details: identity + contact + socials (bio & experience save separately) ──
 export async function saveProfileBasics(formData: FormData) {
   await requireAuth();
   await getProfile();
@@ -106,10 +106,6 @@ export async function saveProfileBasics(formData: FormData) {
     .map((label, i) => ({ label: label.trim(), url: (urls[i] ?? "").trim() }))
     .filter((s) => s.label && s.url);
 
-  // Experience arrives as one JSON string from the ExperienceEditor; re-parse
-  // and normalize through safeExperience so only clean entries are stored.
-  const experience = safeExperience(String(formData.get("experience") ?? "[]"));
-
   await prisma.profile.update({
     where: { id: 1 },
     data: {
@@ -119,9 +115,19 @@ export async function saveProfileBasics(formData: FormData) {
       linkedin: String(formData.get("linkedin") ?? ""),
       github: String(formData.get("github") ?? ""),
       socials: JSON.stringify(socials),
-      bio: String(formData.get("bio") ?? ""),
-      experience: JSON.stringify(experience),
     },
+  });
+  revalidateAll();
+}
+
+// ── Experience (manual edits from the ExperienceEditor) ──
+export async function saveExperience(formData: FormData) {
+  await requireAuth();
+  await getProfile();
+  const experience = safeExperience(String(formData.get("experience") ?? "[]"));
+  await prisma.profile.update({
+    where: { id: 1 },
+    data: { experience: JSON.stringify(experience) },
   });
   revalidateAll();
 }
@@ -138,6 +144,28 @@ export async function uploadBioFile(formData: FormData) {
   if (bio) {
     await getProfile();
     await prisma.profile.update({ where: { id: 1 }, data: { bio } });
+  }
+  revalidateAll();
+}
+
+/**
+ * Experience via file upload: PDF, DOCX, CSV, or text -> Claude extracts
+ * role/company/dates/description entries and APPENDS them to the existing list.
+ */
+export async function uploadExperienceFile(formData: FormData) {
+  await requireAuth();
+  const file = formData.get("file");
+  if (!isUpload(file) || file.size === 0) return;
+  const bytes = Buffer.from(await file.arrayBuffer());
+  const { text } = await fileToText(bytes, file.name);
+  const extracted = await writeExperienceFromText(text);
+  if (extracted.length) {
+    const profile = await getProfile();
+    const existing = safeExperience(profile.experience);
+    await prisma.profile.update({
+      where: { id: 1 },
+      data: { experience: JSON.stringify([...existing, ...extracted]) },
+    });
   }
   revalidateAll();
 }

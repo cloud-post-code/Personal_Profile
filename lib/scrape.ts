@@ -253,6 +253,51 @@ export async function writeBioFromText(raw: string): Promise<string> {
     .trim();
 }
 
+/**
+ * Turn uploaded raw material (a CSV, resume, or notes) into structured
+ * experience entries. Used by the Profile section's "generate experience from
+ * file" upload. Returns an array of {role, company, dates, description}.
+ */
+export async function writeExperienceFromText(
+  raw: string,
+): Promise<{ role: string; company: string; dates: string; description: string }[]> {
+  const clean = raw.replace(/\r/g, "").trim().slice(0, 12000);
+  if (clean.length < 10) return [];
+
+  const prompt =
+    `The following is raw material about Blake's work history (it may be CSV ` +
+    `rows, a resume, or notes). Extract each distinct role/position as a JSON ` +
+    `array. Each item must have keys "role", "company", "dates", and ` +
+    `"description" (a short 1-2 sentence summary of what he did). Use only facts ` +
+    `present in the material; leave a field as "" if unknown. Return ONLY the ` +
+    `JSON array, no prose.\n\n${clean}`;
+
+  const msg = await claude().messages.create({
+    model: claudeModel(),
+    max_tokens: 1200,
+    messages: [{ role: "user", content: prompt }],
+  });
+  const rawOut = msg.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join("");
+
+  try {
+    const arr = JSON.parse(rawOut.slice(rawOut.indexOf("["), rawOut.lastIndexOf("]") + 1));
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .map((x) => ({
+        role: String(x?.role ?? "").trim(),
+        company: String(x?.company ?? "").trim(),
+        dates: String(x?.dates ?? "").trim(),
+        description: String(x?.description ?? "").trim(),
+      }))
+      .filter((x) => x.role || x.company || x.description);
+  } catch {
+    return [];
+  }
+}
+
 /** Extract a pasted text / markdown source. */
 export async function extractText(
   text: string,
