@@ -14,6 +14,7 @@ import {
   saveExperience,
   uploadBioFile,
   uploadExperienceFile,
+  uploadCv,
   savePersona,
   uploadHeadshot,
   rescanSource,
@@ -75,6 +76,18 @@ export default async function Dashboard() {
           <Label>Headshot</Label>
           <AutoUploadFile name="file" accept="image/*" hint="Pick a photo — it uploads automatically." />
         </form>
+      </div>
+
+      {/* ── Upload CV / resume — one upload fills bio AND experience. ── */}
+      <div style={{ border: "1px solid var(--primary)", borderRadius: "var(--radius-md)", padding: 16, marginBottom: 20 }}>
+        <strong style={{ fontSize: 14, color: "#fff", display: "block", marginBottom: 6 }}>
+          Upload your CV / resume
+        </strong>
+        <UploadToGenerate
+          action={uploadCv}
+          buttonLabel="Parse CV → fill bio & experience"
+          hint="Upload a PDF, Word doc, or text CV. Claude reads it and builds your bio and all your experience cards in one step (replaces the current bio and experience)."
+        />
       </div>
 
       {/* Identity + contact + socials — combined save (bio + experience too). */}

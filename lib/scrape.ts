@@ -298,6 +298,60 @@ export async function writeExperienceFromText(
   }
 }
 
+export type CvResult = {
+  bio: string;
+  experience: { role: string; company: string; dates: string; description: string }[];
+};
+
+/**
+ * Parse a whole CV / resume in ONE Claude call and return both a first-person
+ * bio and structured experience entries. Used by the Profile tab's single
+ * "Upload CV / resume" control so one upload fills everything.
+ */
+export async function writeProfileFromCv(raw: string): Promise<CvResult> {
+  const clean = raw.replace(/\r/g, "").trim().slice(0, 14000);
+  if (clean.length < 10) return { bio: "", experience: [] };
+
+  const prompt =
+    `The following is Blake's CV / resume (extracted text — it may be messy, ` +
+    `multi-column, or oddly ordered). Produce TWO things about Blake and return ` +
+    `them as a single STRICT JSON object with exactly these keys:\n` +
+    `- "bio": a warm, first-person bio for his personal website — 2 short ` +
+    `paragraphs, natural and specific, no buzzwords, only facts present in the CV.\n` +
+    `- "experience": an array of his roles, each an object with keys "role", ` +
+    `"company", "dates", and "description" (a short 1-2 sentence summary). Order ` +
+    `most recent first. Use only facts present; leave a field "" if unknown.\n` +
+    `Return ONLY the JSON object, no prose or code fences.\n\n${clean}`;
+
+  const msg = await claude().messages.create({
+    model: claudeModel(),
+    max_tokens: 2000,
+    messages: [{ role: "user", content: prompt }],
+  });
+  const rawOut = msg.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join("");
+
+  try {
+    const obj = JSON.parse(rawOut.slice(rawOut.indexOf("{"), rawOut.lastIndexOf("}") + 1));
+    const bio = String(obj?.bio ?? "").trim();
+    const experience = Array.isArray(obj?.experience)
+      ? obj.experience
+          .map((x: Record<string, unknown>) => ({
+            role: String(x?.role ?? "").trim(),
+            company: String(x?.company ?? "").trim(),
+            dates: String(x?.dates ?? "").trim(),
+            description: String(x?.description ?? "").trim(),
+          }))
+          .filter((x: { role: string; company: string; description: string }) => x.role || x.company || x.description)
+      : [];
+    return { bio, experience };
+  } catch {
+    return { bio: "", experience: [] };
+  }
+}
+
 /** Extract a pasted text / markdown source. */
 export async function extractText(
   text: string,
