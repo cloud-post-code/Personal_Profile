@@ -129,6 +129,7 @@ export async function savePersona(formData: FormData) {
       aesthetic: String(formData.get("aesthetic") ?? ""),
       tone: String(formData.get("tone") ?? ""),
       themeFont: String(formData.get("themeFont") ?? "space-grotesk"),
+      themeBodyFont: String(formData.get("themeBodyFont") ?? "inter"),
       themeColors: JSON.stringify(colors),
     },
   });

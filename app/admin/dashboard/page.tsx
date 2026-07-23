@@ -3,7 +3,8 @@ import { isAuthed } from "@/lib/auth";
 import { prisma, getProfile } from "@/lib/db";
 import { safeTags, safeSocials } from "@/lib/knowledge";
 import { safeJson } from "@/lib/util";
-import { FONT_OPTIONS } from "@/lib/fonts";
+import { FONT_OPTIONS, BODY_FONT_OPTIONS } from "@/lib/fonts";
+import { SocialsEditor } from "../SocialsEditor";
 import {
   logout,
   saveDetails,
@@ -39,7 +40,13 @@ export default async function Dashboard() {
     prisma.contact.findMany({ orderBy: { createdAt: "desc" } }),
   ]);
   const unhandled = contacts.filter((c) => !c.handled).length;
-  const socials = safeSocials(profile.socials);
+  // LinkedIn is now just a social link. If a legacy linkedin value exists and
+  // isn't already in socials, surface it as a pre-filled row so it's not lost.
+  const savedSocials = safeSocials(profile.socials);
+  const socials =
+    profile.linkedin && !savedSocials.some((s) => s.url === profile.linkedin)
+      ? [{ label: "LinkedIn", url: profile.linkedin }, ...savedSocials]
+      : savedSocials;
   const colors = safeJson<{ bg?: string; primary?: string; accent?: string }>(profile.themeColors, {});
 
   // ── DETAILS TAB ──
@@ -63,30 +70,14 @@ export default async function Dashboard() {
             <input name="email" defaultValue={profile.email} style={field} />
           </div>
           <div>
-            <Label>LinkedIn URL</Label>
-            <input name="linkedin" defaultValue={profile.linkedin} style={field} />
+            <Label>GitHub URL</Label>
+            <input name="github" defaultValue={profile.github} style={field} />
           </div>
         </div>
-        <Label>GitHub URL</Label>
-        <input name="github" defaultValue={profile.github} style={field} />
 
-        <Label>Social media (label + URL — add up to 6)</Label>
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} style={{ display: "flex", gap: 8 }}>
-            <input
-              name="social_label"
-              defaultValue={socials[i]?.label ?? ""}
-              placeholder="e.g. Twitter, Instagram"
-              style={{ ...field, flex: "0 0 200px" }}
-            />
-            <input
-              name="social_url"
-              defaultValue={socials[i]?.url ?? ""}
-              placeholder="https://…"
-              style={{ ...field, flex: 1 }}
-            />
-          </div>
-        ))}
+        <Label>Social media (add one at a time)</Label>
+        <SocialsEditor initial={socials} />
+
         <button style={btn}>Save details</button>
       </form>
     </section>
@@ -96,6 +87,21 @@ export default async function Dashboard() {
   const bioTab = (
     <section style={panel}>
       <SectionTitle>Bio</SectionTitle>
+
+      {/* Headshot lives with the bio */}
+      <div style={{ display: "flex", gap: 16, alignItems: "center", marginBottom: 18 }}>
+        {profile.headshot ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={profile.headshot} alt="headshot" style={{ width: 72, height: 72, borderRadius: 999, objectFit: "cover", border: "1px solid var(--border)" }} />
+        ) : (
+          <div style={{ width: 72, height: 72, borderRadius: 999, background: "var(--bg-soft)", border: "1px solid var(--border)" }} />
+        )}
+        <form action={uploadHeadshot} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <input type="file" name="file" accept="image/*" required style={{ ...field, marginBottom: 0, maxWidth: 240 }} />
+          <button style={btnGhost as React.CSSProperties}>Upload headshot</button>
+        </form>
+      </div>
+
       <p style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 14 }}>
         Fill your bio by uploading a CSV or text file — Claude turns it into a bio — or write it
         directly below.
@@ -119,20 +125,6 @@ export default async function Dashboard() {
   const personaTab = (
     <section style={panel}>
       <SectionTitle>Persona & brand</SectionTitle>
-
-      {/* Headshot */}
-      <div style={{ display: "flex", gap: 16, alignItems: "center", marginBottom: 18 }}>
-        {profile.headshot ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={profile.headshot} alt="headshot" style={{ width: 72, height: 72, borderRadius: 999, objectFit: "cover", border: "1px solid var(--border)" }} />
-        ) : (
-          <div style={{ width: 72, height: 72, borderRadius: 999, background: "var(--bg-soft)", border: "1px solid var(--border)" }} />
-        )}
-        <form action={uploadHeadshot} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <input type="file" name="file" accept="image/*" required style={{ ...field, marginBottom: 0, maxWidth: 240 }} />
-          <button style={btnGhost as React.CSSProperties}>Upload headshot</button>
-        </form>
-      </div>
 
       <form action={savePersona}>
         <Label>Tagline</Label>
@@ -162,9 +154,19 @@ export default async function Dashboard() {
           <strong style={{ fontSize: 14 }}>Theme — this restyles the live site</strong>
           <div style={{ ...grid2, marginTop: 10 }}>
             <div>
-              <Label>Heading font</Label>
+              <Label>Headline font</Label>
               <select name="themeFont" defaultValue={profile.themeFont} style={field}>
                 {FONT_OPTIONS.map((f) => (
+                  <option key={f.key} value={f.key}>
+                    {f.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label>Text font</Label>
+              <select name="themeBodyFont" defaultValue={profile.themeBodyFont} style={field}>
+                {BODY_FONT_OPTIONS.map((f) => (
                   <option key={f.key} value={f.key}>
                     {f.label}
                   </option>

@@ -43,7 +43,17 @@ export function headingFamily(key: string): string {
   return (HEADING_FONTS[key as FontKey] ?? HEADING_FONTS["space-grotesk"]).family;
 }
 
+/** Body font uses the same curated families; default is Inter. */
+export function bodyFamily(key: string): string {
+  return (HEADING_FONTS[key as FontKey] ?? HEADING_FONTS["inter"]).family;
+}
+
 export const FONT_OPTIONS = Object.entries(HEADING_FONTS).map(([key, v]) => ({
   key,
   label: v.label,
 }));
+
+// Body font list with Inter as the labeled default.
+export const BODY_FONT_OPTIONS = FONT_OPTIONS.map((f) =>
+  f.key === "inter" ? { ...f, label: "Inter (default)" } : f,
+);

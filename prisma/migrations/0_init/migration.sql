@@ -81,6 +81,7 @@ CREATE TABLE "Profile" (
     "tone" TEXT NOT NULL DEFAULT '',
     "headshot" TEXT,
     "themeFont" TEXT NOT NULL DEFAULT 'space-grotesk',
+    "themeBodyFont" TEXT NOT NULL DEFAULT 'inter',
     "themeColors" TEXT NOT NULL DEFAULT '{}',
     "updatedAt" TIMESTAMP(3) NOT NULL,
 

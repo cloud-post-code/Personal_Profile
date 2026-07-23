@@ -81,13 +81,15 @@ export function themeCssVars(): string {
  */
 export function themeOverrideCss(opts: {
   headingFamily: string;
+  bodyFamily: string;
   colors: { bg?: string; primary?: string; accent?: string };
 }): string {
   const hex = (v?: string) => (v && /^#[0-9a-fA-F]{3,8}$/.test(v) ? v : null);
   const lines: string[] = [];
 
-  // Heading font always set (from the curated allowlist).
+  // Fonts always set (from the curated allowlist).
   lines.push(`--font-heading:${opts.headingFamily};`);
+  lines.push(`--font-body:${opts.bodyFamily};`);
 
   const bg = hex(opts.colors.bg);
   const primary = hex(opts.colors.primary);

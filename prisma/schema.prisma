@@ -107,8 +107,10 @@ model Profile {
   headshot  String?  // /api/uploads/<file>
 
   // ── Theme (drives the live site's CSS variables) ──
-  /// One of the curated font keys (see lib/fonts).
+  /// Curated heading font key (see lib/fonts).
   themeFont String   @default("space-grotesk")
+  /// Curated body/text font key (see lib/fonts).
+  themeBodyFont String @default("inter")
   /// JSON {bg, primary, accent} hex overrides; empty = brand defaults.
   themeColors String @default("{}")
 
