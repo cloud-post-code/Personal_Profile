@@ -279,9 +279,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   h1: { fontSize: "clamp(40px, 8vw, 68px)", lineHeight: 1.02, marginBottom: 16 },
   h1accent: {
-    background: "linear-gradient(90deg, var(--primary-soft), var(--accent))",
-    WebkitBackgroundClip: "text",
-    WebkitTextFillColor: "transparent",
+    color: "var(--accent)",
   },
   sub: { color: "var(--text-muted)", fontSize: 18, marginBottom: 36, maxWidth: 520 },
 
@@ -305,7 +303,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "12px 14px",
   },
   sendBtn: {
-    background: "linear-gradient(90deg, var(--primary), var(--primary-soft))",
+    background: "var(--primary)",
     color: "white",
     border: "none",
     borderRadius: "var(--radius-md)",
@@ -363,7 +361,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 30,
     fontWeight: 600,
     color: "white",
-    background: "linear-gradient(90deg, var(--primary), var(--primary-soft))",
+    background: "var(--primary)",
     border: "2px solid var(--border)",
   },
   quickActions: { display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" },
@@ -379,7 +377,7 @@ const styles: Record<string, React.CSSProperties> = {
   thread: { flex: 1, overflowY: "auto", padding: "12px 4px", display: "flex", flexDirection: "column", gap: 14 },
   row: { display: "flex", width: "100%" },
   userBubble: {
-    background: "linear-gradient(90deg, var(--primary), var(--primary-soft))",
+    background: "var(--primary)",
     color: "white",
     padding: "12px 16px",
     borderRadius: "18px 18px 4px 18px",

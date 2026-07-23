@@ -23,7 +23,7 @@ export const field: React.CSSProperties = {
 
 export const btn: React.CSSProperties = {
   padding: "9px 16px",
-  background: "linear-gradient(90deg, var(--primary), var(--primary-soft))",
+  background: "var(--primary)",
   color: "white",
   border: "none",
   borderRadius: "var(--radius-sm)",

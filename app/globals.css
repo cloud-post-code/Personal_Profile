@@ -20,8 +20,9 @@
   --radius-lg: 22px;
   --radius-pill: 999px;
 
-  --glow-primary: 0 0 0 1px rgba(124, 92, 255, 0.4), 0 8px 30px rgba(124, 92, 255, 0.25);
-  --glow-accent: 0 0 0 1px rgba(255, 184, 77, 0.4), 0 8px 30px rgba(255, 184, 77, 0.2);
+  /* Gradients/glows removed site-wide — flat solids only. */
+  --glow-primary: none;
+  --glow-accent: none;
 }
 
 * {
@@ -36,10 +37,7 @@ body {
 }
 
 body {
-  background:
-    radial-gradient(1200px 700px at 15% -10%, rgba(124, 92, 255, 0.18), transparent 60%),
-    radial-gradient(900px 600px at 100% 0%, rgba(255, 184, 77, 0.1), transparent 55%),
-    var(--bg);
+  background: var(--bg);
   color: var(--text);
   font-family: var(--font-body), system-ui, sans-serif;
   line-height: 1.5;
@@ -80,7 +78,8 @@ select {
 }
 
 ::selection {
-  background: rgba(124, 92, 255, 0.4);
+  background: var(--primary);
+  color: #fff;
 }
 
 /* Thin custom scrollbar for the chat */

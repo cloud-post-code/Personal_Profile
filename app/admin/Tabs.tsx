@@ -67,7 +67,7 @@ const tab: React.CSSProperties = {
   gap: 8,
 };
 const tabOn: React.CSSProperties = {
-  background: "linear-gradient(90deg, var(--primary), var(--primary-soft))",
+  background: "var(--primary)",
   color: "white",
   border: "1px solid transparent",
   boxShadow: "var(--glow-primary)",

@@ -53,10 +53,10 @@ export const brand = {
     pill: "999px",
   },
 
-  // Signature glow used on the primary/accent elements.
+  // Gradients/glows removed site-wide — flat solids only.
   glow: {
-    primary: "0 0 0 1px rgba(124,92,255,0.4), 0 8px 30px rgba(124,92,255,0.25)",
-    accent: "0 0 0 1px rgba(255,184,77,0.4), 0 8px 30px rgba(255,184,77,0.20)",
+    primary: "none",
+    accent: "none",
   },
 } as const;
 

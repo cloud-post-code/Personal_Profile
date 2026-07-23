@@ -63,7 +63,7 @@ export default async function AdminLogin({
           style={{
             width: "100%",
             padding: "12px",
-            background: "linear-gradient(90deg, var(--primary), var(--primary-soft))",
+            background: "var(--primary)",
             color: "white",
             border: "none",
             borderRadius: "var(--radius-md)",

@@ -296,7 +296,7 @@ const cf: React.CSSProperties = {
   color: "var(--text)",
 };
 const liveBtn: React.CSSProperties = {
-  background: "linear-gradient(90deg, var(--primary), var(--primary-soft))",
+  background: "var(--primary)",
   color: "white",
   border: "none",
 };

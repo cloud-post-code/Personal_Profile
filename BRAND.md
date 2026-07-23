@@ -23,8 +23,10 @@ Blake would rather talk than list bullet points.
 | Text | `#E8ECFF` | Body |
 | Muted | `#9AA3C7` | Secondary text |
 
-High contrast, glow-y accents. Two ambient radial gradients (violet + amber)
-sit behind everything so the page feels lit from within.
+High contrast, flat solid colors. No gradients or glows — the background is a
+single solid, and every accent is a flat fill. The three admin theme colors
+(Background / Primary / Accent) are the single source of truth and everything
+across the site derives from them.
 
 ## Type
 
@@ -37,8 +39,7 @@ All three are open-source, commercial-safe, and self-hosted via `next/font`.
 ## Signature moves
 
 - **Chat-first homepage** — the conversation is the hero.
-- **Gradient wordmark** (violet → amber) on the big headline.
-- **Glow** on the primary composer and login card.
+- **Flat amber wordmark** on the big headline.
 - **Amber "live" dot** in the wordmark — the site feels awake.
 
 ## To rebrand from your real vibe
