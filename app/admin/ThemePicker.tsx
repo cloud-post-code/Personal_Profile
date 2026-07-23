@@ -62,6 +62,18 @@ export function ThemePicker({
       </div>
 
       <div>
+        <Label>Colors</Label>
+        <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
+          <ColorSwatch label="Background" value={bg} fallback="#0B1020" onChange={setBg} />
+          <ColorSwatch label="Primary" value={primary} fallback="#7C5CFF" onChange={setPrimary} />
+          <ColorSwatch label="Accent" value={accent} fallback="#FFB84D" onChange={setAccent} />
+        </div>
+        <p style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 12 }}>
+          Adjust each color or type a hex. Leave blank to keep the default.
+        </p>
+      </div>
+
+      <div>
         <Label>Corners</Label>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
           {radiusOptions.map((r, i) => {
@@ -102,18 +114,6 @@ export function ThemePicker({
           })}
         </div>
       </div>
-
-      <div>
-        <Label>Colors</Label>
-        <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-          <ColorSwatch label="Background" value={bg} fallback="#0B1020" onChange={setBg} />
-          <ColorSwatch label="Primary" value={primary} fallback="#7C5CFF" onChange={setPrimary} />
-          <ColorSwatch label="Accent" value={accent} fallback="#FFB84D" onChange={setAccent} />
-        </div>
-        <p style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 10 }}>
-          Click a swatch to pick a color or type a hex. Leave blank to keep the default.
-        </p>
-      </div>
     </div>
   );
 }
@@ -144,9 +144,10 @@ function FontDropdown({
           alignItems: "center",
           cursor: "pointer",
           textAlign: "left",
+          color: "#fff",
         }}
       >
-        <span style={{ fontFamily: current?.family, fontSize: 16 }}>{current?.label}</span>
+        <span style={{ fontFamily: current?.family, fontSize: 16, color: "#fff" }}>{current?.label}</span>
         <span style={{ color: "var(--text-muted)", fontSize: 12 }}>{open ? "▲" : "▼"}</span>
       </button>
       {open && (
@@ -180,7 +181,7 @@ function FontDropdown({
                 padding: "10px 12px",
                 background: o.key === value ? "var(--bg-soft)" : "transparent",
                 border: "none",
-                color: "var(--text)",
+                color: "#fff",
                 cursor: "pointer",
                 fontFamily: o.family,
                 fontSize: 17,
@@ -195,7 +196,7 @@ function FontDropdown({
   );
 }
 
-/** A color box that opens a native color picker + hex text entry. */
+/** A color control shown open by default: swatch + native picker + hex entry. */
 function ColorSwatch({
   label,
   value,
@@ -207,77 +208,48 @@ function ColorSwatch({
   fallback: string;
   onChange: (v: string) => void;
 }) {
-  const [open, setOpen] = useState(false);
   const shown = /^#[0-9a-fA-F]{3,8}$/.test(value) ? value : fallback;
 
   return (
-    <div style={{ position: "relative" }}>
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-        <button
-          type="button"
-          onClick={() => setOpen((o) => !o)}
-          style={{
-            width: 56,
-            height: 56,
-            borderRadius: 12,
-            background: shown,
-            border: "2px solid var(--border)",
-            cursor: "pointer",
-          }}
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+        background: "var(--surface)",
+        border: "1px solid var(--border)",
+        borderRadius: "var(--radius-sm)",
+        padding: 12,
+        width: 168,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <span
+          style={{ width: 40, height: 40, borderRadius: 10, background: shown, border: "2px solid var(--border)", flexShrink: 0 }}
           title={`${label}: ${value || "default"}`}
         />
-        <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{label}</span>
+        <span style={{ fontSize: 13, color: "#fff", fontWeight: 600 }}>{label}</span>
       </div>
-      {open && (
-        <div
-          style={{
-            position: "absolute",
-            zIndex: 20,
-            top: "calc(100% + 6px)",
-            left: "50%",
-            transform: "translateX(-50%)",
-            background: "var(--surface)",
-            border: "1px solid var(--border)",
-            borderRadius: "var(--radius-sm)",
-            padding: 12,
-            boxShadow: "0 12px 32px rgba(0,0,0,0.4)",
-            display: "flex",
-            flexDirection: "column",
-            gap: 10,
-            width: 180,
-          }}
-        >
-          <input
-            type="color"
-            value={shown}
-            onChange={(e) => onChange(e.target.value)}
-            style={{ width: "100%", height: 40, border: "none", background: "transparent", cursor: "pointer" }}
-          />
-          <input
-            type="text"
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder={fallback}
-            style={{ ...field, marginBottom: 0, fontFamily: "var(--font-mono)", fontSize: 13 }}
-          />
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              type="button"
-              onClick={() => onChange("")}
-              style={{ flex: 1, fontSize: 12, background: "transparent", color: "var(--text-muted)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "6px 0", cursor: "pointer" }}
-            >
-              Reset
-            </button>
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              style={{ flex: 1, fontSize: 12, background: "var(--primary)", color: "white", border: "none", borderRadius: "var(--radius-sm)", padding: "6px 0", cursor: "pointer" }}
-            >
-              Done
-            </button>
-          </div>
-        </div>
-      )}
+      <input
+        type="color"
+        value={shown}
+        onChange={(e) => onChange(e.target.value)}
+        style={{ width: "100%", height: 40, border: "none", background: "transparent", cursor: "pointer", padding: 0 }}
+      />
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={fallback}
+        style={{ ...field, marginBottom: 0, color: "#fff", fontFamily: "var(--font-mono)", fontSize: 13 }}
+      />
+      <button
+        type="button"
+        onClick={() => onChange("")}
+        style={{ fontSize: 12, background: "transparent", color: "var(--text-muted)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "6px 0", cursor: "pointer" }}
+      >
+        Reset to default
+      </button>
     </div>
   );
 }
