@@ -15,6 +15,13 @@
   --success: #4ade80;
   --danger: #ff6b6b;
 
+  /* ── Contrast pairs ── the readable foreground for content sitting ON each
+     fill. Recomputed from the admin palette in lib/theme.ts, so anything
+     inside a primary button / accent chip / card stays legible. */
+  --on-primary: #ffffff;
+  --on-accent: #10131c;
+  --on-surface: #e8ecff;
+
   --radius-sm: 8px;
   --radius-md: 14px;
   --radius-lg: 22px;
@@ -85,7 +92,7 @@ select {
 
 ::selection {
   background: var(--primary);
-  color: #fff;
+  color: var(--on-primary);
 }
 
 /* Thin custom scrollbar for the chat */

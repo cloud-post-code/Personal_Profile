@@ -230,6 +230,7 @@ export async function extractPdf(bytes: Buffer, filename: string): Promise<Extra
 export type ResumeParse = {
   bio: string;
   experience: { role: string; company: string; dates: string; description: string }[];
+  experienceSummary: string;
   other: string;
   name: string;
   location: string;
@@ -248,6 +249,7 @@ export async function writeProfileFromResume(raw: string): Promise<ResumeParse> 
   const empty: ResumeParse = {
     bio: "",
     experience: [],
+    experienceSummary: "",
     other: "",
     name: "",
     location: "",
@@ -270,6 +272,10 @@ export async function writeProfileFromResume(raw: string): Promise<ResumeParse> 
     `only facts present (or "").\n` +
     `- "experience": array of roles, each {role, company, dates, description} ` +
     `(1-2 sentence description), most recent first (or []).\n` +
+    `- "experienceSummary": ONE first-person paragraph (3-5 sentences) ` +
+    `summarizing their overall work experience — the arc of their career, the ` +
+    `kind of work they do, and what they're good at. Must be non-empty ` +
+    `whenever any job history is present.\n` +
     `- "other": a plain-text block of EVERYTHING else — education, skills, ` +
     `certifications, awards, projects — that isn't the bio or a job (or "").\n` +
     `Use only facts present. Return ONLY the JSON object, no prose or fences.\n\n${clean}`;
@@ -304,9 +310,24 @@ export async function writeProfileFromResume(raw: string): Promise<ResumeParse> 
           }))
           .filter((s: { label: string; url: string }) => s.label && s.url)
       : [];
+    // Guarantee the overview paragraph whenever roles exist — if the model
+    // skipped it, stitch one from the parsed cards so the field is never blank.
+    const summary =
+      String(obj?.experienceSummary ?? "").trim() ||
+      (experience.length
+        ? experience
+            .map((x: { role: string; company: string; dates: string }) =>
+              [x.role, x.company && `at ${x.company}`, x.dates && `(${x.dates})`]
+                .filter(Boolean)
+                .join(" "),
+            )
+            .join(". ") + "."
+        : "");
+
     return {
       bio: String(obj?.bio ?? "").trim(),
       experience,
+      experienceSummary: summary,
       other: String(obj?.other ?? "").trim(),
       name: String(obj?.name ?? "").trim(),
       location: String(obj?.location ?? "").trim(),

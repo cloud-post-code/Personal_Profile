@@ -68,13 +68,13 @@ const tab: React.CSSProperties = {
 };
 const tabOn: React.CSSProperties = {
   background: "var(--primary)",
-  color: "white",
+  color: "var(--on-primary)",
   border: "1px solid transparent",
   boxShadow: "var(--glow-primary)",
 };
 const badgeStyle: React.CSSProperties = {
   background: "var(--accent)",
-  color: "#0B1020",
+  color: "var(--on-accent)",
   borderRadius: 999,
   fontSize: 11,
   fontWeight: 700,

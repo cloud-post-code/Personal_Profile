@@ -17,7 +17,7 @@ export function Extractor() {
         borderRadius: "var(--radius-sm)",
         border: "1px solid var(--border)",
         background: mode === m ? "var(--primary)" : "transparent",
-        color: mode === m ? "white" : "var(--text-muted)",
+        color: mode === m ? "var(--on-primary)" : "var(--text-muted)",
         fontSize: 13,
         fontWeight: 600,
       }}

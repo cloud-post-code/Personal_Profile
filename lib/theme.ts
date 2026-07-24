@@ -130,6 +130,79 @@ export const HEADING_WEIGHTS = [
 
 const hex = (v?: string) => (v && /^#[0-9a-fA-F]{3,8}$/.test(v) ? v : null);
 
+/** Parse a #rgb / #rrggbb hex into [r,g,b] 0-255. Returns null if unparseable. */
+function rgb(h: string): [number, number, number] | null {
+  const s = h.replace("#", "");
+  const full = s.length === 3 ? s.split("").map((c) => c + c).join("") : s.slice(0, 6);
+  if (full.length !== 6 || !/^[0-9a-fA-F]{6}$/.test(full)) return null;
+  return [
+    parseInt(full.slice(0, 2), 16),
+    parseInt(full.slice(2, 4), 16),
+    parseInt(full.slice(4, 6), 16),
+  ];
+}
+
+/** WCAG relative luminance (0 = black, 1 = white). */
+function luminance(h: string): number {
+  const c = rgb(h);
+  if (!c) return 0;
+  const [r, g, b] = c.map((v) => {
+    const s = v / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** True when a surface is light enough that it needs dark text on top. */
+export function isLight(h: string): boolean {
+  return luminance(h) > 0.45;
+}
+
+/** WCAG contrast ratio between two hex colors (1 = identical, 21 = max). */
+function contrastRatio(a: string, b: string): number {
+  const la = luminance(a);
+  const lb = luminance(b);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+
+/** Near-black / near-white foregrounds — softer than pure #000/#fff. */
+const INK = "#10131C";
+const PAPER = "#FFFFFF";
+
+/**
+ * The readable foreground for text/icons sitting ON a colored surface. Every
+ * filled element (primary button, accent chip, card) pairs its background with
+ * this so the contents never vanish into it. Picks whichever of ink/paper
+ * actually scores the higher contrast ratio rather than guessing from
+ * luminance — mid-tone fills (violet, teal) sit right at the boundary.
+ */
+export function contrastOn(h: string): string {
+  return contrastRatio(h, INK) >= contrastRatio(h, PAPER) ? INK : PAPER;
+}
+
+/** Mix a hex toward white (amount>0) or black (amount<0) by `amount` (0..1). */
+function shift(h: string, amount: number): string {
+  const c = rgb(h);
+  if (!c) return h;
+  const target = amount >= 0 ? 255 : 0;
+  const t = Math.abs(amount);
+  const out = c.map((v) => Math.round(v + (target - v) * t));
+  return `#${out.map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+}
+
+/**
+ * Derive the supporting surface tones from the chosen background. Without this
+ * a light `bg` would keep the dark-navy `--bg-soft`/`--surface`/`--border`
+ * defaults from globals.css, leaving dark blue panels stuck on a light site.
+ * Light backgrounds darken slightly for depth; dark ones lighten.
+ */
+function derivedSurfaces(bg: string): { soft: string; surface: string; border: string } {
+  const light = isLight(bg);
+  return light
+    ? { soft: shift(bg, -0.04), surface: shift(bg, -0.07), border: shift(bg, -0.18) }
+    : { soft: shift(bg, 0.05), surface: shift(bg, 0.09), border: shift(bg, 0.2) };
+}
+
 /**
  * Build the CSS-variable declarations (the inner body of a :root block) from
  * admin-chosen theme values. Shared by the live-site <style> injector and the
@@ -174,11 +247,24 @@ export function themeVarLines(opts: {
   const textMuted = hex(c.textMuted);
   const primary = hex(c.primary);
   const accent = hex(c.accent);
+
+  // Picking a background re-derives every supporting tone, so a light bg can't
+  // leave dark-navy panels/borders behind. Explicit choices still win below.
   if (bg) {
+    const d = derivedSurfaces(bg);
     lines.push(`--bg:${bg};`);
-    lines.push(`--bg-soft:${bg};`);
+    lines.push(`--bg-soft:${d.soft};`);
+    lines.push(`--surface:${d.surface};`);
+    lines.push(`--border:${d.border};`);
+    // Default text to whatever reads on this background; overridden if set.
+    lines.push(`--text:${contrastOn(bg)};`);
+    lines.push(`--text-muted:${shift(contrastOn(bg), isLight(bg) ? 0.4 : -0.35)};`);
   }
-  if (surface) lines.push(`--surface:${surface};`);
+
+  if (surface) {
+    lines.push(`--surface:${surface};`);
+    if (!bg) lines.push(`--bg-soft:${surface};`);
+  }
   if (border) lines.push(`--border:${border};`);
   if (text) lines.push(`--text:${text};`);
   if (textMuted) lines.push(`--text-muted:${textMuted};`);
@@ -187,6 +273,13 @@ export function themeVarLines(opts: {
     lines.push(`--primary-soft:${primary};`);
   }
   if (accent) lines.push(`--accent:${accent};`);
+
+  // ── Contrast pairs ── the foreground for content sitting ON each fill, so
+  // buttons/chips/cards always have a readable color inside them.
+  lines.push(`--on-primary:${contrastOn(primary ?? "#7C5CFF")};`);
+  lines.push(`--on-accent:${contrastOn(accent ?? "#FFB84D")};`);
+  const surfaceFill = surface ?? (bg ? derivedSurfaces(bg).surface : "#1A2140");
+  lines.push(`--on-surface:${text ?? contrastOn(surfaceFill)};`);
 
   return lines.join("");
 }

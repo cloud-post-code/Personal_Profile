@@ -65,6 +65,7 @@ ${profile.values ? `Values: ${profile.values}` : ""}
 ${profile.location ? `Based in: ${profile.location}` : ""}
 
 EXPERIENCE:
+${profile.experienceSummary ? `${profile.experienceSummary}\n` : ""}
 ${experienceBlock(profile.experience)}
 ${profile.other ? `\nEDUCATION / SKILLS / OTHER:\n${profile.other}` : ""}
 

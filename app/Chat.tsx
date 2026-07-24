@@ -304,7 +304,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   sendBtn: {
     background: "var(--primary)",
-    color: "white",
+    color: "var(--on-primary)",
     border: "none",
     borderRadius: "var(--radius-md)",
     padding: "0 18px",
@@ -360,7 +360,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: "center",
     fontSize: 30,
     fontWeight: 600,
-    color: "white",
+    color: "var(--on-primary)",
     background: "var(--primary)",
     border: "2px solid var(--border)",
   },
@@ -378,7 +378,7 @@ const styles: Record<string, React.CSSProperties> = {
   row: { display: "flex", width: "100%" },
   userBubble: {
     background: "var(--primary)",
-    color: "white",
+    color: "var(--on-primary)",
     padding: "12px 16px",
     borderRadius: "18px 18px 4px 18px",
     maxWidth: "80%",

@@ -97,6 +97,8 @@ model Profile {
   bio       String   @default("") @db.Text
   /// JSON array of {role, company, dates, description} experience entries.
   experience String  @default("[]") @db.Text
+  /// Prose paragraph summarizing work experience, shown on the profile.
+  experienceSummary String @default("") @db.Text
   /// Free-text "everything else" from the resume: education, skills, awards.
   other      String  @default("") @db.Text
 

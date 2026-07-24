@@ -297,7 +297,7 @@ const cf: React.CSSProperties = {
 };
 const liveBtn: React.CSSProperties = {
   background: "var(--primary)",
-  color: "white",
+  color: "var(--on-primary)",
   border: "none",
 };
 const navArrow: React.CSSProperties = {

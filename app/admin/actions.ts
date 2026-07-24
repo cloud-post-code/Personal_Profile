@@ -84,19 +84,12 @@ export async function saveDetails(formData: FormData) {
   revalidateAll();
 }
 
-// ── Bio (manual text) ──
-export async function saveBio(formData: FormData) {
-  await requireAuth();
-  await getProfile();
-  await prisma.profile.update({
-    where: { id: 1 },
-    data: { bio: String(formData.get("bio") ?? "") },
-  });
-  revalidateAll();
-}
-
-// ── Details: identity + contact + socials (bio & experience save separately) ──
-export async function saveProfileBasics(formData: FormData) {
+/**
+ * The whole Profile tab saves at once: identity, contact, socials, bio, the
+ * experience overview paragraph, the experience cards, and "other". One form,
+ * one button — so nothing is silently left unsaved in another section.
+ */
+export async function saveProfile(formData: FormData) {
   await requireAuth();
   await getProfile();
 
@@ -107,39 +100,21 @@ export async function saveProfileBasics(formData: FormData) {
     .map((label, i) => ({ label: label.trim(), url: (urls[i] ?? "").trim() }))
     .filter((s) => s.label && s.url);
 
+  const experience = safeExperience(String(formData.get("experience") ?? "[]"));
+
   await prisma.profile.update({
     where: { id: 1 },
     data: {
       name: String(formData.get("name") ?? "Blake"),
       location: String(formData.get("location") ?? ""),
       email: String(formData.get("email") ?? ""),
-      linkedin: String(formData.get("linkedin") ?? ""),
       github: String(formData.get("github") ?? ""),
       socials: JSON.stringify(socials),
+      bio: String(formData.get("bio") ?? ""),
+      experienceSummary: String(formData.get("experienceSummary") ?? ""),
+      experience: JSON.stringify(experience),
+      other: String(formData.get("other") ?? ""),
     },
-  });
-  revalidateAll();
-}
-
-// ── Experience (manual edits from the ExperienceEditor) ──
-export async function saveExperience(formData: FormData) {
-  await requireAuth();
-  await getProfile();
-  const experience = safeExperience(String(formData.get("experience") ?? "[]"));
-  await prisma.profile.update({
-    where: { id: 1 },
-    data: { experience: JSON.stringify(experience) },
-  });
-  revalidateAll();
-}
-
-// ── Other (education / skills / awards — everything else) ──
-export async function saveOther(formData: FormData) {
-  await requireAuth();
-  await getProfile();
-  await prisma.profile.update({
-    where: { id: 1 },
-    data: { other: String(formData.get("other") ?? "") },
   });
   revalidateAll();
 }
@@ -163,6 +138,7 @@ export async function uploadResume(formData: FormData) {
   const data: Record<string, string> = {};
   if (parsed.bio) data.bio = parsed.bio;
   if (parsed.experience.length) data.experience = JSON.stringify(parsed.experience);
+  if (parsed.experienceSummary) data.experienceSummary = parsed.experienceSummary;
   if (parsed.other) data.other = parsed.other;
   if (parsed.name) data.name = parsed.name;
   if (parsed.location) data.location = parsed.location;

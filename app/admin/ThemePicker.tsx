@@ -68,7 +68,7 @@ export function ThemePicker({
 
       {/* ── Typography ── */}
       <div>
-        <strong style={{ fontSize: 13, color: "#fff", display: "block", marginBottom: 10 }}>Typography</strong>
+        <strong style={{ fontSize: 13, color: "var(--on-surface)", display: "block", marginBottom: 10 }}>Typography</strong>
         <div style={grid2}>
           <div>
             <Label>Headline font</Label>
@@ -106,7 +106,7 @@ export function ThemePicker({
                       marginBottom: 0,
                       width: "auto",
                       padding: "8px 12px",
-                      color: "#fff",
+                      color: "var(--on-surface)",
                       fontWeight: Number(w.key),
                       cursor: "pointer",
                       border: on ? "1px solid var(--primary)" : "1px solid var(--border)",
@@ -124,7 +124,7 @@ export function ThemePicker({
 
       {/* ── Colors (all 7 roles) ── */}
       <div>
-        <strong style={{ fontSize: 13, color: "#fff", display: "block", marginBottom: 10 }}>Colors</strong>
+        <strong style={{ fontSize: 13, color: "var(--on-surface)", display: "block", marginBottom: 10 }}>Colors</strong>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
           {COLOR_ROLES.map((r) => (
             <ColorSwatch
@@ -143,7 +143,7 @@ export function ThemePicker({
 
       {/* ── Corners ── */}
       <div>
-        <strong style={{ fontSize: 13, color: "#fff", display: "block", marginBottom: 10 }}>Corners</strong>
+        <strong style={{ fontSize: 13, color: "var(--on-surface)", display: "block", marginBottom: 10 }}>Corners</strong>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
           {radiusOptions.map((r, i) => {
             const on = r.key === themeRadius;
@@ -177,7 +177,7 @@ export function ThemePicker({
 
       {/* ── Live preview ── */}
       <div>
-        <strong style={{ fontSize: 13, color: "#fff", display: "block", marginBottom: 10 }}>Live preview</strong>
+        <strong style={{ fontSize: 13, color: "var(--on-surface)", display: "block", marginBottom: 10 }}>Live preview</strong>
         <div className="theme-preview" style={{ borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)" }}>
           {/* Scoped CSS vars so the preview renders exactly like the live site. */}
           <style>{`.theme-preview{${previewCss}}`}</style>
@@ -202,7 +202,7 @@ function PreviewCard() {
         <span style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)", borderRadius: "var(--radius-md)", padding: "8px 12px", fontSize: 13 }}>
           A card / bubble
         </span>
-        <span style={{ background: "var(--primary)", color: "#fff", borderRadius: "var(--radius-md)", padding: "8px 14px", fontSize: 13, fontWeight: 600 }}>
+        <span style={{ background: "var(--primary)", color: "var(--on-primary)", borderRadius: "var(--radius-md)", padding: "8px 14px", fontSize: 13, fontWeight: 600 }}>
           Primary button
         </span>
       </div>
@@ -231,9 +231,9 @@ function FontDropdown({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        style={{ ...field, marginBottom: 0, display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", textAlign: "left", color: "#fff" }}
+        style={{ ...field, marginBottom: 0, display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", textAlign: "left", color: "var(--on-surface)" }}
       >
-        <span style={{ fontFamily: current?.family, fontSize: 16, color: "#fff" }}>{current?.label}</span>
+        <span style={{ fontFamily: current?.family, fontSize: 16, color: "var(--on-surface)" }}>{current?.label}</span>
         <span style={{ color: "var(--text-muted)", fontSize: 12 }}>{open ? "▲" : "▼"}</span>
       </button>
       {open && (
@@ -246,7 +246,7 @@ function FontDropdown({
                 onChange(o.key);
                 setOpen(false);
               }}
-              style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 12px", background: o.key === value ? "var(--bg-soft)" : "transparent", border: "none", color: "#fff", cursor: "pointer", fontFamily: o.family, fontSize: 17 }}
+              style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 12px", background: o.key === value ? "var(--bg-soft)" : "transparent", border: "none", color: "var(--on-surface)", cursor: "pointer", fontFamily: o.family, fontSize: 17 }}
             >
               {o.label}
             </button>
@@ -275,10 +275,10 @@ function ColorSwatch({
     <div style={{ display: "flex", flexDirection: "column", gap: 8, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: 10, width: 150 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <span style={{ width: 32, height: 32, borderRadius: 8, background: shown, border: "2px solid var(--border)", flexShrink: 0 }} title={`${label}: ${value || "default"}`} />
-        <span style={{ fontSize: 12, color: "#fff", fontWeight: 600, lineHeight: 1.15 }}>{label}</span>
+        <span style={{ fontSize: 12, color: "var(--on-surface)", fontWeight: 600, lineHeight: 1.15 }}>{label}</span>
       </div>
       <input type="color" value={shown} onChange={(e) => onChange(e.target.value)} style={{ width: "100%", height: 34, border: "none", background: "transparent", cursor: "pointer", padding: 0 }} />
-      <input type="text" value={value} onChange={(e) => onChange(e.target.value)} placeholder={fallback} style={{ ...field, marginBottom: 0, color: "#fff", fontFamily: "var(--font-mono)", fontSize: 12, padding: "6px 8px" }} />
+      <input type="text" value={value} onChange={(e) => onChange(e.target.value)} placeholder={fallback} style={{ ...field, marginBottom: 0, color: "var(--on-surface)", fontFamily: "var(--font-mono)", fontSize: 12, padding: "6px 8px" }} />
       <button type="button" onClick={() => onChange("")} style={{ fontSize: 11, background: "transparent", color: "var(--text-muted)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "5px 0", cursor: "pointer" }}>
         Reset
       </button>

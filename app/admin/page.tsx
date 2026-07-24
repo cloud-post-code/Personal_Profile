@@ -64,7 +64,7 @@ export default async function AdminLogin({
             width: "100%",
             padding: "12px",
             background: "var(--primary)",
-            color: "white",
+            color: "var(--on-primary)",
             border: "none",
             borderRadius: "var(--radius-md)",
             fontWeight: 600,

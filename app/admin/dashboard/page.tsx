@@ -9,10 +9,7 @@ import { SocialsEditor } from "../SocialsEditor";
 import { ExperienceEditor } from "../ExperienceEditor";
 import {
   logout,
-  saveProfileBasics,
-  saveBio,
-  saveExperience,
-  saveOther,
+  saveProfile,
   uploadResume,
   savePersona,
   uploadHeadshot,
@@ -80,7 +77,7 @@ export default async function Dashboard() {
 
       {/* ── Upload resume — drops the resume's raw text into the Bio. ── */}
       <div style={{ border: "1px solid var(--primary)", borderRadius: "var(--radius-md)", padding: 16, marginBottom: 20 }}>
-        <strong style={{ fontSize: 14, color: "#fff", display: "block", marginBottom: 6 }}>
+        <strong style={{ fontSize: 14, color: "var(--on-surface)", display: "block", marginBottom: 6 }}>
           Upload your resume
         </strong>
         <UploadToGenerate
@@ -90,8 +87,9 @@ export default async function Dashboard() {
         />
       </div>
 
-      {/* Identity + contact + socials — combined save (bio + experience too). */}
-      <form action={saveProfileBasics}>
+      {/* One form for the whole Profile tab — identity, bio, experience, and
+          other all save together from the single button at the bottom. */}
+      <form action={saveProfile}>
         <div style={grid2}>
           <div>
             <Label>Name</Label>
@@ -115,35 +113,35 @@ export default async function Dashboard() {
 
         <Label>Social media (add one at a time)</Label>
         <SocialsEditor initial={socials} />
-        <SaveButton>Save details</SaveButton>
-      </form>
 
-      {/* ── Bio ── plain editable text (resume text lands here). */}
-      <div style={{ borderTop: "1px solid var(--border)", margin: "18px 0", paddingTop: 16 }}>
-        <form action={saveBio}>
+        {/* ── Bio ── plain editable text (resume text lands here). */}
+        <div style={{ borderTop: "1px solid var(--border)", margin: "18px 0", paddingTop: 16 }}>
           <Label>Bio</Label>
           <textarea name="bio" defaultValue={profile.bio} rows={10} style={{ ...field, resize: "vertical" }} />
-          <SaveButton>Save bio</SaveButton>
-        </form>
-      </div>
+        </div>
 
-      {/* ── Experience ── manual add-one-at-a-time list. */}
-      <div style={{ borderTop: "1px solid var(--border)", margin: "18px 0", paddingTop: 16 }}>
-        <form action={saveExperience}>
-          <Label>Experience (add one at a time)</Label>
+        {/* ── Experience ── a summary paragraph plus the per-role cards. */}
+        <div style={{ borderTop: "1px solid var(--border)", margin: "18px 0", paddingTop: 16 }}>
+          <Label>Experience — overview paragraph</Label>
+          <textarea
+            name="experienceSummary"
+            defaultValue={profile.experienceSummary}
+            rows={5}
+            placeholder="A paragraph summarizing your work experience — this is what shows on your profile."
+            style={{ ...field, resize: "vertical" }}
+          />
+          <Label>Experience roles (add one at a time)</Label>
           <ExperienceEditor initial={experience} />
-          <SaveButton>Save experience</SaveButton>
-        </form>
-      </div>
+        </div>
 
-      {/* ── Other ── everything else from the resume (education, skills, etc.). */}
-      <div style={{ borderTop: "1px solid var(--border)", margin: "18px 0", paddingTop: 16 }}>
-        <form action={saveOther}>
+        {/* ── Other ── everything else from the resume (education, skills, etc.). */}
+        <div style={{ borderTop: "1px solid var(--border)", margin: "18px 0", paddingTop: 16 }}>
           <Label>Other (education, skills, awards — everything else)</Label>
           <textarea name="other" defaultValue={profile.other} rows={7} style={{ ...field, resize: "vertical" }} />
-          <SaveButton>Save other</SaveButton>
-        </form>
-      </div>
+        </div>
+
+        <SaveButton>Save profile</SaveButton>
+      </form>
     </section>
   );
 
@@ -207,7 +205,7 @@ export default async function Dashboard() {
 
       {/* ── Import all repos from a GitHub profile link. ── */}
       <div style={{ border: "1px solid var(--primary)", borderRadius: "var(--radius-md)", padding: 16, marginBottom: 18 }}>
-        <strong style={{ fontSize: 14, color: "#fff", display: "block", marginBottom: 6 }}>
+        <strong style={{ fontSize: 14, color: "var(--on-surface)", display: "block", marginBottom: 6 }}>
           Import from GitHub
         </strong>
         <p style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 10 }}>

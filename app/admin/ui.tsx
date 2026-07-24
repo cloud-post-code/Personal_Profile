@@ -24,7 +24,7 @@ export const field: React.CSSProperties = {
 export const btn: React.CSSProperties = {
   padding: "9px 16px",
   background: "var(--primary)",
-  color: "white",
+  color: "var(--on-primary)",
   border: "none",
   borderRadius: "var(--radius-sm)",
   fontWeight: 600,
