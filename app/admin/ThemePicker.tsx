@@ -2,7 +2,20 @@
 
 import { useState } from "react";
 import { field, Label } from "./ui";
-import { COLOR_ROLES, HEADING_WEIGHTS, themeVarLines, type ThemeColors } from "@/lib/theme";
+import {
+  COLOR_GROUPS,
+  COLOR_ROLES,
+  HEADING_WEIGHTS,
+  contrastRatioOf,
+  themeVarLines,
+  type ThemeColors,
+} from "@/lib/theme";
+
+/** "7.2:1" for the swatch pair readout, or "—" when a color won't parse. */
+function ratioLabel(bg: string, fg: string): string {
+  const r = contrastRatioOf(bg, fg);
+  return r ? `${r.toFixed(1)}:1` : "—";
+}
 
 type FontOption = { key: string; label: string; family: string };
 type RadiusOption = { key: string; label: string; preview: string };
@@ -122,28 +135,84 @@ export function ThemePicker({
         </div>
       </div>
 
-      {/* ── Colors (all 7 roles) ── */}
+      {/* ── Colors ── grouped by fill, each owning the text that sits on it. ── */}
       <div>
         <strong style={{ fontSize: 13, color: "var(--on-surface)", display: "block", marginBottom: 10 }}>Colors</strong>
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-          {COLOR_ROLES.map((r) => (
-            <ColorSwatch
-              key={r.key}
-              label={r.label}
-              value={colors[r.key] ?? ""}
-              fallback={r.fallback}
-              onChange={(v) => setColor(r.key, v)}
-            />
-          ))}
+        {/* Three across on desktop, stacked on mobile — auto-fit handles both
+            without a media query, since each card has a 240px floor. */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+            gap: 12,
+            alignItems: "start",
+          }}
+        >
+          {COLOR_GROUPS.map((g) => {
+            const fillValue = colors[g.fill.key] ?? "";
+            const fillShown = /^#[0-9a-fA-F]{3,8}$/.test(fillValue) ? fillValue : g.fill.fallback;
+            return (
+              <div
+                key={g.fill.key}
+                style={{
+                  border: "1px solid var(--border)",
+                  borderRadius: "var(--radius-md)",
+                  padding: 14,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 12,
+                }}
+              >
+                {/* The fill, then the text that sits on it — one card each. */}
+                <ColorField
+                  label={g.fill.label}
+                  value={fillValue}
+                  fallback={g.fill.fallback}
+                  onChange={(v) => setColor(g.fill.key, v)}
+                />
+                {g.text.map((t) => {
+                  const tv = colors[t.key] ?? "";
+                  const tShown = /^#[0-9a-fA-F]{3,8}$/.test(tv) ? tv : t.fallback;
+                  return (
+                    <div key={t.key} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      <ColorField
+                        label={t.label}
+                        value={tv}
+                        fallback={t.fallback}
+                        onChange={(v) => setColor(t.key, v)}
+                      />
+                      {/* Read the pair exactly as it appears on the site. */}
+                      <div
+                        style={{
+                          background: fillShown,
+                          color: tShown,
+                          borderRadius: "var(--radius-sm)",
+                          padding: "10px 12px",
+                          fontSize: 12,
+                          border: "1px solid var(--border)",
+                        }}
+                      >
+                        Sample text · {ratioLabel(fillShown, tShown)}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
         </div>
         <p style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 10 }}>
-          These control every color on the site. Leave one blank to keep its default.
+          Each fill owns the text that sits on it, with its live contrast ratio — aim for 4.5 or
+          higher. Muted text is derived from each text color automatically. Cards and primary
+          buttons share the Surface color. Clear a hex field to fall back to its default.
         </p>
       </div>
 
-      {/* ── Corners ── */}
+      {/* ── Corners & border ── both describe an element's edge, so the corner
+          shape and the line drawn around it are chosen side by side. ── */}
       <div>
-        <strong style={{ fontSize: 13, color: "var(--on-surface)", display: "block", marginBottom: 10 }}>Corners</strong>
+        <strong style={{ fontSize: 13, color: "var(--on-surface)", display: "block", marginBottom: 10 }}>Corners &amp; border</strong>
+        <div style={{ display: "flex", gap: 20, flexWrap: "wrap", alignItems: "flex-start" }}>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
           {radiusOptions.map((r, i) => {
             const on = r.key === themeRadius;
@@ -172,6 +241,22 @@ export function ThemePicker({
               </button>
             );
           })}
+        </div>
+          <div
+            style={{
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-md)",
+              padding: 14,
+              minWidth: 200,
+            }}
+          >
+            <ColorField
+              label="Border color"
+              value={colors.border ?? ""}
+              fallback="#2A335C"
+              onChange={(v) => setColor("border", v)}
+            />
+          </div>
         </div>
       </div>
 
@@ -257,8 +342,12 @@ function FontDropdown({
   );
 }
 
-/** A color control shown open by default: swatch + native picker + hex entry. */
-function ColorSwatch({
+/**
+ * One color row: a swatch that opens the native picker, its label, and a hex
+ * field. Carries no card chrome of its own — the containing group card frames
+ * it — and no reset; clearing the hex field falls back to the default.
+ */
+function ColorField({
   label,
   value,
   fallback,
@@ -272,16 +361,50 @@ function ColorSwatch({
   const shown = /^#[0-9a-fA-F]{3,8}$/.test(value) ? value : fallback;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: 10, width: 150 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 0 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ width: 32, height: 32, borderRadius: 8, background: shown, border: "2px solid var(--border)", flexShrink: 0 }} title={`${label}: ${value || "default"}`} />
-        <span style={{ fontSize: 12, color: "var(--on-surface)", fontWeight: 600, lineHeight: 1.15 }}>{label}</span>
+        {/* The swatch is the color picker — clicking it opens the OS picker. */}
+        <span style={{ position: "relative", width: 32, height: 32, flexShrink: 0 }}>
+          <span
+            aria-hidden
+            style={{
+              display: "block",
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              background: shown,
+              border: "2px solid var(--border)",
+            }}
+          />
+          <input
+            type="color"
+            value={shown}
+            onChange={(e) => onChange(e.target.value)}
+            aria-label={label}
+            title={`${label}: ${value || "default"}`}
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              opacity: 0,
+              border: "none",
+              padding: 0,
+              cursor: "pointer",
+            }}
+          />
+        </span>
+        <span style={{ fontSize: 12, color: "var(--on-surface)", fontWeight: 600, lineHeight: 1.2 }}>
+          {label}
+        </span>
       </div>
-      <input type="color" value={shown} onChange={(e) => onChange(e.target.value)} style={{ width: "100%", height: 34, border: "none", background: "transparent", cursor: "pointer", padding: 0 }} />
-      <input type="text" value={value} onChange={(e) => onChange(e.target.value)} placeholder={fallback} style={{ ...field, marginBottom: 0, color: "var(--on-surface)", fontFamily: "var(--font-mono)", fontSize: 12, padding: "6px 8px" }} />
-      <button type="button" onClick={() => onChange("")} style={{ fontSize: 11, background: "transparent", color: "var(--text-muted)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "5px 0", cursor: "pointer" }}>
-        Reset
-      </button>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={fallback}
+        style={{ ...field, marginBottom: 0, color: "var(--on-surface)", fontFamily: "var(--font-mono)", fontSize: 12, padding: "6px 8px" }}
+      />
     </div>
   );
 }

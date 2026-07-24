@@ -101,24 +101,75 @@ export const RADIUS_OPTIONS = (Object.keys(RADIUS_PRESETS) as RadiusKey[]).map((
  */
 export type ThemeColors = {
   bg?: string;
+  /** Cards, panels, and primary buttons all share this fill. */
   surface?: string;
   border?: string;
-  text?: string;
-  textMuted?: string;
-  primary?: string;
   accent?: string;
+
+  // ── Per-fill text ── each pairs with the fill it sits on, so contrast is
+  // chosen where it's actually seen rather than as a floating global. Muted
+  // variants aren't editable; they're derived from these (see mutedFrom).
+  text?: string;
+  surfaceText?: string;
+  accentText?: string;
 };
 
-/** The color roles shown in the admin design panel (order = display order). */
-export const COLOR_ROLES: { key: keyof ThemeColors; label: string; fallback: string }[] = [
-  { key: "bg", label: "Background", fallback: "#0B1020" },
-  { key: "surface", label: "Surface / cards", fallback: "#1A2140" },
-  { key: "border", label: "Border", fallback: "#2A335C" },
-  { key: "text", label: "Text", fallback: "#E8ECFF" },
-  { key: "textMuted", label: "Muted text", fallback: "#9AA3C7" },
-  { key: "primary", label: "Primary", fallback: "#7C5CFF" },
-  { key: "accent", label: "Accent", fallback: "#FFB84D" },
+/**
+ * The design panel is organized as fills, each owning the text that sits on
+ * it. `surface` doubles as `--primary` so cards and buttons never drift apart.
+ * Text is nested under its backdrop rather than standing alone, so a contrast
+ * pair is always edited together.
+ */
+export const COLOR_GROUPS: {
+  fill: { key: keyof ThemeColors; label: string; fallback: string };
+  text: { key: keyof ThemeColors; label: string; fallback: string }[];
+}[] = [
+  {
+    fill: { key: "bg", label: "Background", fallback: "#0B1020" },
+    text: [{ key: "text", label: "Text on background", fallback: "#E8ECFF" }],
+  },
+  {
+    fill: { key: "surface", label: "Surface / cards & primary", fallback: "#1A2140" },
+    text: [{ key: "surfaceText", label: "Text on surface", fallback: "#E8ECFF" }],
+  },
+  {
+    fill: { key: "accent", label: "Accent", fallback: "#FFB84D" },
+    text: [{ key: "accentText", label: "Text on accent", fallback: "#10131C" }],
+  },
 ];
+
+/** Flat list of every color role — used to emit the hidden form inputs. */
+export const COLOR_ROLES: { key: keyof ThemeColors; label: string; fallback: string }[] = [
+  ...COLOR_GROUPS.flatMap((g) => [g.fill, ...g.text]),
+  { key: "border", label: "Border", fallback: "#2A335C" },
+];
+
+/**
+ * Muted text is always derived from its paired text color — faded toward the
+ * fill behind it so the relationship holds for any palette. Editing the text
+ * color moves its muted variant with it, which is why there's no picker.
+ */
+export function mutedFrom(text: string, fill: string): string {
+  // Fade the text toward the fill in small steps: a light fill pulls it
+  // lighter, a dark fill darker. Muted text isn't user-adjustable, so it has
+  // to stay legible on its own — but holding it to the same 4.5:1 as body text
+  // leaves nothing to fade when the base pair is already near that line, and
+  // muted would come out identical to normal text. So it must both stay above
+  // a 3:1 floor (WCAG's large/secondary-text bar) and read as visibly softer
+  // than its source. If nothing satisfies both, one dimmed step still beats
+  // returning the text color unchanged.
+  const direction = isLight(fill) ? 1 : -1;
+  const baseRatio = contrastRatio(text, fill);
+  const floor = Math.max(3, Math.min(4.5, baseRatio * 0.7));
+
+  let best: string | null = null;
+  for (let amount = 0.08; amount <= 0.55; amount += 0.04) {
+    const candidate = shift(text, direction * amount);
+    if (contrastRatio(candidate, fill) < floor) break;
+    best = candidate;
+  }
+  return best ?? shift(text, direction * 0.12);
+}
 
 /** Heading weight options for the design panel. */
 export const HEADING_WEIGHTS = [
@@ -156,6 +207,15 @@ function luminance(h: string): number {
 /** True when a surface is light enough that it needs dark text on top. */
 export function isLight(h: string): boolean {
   return luminance(h) > 0.45;
+}
+
+/**
+ * WCAG contrast ratio between two hex colors, or null if either won't parse.
+ * Used by the admin panel to show each fill/text pair's live ratio.
+ */
+export function contrastRatioOf(a: string, b: string): number | null {
+  if (!rgb(a) || !rgb(b)) return null;
+  return contrastRatio(a, b);
 }
 
 /** WCAG contrast ratio between two hex colors (1 = identical, 21 = max). */
@@ -244,9 +304,9 @@ export function themeVarLines(opts: {
   const surface = hex(c.surface);
   const border = hex(c.border);
   const text = hex(c.text);
-  const textMuted = hex(c.textMuted);
-  const primary = hex(c.primary);
+  const surfaceText = hex(c.surfaceText);
   const accent = hex(c.accent);
+  const accentText = hex(c.accentText);
 
   // Picking a background re-derives every supporting tone, so a light bg can't
   // leave dark-navy panels/borders behind. Explicit choices still win below.
@@ -258,28 +318,39 @@ export function themeVarLines(opts: {
     lines.push(`--border:${d.border};`);
     // Default text to whatever reads on this background; overridden if set.
     lines.push(`--text:${contrastOn(bg)};`);
-    lines.push(`--text-muted:${shift(contrastOn(bg), isLight(bg) ? 0.4 : -0.35)};`);
+    lines.push(`--text-muted:${mutedFrom(contrastOn(bg), bg)};`);
   }
 
+  // Surface is the single fill behind BOTH cards and primary buttons, so the
+  // two can never drift apart.
   if (surface) {
     lines.push(`--surface:${surface};`);
     if (!bg) lines.push(`--bg-soft:${surface};`);
   }
+  const surfaceFill = surface ?? (bg ? derivedSurfaces(bg).surface : "#1A2140");
+  lines.push(`--primary:${surfaceFill};`);
+  lines.push(`--primary-soft:${surfaceFill};`);
+
   if (border) lines.push(`--border:${border};`);
-  if (text) lines.push(`--text:${text};`);
-  if (textMuted) lines.push(`--text-muted:${textMuted};`);
-  if (primary) {
-    lines.push(`--primary:${primary};`);
-    lines.push(`--primary-soft:${primary};`);
-  }
   if (accent) lines.push(`--accent:${accent};`);
 
-  // ── Contrast pairs ── the foreground for content sitting ON each fill, so
-  // buttons/chips/cards always have a readable color inside them.
-  lines.push(`--on-primary:${contrastOn(primary ?? "#7C5CFF")};`);
-  lines.push(`--on-accent:${contrastOn(accent ?? "#FFB84D")};`);
-  const surfaceFill = surface ?? (bg ? derivedSurfaces(bg).surface : "#1A2140");
-  lines.push(`--on-surface:${text ?? contrastOn(surfaceFill)};`);
+  // An explicit background text color also re-derives its muted variant, so
+  // the two always move together.
+  if (text) {
+    lines.push(`--text:${text};`);
+    lines.push(`--text-muted:${mutedFrom(text, bg ?? "#0B1020")};`);
+  }
+
+  // ── Contrast pairs ── each fill's text, taken from the paired picker when
+  // set and otherwise computed, so content on a fill is always legible. Muted
+  // variants are always derived — never separately chosen.
+  const accentFill = accent ?? "#FFB84D";
+  const onSurface = surfaceText ?? contrastOn(surfaceFill);
+  lines.push(`--on-surface:${onSurface};`);
+  lines.push(`--on-surface-muted:${mutedFrom(onSurface, surfaceFill)};`);
+  // Primary shares surface's fill, so it shares surface's foreground too.
+  lines.push(`--on-primary:${onSurface};`);
+  lines.push(`--on-accent:${accentText ?? contrastOn(accentFill)};`);
 
   return lines.join("");
 }

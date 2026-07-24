@@ -14,6 +14,7 @@ import { prisma, getProfile } from "@/lib/db";
 import { checkPassword, createSession, destroySession, isAuthed } from "@/lib/auth";
 import { extractLink, extractDocument, extractText, fileToText, writeProfileFromResume } from "@/lib/scrape";
 import { safeExperience, safeSocials } from "@/lib/knowledge";
+import { COLOR_ROLES } from "@/lib/theme";
 import { fetchGithubProjects } from "@/lib/github";
 import { saveUpload, saveBytes } from "@/lib/uploads";
 import { describeImage } from "@/lib/vision";
@@ -163,16 +164,15 @@ export async function savePersona(formData: FormData) {
   await requireAuth();
   await getProfile();
 
-  // Full color set — every role the design panel exposes.
-  const colors = {
-    bg: String(formData.get("color_bg") ?? "").trim(),
-    surface: String(formData.get("color_surface") ?? "").trim(),
-    border: String(formData.get("color_border") ?? "").trim(),
-    text: String(formData.get("color_text") ?? "").trim(),
-    textMuted: String(formData.get("color_textMuted") ?? "").trim(),
-    primary: String(formData.get("color_primary") ?? "").trim(),
-    accent: String(formData.get("color_accent") ?? "").trim(),
-  };
+  // Driven by COLOR_ROLES so adding a role to the design panel can't silently
+  // fail to save. Only valid hex values are stored — a blank or malformed entry
+  // is omitted entirely so the role falls back to its default rather than being
+  // persisted as an empty string.
+  const colors: Record<string, string> = {};
+  for (const role of COLOR_ROLES) {
+    const v = String(formData.get(`color_${role.key}`) ?? "").trim();
+    if (/^#[0-9a-fA-F]{3,8}$/.test(v)) colors[role.key] = v;
+  }
 
   await prisma.profile.update({
     where: { id: 1 },
