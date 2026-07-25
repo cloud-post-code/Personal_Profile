@@ -40,3 +40,6 @@ prisma/dev.db-journal
 
 # typescript
 *.tsbuildinfo
+
+# Local Claude Code tooling config
+.claude/

@@ -69,6 +69,34 @@ model Project {
   updatedAt   DateTime @updatedAt
 }
 
+/// A single visitor conversation with the chatbot. One row per browser
+/// session (the client sends a stable sessionId); messages hang off it so the
+/// admin "Activity" tab can replay what people are asking.
+model ChatSession {
+  id         String        @id @default(cuid())
+  /// Stable id generated client-side and reused across a visitor's turns.
+  visitorKey String        @unique
+  /// First user question — a quick label for the conversation list.
+  firstQuery String        @default("") @db.Text
+  messages   ChatMessage[]
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+}
+
+/// One message inside a ChatSession: either the visitor's question or the
+/// bot's answer. Text only — rendered cards aren't stored.
+model ChatMessage {
+  id        String      @id @default(cuid())
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId String
+  /// user | assistant
+  role      String
+  content   String      @db.Text
+  createdAt DateTime    @default(now())
+
+  @@index([sessionId])
+}
+
 /// A contact submission captured by the in-chat A2UI contact form.
 model Contact {
   id        String   @id @default(cuid())

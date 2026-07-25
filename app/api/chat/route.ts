@@ -2,6 +2,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { claude, claudeModel } from "@/lib/claude";
 import { buildSystemPrompt } from "@/lib/knowledge";
 import { allProjectsBlock, singleProjectBlock, galleryBlock, type UiBlock } from "@/lib/cards";
+import { recordTurn } from "@/lib/activity";
 
 export const runtime = "nodejs";
 
@@ -69,13 +70,14 @@ async function hydrate(name: string, input: Record<string, unknown>): Promise<Ui
 }
 
 export async function POST(req: Request) {
-  let body: { messages?: Msg[] };
+  let body: { messages?: Msg[]; sessionId?: string };
   try {
     body = await req.json();
   } catch {
     return new Response("Bad request", { status: 400 });
   }
 
+  const sessionId = typeof body.sessionId === "string" ? body.sessionId : "";
   const incoming = (body.messages ?? [])
     .filter(
       (m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string",
@@ -101,6 +103,9 @@ export async function POST(req: Request) {
         content: m.content,
       }));
 
+      // Full assistant text across all turns, for the activity log.
+      let answer = "";
+
       try {
         // Loop so we can run tools and let Claude continue speaking after.
         for (let turn = 0; turn < 4; turn++) {
@@ -117,6 +122,7 @@ export async function POST(req: Request) {
               event.type === "content_block_delta" &&
               event.delta.type === "text_delta"
             ) {
+              answer += event.delta.text;
               controller.enqueue(line({ t: "text", v: event.delta.text }));
             }
           }
@@ -152,6 +158,14 @@ export async function POST(req: Request) {
         controller.enqueue(line({ t: "text", v: `\n\n[${msg}]` }));
       } finally {
         controller.close();
+        // Record this turn for the admin "Activity" tab. Best-effort: never let
+        // a logging failure affect the visitor's chat.
+        const lastUser = [...incoming].reverse().find((m) => m.role === "user");
+        recordTurn({
+          sessionId,
+          question: lastUser?.content ?? "",
+          answer,
+        }).catch(() => {});
       }
     },
   });

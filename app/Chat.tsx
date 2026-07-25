@@ -37,7 +37,27 @@ export default function Chat({
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const sessionId = useRef<string>("");
   const started = messages.length > 0;
+
+  // A stable per-visitor id, kept in sessionStorage so every turn in the same
+  // browser tab groups into one conversation in the admin Activity tab.
+  useEffect(() => {
+    try {
+      const KEY = "chat-session-id";
+      let id = sessionStorage.getItem(KEY);
+      if (!id) {
+        id =
+          typeof crypto !== "undefined" && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `s-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        sessionStorage.setItem(KEY, id);
+      }
+      sessionId.current = id;
+    } catch {
+      /* sessionStorage unavailable (private mode) — server falls back to anon */
+    }
+  }, []);
 
   useEffect(() => {
     // Scroll the thread to the newest message after the DOM has painted it, so
@@ -64,6 +84,7 @@ export default function Chat({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages: next.map(({ role, content }) => ({ role, content })),
+          sessionId: sessionId.current,
         }),
       });
       if (!res.ok || !res.body) throw new Error(await res.text());

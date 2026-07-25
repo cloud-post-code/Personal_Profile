@@ -24,6 +24,7 @@ import {
   deletePhoto,
   toggleContactHandled,
   deleteContact,
+  deleteChatSession,
 } from "../actions";
 import { Extractor } from "../Extractor";
 import { Tabs } from "../Tabs";
@@ -32,19 +33,26 @@ import { AutoUploadFile } from "../AutoUploadFile";
 import { ThemePicker } from "../ThemePicker";
 import type { ThemeColors } from "@/lib/theme";
 import { panel, field, btn, btnGhost, btnDanger, SectionTitle, Label } from "../ui";
+import { chatMetrics } from "@/lib/activity";
 
 export const dynamic = "force-dynamic";
 
 export default async function Dashboard() {
   if (!(await isAuthed())) redirect("/admin");
 
-  const [profile, projects, sources, photos, contacts] = await Promise.all([
+  const [profile, projects, sources, photos, contacts, chatSessions] = await Promise.all([
     getProfile(),
     prisma.project.findMany({ orderBy: { order: "asc" } }),
     prisma.source.findMany({ orderBy: { createdAt: "desc" } }),
     prisma.photo.findMany({ orderBy: { order: "asc" } }),
     prisma.contact.findMany({ orderBy: { createdAt: "desc" } }),
+    prisma.chatSession.findMany({
+      orderBy: { updatedAt: "desc" },
+      take: 100,
+      include: { messages: { orderBy: { createdAt: "asc" } } },
+    }),
   ]);
+  const metrics = chatMetrics(chatSessions);
   const unhandled = contacts.filter((c) => !c.handled).length;
   // LinkedIn is now just a social link. If a legacy linkedin value exists and
   // isn't already in socials, surface it as a pre-filled row so it's not lost.
@@ -393,6 +401,129 @@ export default async function Dashboard() {
     </section>
   );
 
+  // ── ACTIVITY TAB — what visitors are asking the chatbot ──
+  const activityTab = (
+    <section style={panel}>
+      <SectionTitle>Activity — visitor conversations</SectionTitle>
+      <p style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 14 }}>
+        Every conversation people have with your chatbot is recorded here — their
+        questions and the answers they got. Click any chat to read the full transcript.
+      </p>
+
+      {chatSessions.length === 0 ? (
+        <Empty>No conversations yet. They&apos;ll appear here as visitors chat.</Empty>
+      ) : (
+        <>
+          {/* ── Metrics overview ── */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+              gap: 10,
+              marginBottom: 16,
+            }}
+          >
+            <Stat label="Chats" value={metrics.totalChats} />
+            <Stat label="This week" value={metrics.chatsThisWeek} />
+            <Stat label="Questions" value={metrics.totalQuestions} />
+            <Stat label="Messages" value={metrics.totalMessages} />
+            <Stat label="Avg / chat" value={metrics.avgQuestions} />
+          </div>
+
+          {/* ── Most-asked questions ── */}
+          {metrics.topQuestions.length > 0 && (
+            <div style={{ marginBottom: 18 }}>
+              <Label>Most asked</Label>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {metrics.topQuestions.map((q) => (
+                  <div
+                    key={q.label}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: 10,
+                      alignItems: "center",
+                      border: "1px solid var(--border)",
+                      borderRadius: 8,
+                      padding: "7px 12px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 13,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        minWidth: 0,
+                      }}
+                    >
+                      {q.label}
+                    </span>
+                    <span
+                      style={{
+                        flexShrink: 0,
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: "var(--primary-soft)",
+                        background: "var(--bg-soft)",
+                        borderRadius: 999,
+                        padding: "1px 9px",
+                      }}
+                    >
+                      {q.count}×
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <Label>All conversations</Label>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {chatSessions.map((s) => (
+          <details key={s.id} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px" }}>
+            <summary style={{ cursor: "pointer", display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", listStyle: "none" }}>
+              <span style={{ minWidth: 0, flex: 1 }}>
+                <strong style={{ fontSize: 14, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {s.firstQuery || "(no question)"}
+                </strong>
+                <span style={{ color: "var(--text-muted)", fontSize: 11 }}>
+                  {s.messages.length} messages · {s.updatedAt.toISOString().slice(0, 16).replace("T", " ")} UTC
+                </span>
+              </span>
+              <form action={deleteChatSession}>
+                <input type="hidden" name="id" value={s.id} />
+                <button style={btnDanger as React.CSSProperties}>Delete</button>
+              </form>
+            </summary>
+            <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+              {s.messages.map((m) => (
+                <div
+                  key={m.id}
+                  style={{
+                    alignSelf: m.role === "user" ? "flex-end" : "flex-start",
+                    maxWidth: "85%",
+                    background: m.role === "user" ? "var(--primary)" : "var(--bg-soft)",
+                    color: m.role === "user" ? "var(--on-primary)" : "var(--text)",
+                    border: m.role === "user" ? "1px solid transparent" : "1px solid var(--border)",
+                    borderRadius: 12,
+                    padding: "8px 12px",
+                    fontSize: 13,
+                    whiteSpace: "pre-wrap",
+                  }}
+                >
+                  {m.content}
+                </div>
+              ))}
+            </div>
+          </details>
+        ))}
+          </div>
+        </>
+      )}
+    </section>
+  );
+
   return (
     <main style={{ maxWidth: 860, margin: "0 auto", padding: "24px 20px 80px" }}>
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
@@ -415,6 +546,7 @@ export default async function Dashboard() {
           { key: "projects", label: "Projects", content: projectsTab },
           { key: "knowledge", label: "Knowledge", content: knowledgeTab },
           { key: "photos", label: "Photos", content: photosTab },
+          { key: "activity", label: "Activity", content: activityTab },
           { key: "contacts", label: "Contacts", badge: unhandled, content: contactsTab },
         ]}
       />
@@ -465,6 +597,27 @@ function UploadToGenerate({
 
 function Empty({ children }: { children: React.ReactNode }) {
   return <p style={{ color: "var(--text-muted)", fontSize: 14 }}>{children}</p>;
+}
+
+/** A single metric tile: big number over a small label. */
+function Stat({ label, value }: { label: string; value: number }) {
+  return (
+    <div
+      style={{
+        border: "1px solid var(--border)",
+        borderRadius: 10,
+        padding: "12px 14px",
+        background: "var(--bg-soft)",
+      }}
+    >
+      <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "var(--font-heading)", lineHeight: 1.1 }}>
+        {value}
+      </div>
+      <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 2 }}>
+        {label}
+      </div>
+    </div>
+  );
 }
 
 function TypePill({ t }: { t: string }) {

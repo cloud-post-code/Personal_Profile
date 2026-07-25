@@ -232,6 +232,7 @@ export function ThemePicker({
                     background: tint,
                     borderRadius: r.preview,
                     border: on ? "3px solid var(--text)" : "3px solid transparent",
+                    boxShadow: on ? "none" : "inset 0 0 0 1px var(--border)",
                     transition: "border-color 0.15s ease",
                   }}
                 />
@@ -410,4 +411,8 @@ function ColorField({
 }
 
 const grid2: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 };
-const CORNER_TINTS = ["var(--primary)", "var(--accent)", "var(--primary-soft)"];
+// Fills for the corner-shape previews. These are decorative shape samples, so
+// they must stay visible against the editor panel no matter what the live theme
+// colors are — a theme whose --primary matches the panel would otherwise make
+// the swatch blend in and read as an empty bordered box.
+const CORNER_TINTS = ["var(--accent)", "var(--primary)", "var(--primary-soft)"];

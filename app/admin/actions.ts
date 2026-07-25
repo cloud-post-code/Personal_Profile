@@ -463,6 +463,14 @@ export async function deleteContact(formData: FormData) {
   revalidatePath("/admin/dashboard");
 }
 
+/** Delete one recorded conversation (messages cascade). */
+export async function deleteChatSession(formData: FormData) {
+  await requireAuth();
+  const id = String(formData.get("id") ?? "");
+  if (id) await prisma.chatSession.delete({ where: { id } }).catch(() => {});
+  revalidatePath("/admin/dashboard");
+}
+
 // ── helpers ──
 function toData(r: {
   title: string | null;
