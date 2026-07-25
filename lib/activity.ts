@@ -43,7 +43,7 @@ export async function recordTurn({
 /** A conversation with its messages, as loaded for the admin Activity tab. */
 type SessionWithMessages = {
   createdAt: Date;
-  messages: { role: string; content: string }[];
+  messages: { role: string; content: string; rating?: string | null }[];
 };
 
 /**
@@ -75,6 +75,10 @@ export function chatMetrics(sessions: SessionWithMessages[]) {
     .sort((a, b) => b.count - a.count)
     .slice(0, 5);
 
+  // Feedback tallies across all bot answers.
+  const botMessages = sessions.flatMap((s) => s.messages.filter((m) => m.role === "assistant"));
+  const flaggedDown = botMessages.filter((m) => m.rating === "down").length;
+
   return {
     totalChats: sessions.length,
     totalMessages,
@@ -82,5 +86,6 @@ export function chatMetrics(sessions: SessionWithMessages[]) {
     chatsThisWeek,
     avgQuestions,
     topQuestions,
+    flaggedDown,
   };
 }

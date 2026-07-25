@@ -25,6 +25,7 @@ import {
   toggleContactHandled,
   deleteContact,
   deleteChatSession,
+  saveChatFeedback,
 } from "../actions";
 import { Extractor } from "../Extractor";
 import { Tabs } from "../Tabs";
@@ -428,6 +429,7 @@ export default async function Dashboard() {
             <Stat label="Questions" value={metrics.totalQuestions} />
             <Stat label="Messages" value={metrics.totalMessages} />
             <Stat label="Avg / chat" value={metrics.avgQuestions} />
+            <Stat label="Flagged 👎" value={metrics.flaggedDown} />
           </div>
 
           {/* ── Most-asked questions ── */}
@@ -496,24 +498,9 @@ export default async function Dashboard() {
                 <button style={btnDanger as React.CSSProperties}>Delete</button>
               </form>
             </summary>
-            <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 10 }}>
               {s.messages.map((m) => (
-                <div
-                  key={m.id}
-                  style={{
-                    alignSelf: m.role === "user" ? "flex-end" : "flex-start",
-                    maxWidth: "85%",
-                    background: m.role === "user" ? "var(--primary)" : "var(--bg-soft)",
-                    color: m.role === "user" ? "var(--on-primary)" : "var(--text)",
-                    border: m.role === "user" ? "1px solid transparent" : "1px solid var(--border)",
-                    borderRadius: 12,
-                    padding: "8px 12px",
-                    fontSize: 13,
-                    whiteSpace: "pre-wrap",
-                  }}
-                >
-                  {m.content}
-                </div>
+                <MessageRow key={m.id} message={m} />
               ))}
             </div>
           </details>
@@ -597,6 +584,95 @@ function UploadToGenerate({
 
 function Empty({ children }: { children: React.ReactNode }) {
   return <p style={{ color: "var(--text-muted)", fontSize: 14 }}>{children}</p>;
+}
+
+/** One message in a transcript: the bubble, plus feedback controls on bot answers. */
+function MessageRow({
+  message,
+}: {
+  message: { id: string; role: string; content: string; rating: string | null; note: string | null };
+}) {
+  const isUser = message.role === "user";
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: isUser ? "flex-end" : "flex-start", gap: 4 }}>
+      <div
+        style={{
+          maxWidth: "85%",
+          background: isUser ? "var(--primary)" : "var(--bg-soft)",
+          color: isUser ? "var(--on-primary)" : "var(--text)",
+          border: isUser ? "1px solid transparent" : "1px solid var(--border)",
+          borderRadius: 12,
+          padding: "8px 12px",
+          fontSize: 13,
+          whiteSpace: "pre-wrap",
+        }}
+      >
+        {message.content}
+      </div>
+      {!isUser && <FeedbackControls id={message.id} rating={message.rating} note={message.note} />}
+    </div>
+  );
+}
+
+/**
+ * Admin feedback on a bot answer. 👍/👎 buttons submit immediately; the note
+ * (a correction the bot should follow next time) submits with its own Save.
+ * Each is its own form so a rating click doesn't require typing a note.
+ */
+function FeedbackControls({
+  id,
+  rating,
+  note,
+}: {
+  id: string;
+  rating: string | null;
+  note: string | null;
+}) {
+  const pill = (active: boolean): React.CSSProperties => ({
+    ...(btnGhost as React.CSSProperties),
+    padding: "4px 10px",
+    fontSize: 13,
+    ...(active ? { borderColor: "var(--primary)", color: "var(--primary-soft)", background: "var(--bg-soft)" } : {}),
+  });
+  return (
+    <div style={{ maxWidth: "85%", width: "100%" }}>
+      <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+        <form action={saveChatFeedback} style={{ display: "flex", gap: 6 }}>
+          <input type="hidden" name="id" value={id} />
+          <input type="hidden" name="note" value={note ?? ""} />
+          <button name="rating" value="up" style={pill(rating === "up")} title="Good answer">👍</button>
+          <button name="rating" value="down" style={pill(rating === "down")} title="Bad answer">👎</button>
+        </form>
+        {rating && (
+          <form action={saveChatFeedback}>
+            <input type="hidden" name="id" value={id} />
+            <input type="hidden" name="rating" value="" />
+            <input type="hidden" name="note" value="" />
+            <button style={{ ...(btnGhost as React.CSSProperties), padding: "4px 10px", fontSize: 12 }} title="Clear feedback">
+              Clear
+            </button>
+          </form>
+        )}
+        {rating === "up" && <span style={{ fontSize: 11, color: "var(--success)" }}>Marked good</span>}
+      </div>
+
+      {/* Correction note — steers future answers when the rating is 👎. */}
+      <form action={saveChatFeedback} style={{ marginTop: 6 }}>
+        <input type="hidden" name="id" value={id} />
+        <input type="hidden" name="rating" value={rating ?? ""} />
+        <textarea
+          name="note"
+          defaultValue={note ?? ""}
+          rows={2}
+          placeholder="What should it have done instead? Saved as a correction the bot follows on future chats."
+          style={{ ...field, marginBottom: 6, fontSize: 12, resize: "vertical" }}
+        />
+        <button style={{ ...(btnGhost as React.CSSProperties), padding: "5px 12px", fontSize: 12 }}>
+          Save correction
+        </button>
+      </form>
+    </div>
+  );
 }
 
 /** A single metric tile: big number over a small label. */

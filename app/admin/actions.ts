@@ -471,6 +471,26 @@ export async function deleteChatSession(formData: FormData) {
   revalidatePath("/admin/dashboard");
 }
 
+/**
+ * Save Blake's feedback on one bot answer from the Activity tab: a rating
+ * (up/down) and an optional correction note. A "down" + note is injected into
+ * future system prompts so the bot doesn't repeat the mistake.
+ */
+export async function saveChatFeedback(formData: FormData) {
+  await requireAuth();
+  const id = String(formData.get("id") ?? "");
+  const ratingRaw = String(formData.get("rating") ?? "");
+  const rating = ratingRaw === "up" || ratingRaw === "down" ? ratingRaw : null;
+  const noteRaw = String(formData.get("note") ?? "").trim();
+  const note = noteRaw ? noteRaw.slice(0, 2000) : null;
+  if (id) {
+    await prisma.chatMessage
+      .update({ where: { id }, data: { rating, note } })
+      .catch(() => {});
+  }
+  revalidatePath("/admin/dashboard");
+}
+
 // ── helpers ──
 function toData(r: {
   title: string | null;

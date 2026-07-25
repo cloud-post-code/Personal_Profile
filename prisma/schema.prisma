@@ -94,6 +94,13 @@ model ChatMessage {
   content   String      @db.Text
   createdAt DateTime    @default(now())
 
+  // ── Admin feedback (set from the Activity tab, only on assistant messages) ──
+  /// null = unrated, "up" = good answer, "down" = bad answer.
+  rating    String?
+  /// Blake's correction: what the bot should have done instead. When set on a
+  /// "down"-rated message, it's injected into future system prompts as guidance.
+  note      String?     @db.Text
+
   @@index([sessionId])
 }
 

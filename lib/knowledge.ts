@@ -10,7 +10,7 @@ import { prisma, getProfile } from "./db";
  * show_project, show_gallery) so it can render rich cards in chat.
  */
 export async function buildSystemPrompt(): Promise<string> {
-  const [profile, projects, sources, photos] = await Promise.all([
+  const [profile, projects, sources, photos, corrections] = await Promise.all([
     getProfile(),
     prisma.project.findMany({ orderBy: { order: "asc" } }),
     prisma.source.findMany({
@@ -19,6 +19,14 @@ export async function buildSystemPrompt(): Promise<string> {
       take: 60,
     }),
     prisma.photo.findMany({ orderBy: { order: "asc" } }),
+    // Admin corrections: bad answers Blake flagged with a note on the Activity
+    // tab. These steer the bot away from repeating mistakes.
+    prisma.chatMessage.findMany({
+      where: { role: "assistant", rating: "down", note: { not: null } },
+      orderBy: { createdAt: "desc" },
+      take: 30,
+      select: { note: true },
+    }),
   ]);
 
   const projectBlock = projects.length
@@ -50,6 +58,15 @@ export async function buildSystemPrompt(): Promise<string> {
   const photoBlock = photos.length
     ? `${photos.length} photo(s) available. Use show_gallery to display them.`
     : "(No photos uploaded yet.)";
+
+  const correctionNotes = corrections
+    .map((c) => c.note?.trim())
+    .filter((n): n is string => !!n);
+  const correctionBlock = correctionNotes.length
+    ? `\n\nCORRECTIONS (Blake reviewed past answers and flagged these — follow them strictly, they override nothing factual above but tell you how to behave):\n${correctionNotes
+        .map((n) => `- ${n}`)
+        .join("\n")}`
+    : "";
 
   return `You are the personal AI host for ${profile.name}'s website. You speak on Blake's behalf to visitors — friendly, curious, and genuine, never corporate. Refer to Blake in the first person ("I", "my") as if you are him, unless a visitor asks something you have no information about.
 
@@ -93,7 +110,7 @@ RULES:
 - Only state facts present above. If you don't know, say so warmly and point them to how they can connect with Blake directly.
 - For questions about Blake's history, background, or opinions, synthesize naturally from the ABOUT and KNOWLEDGE SOURCES sections.
 - Keep answers concise and conversational.
-- Never invent projects, jobs, dates, or credentials.`;
+- Never invent projects, jobs, dates, or credentials.${correctionBlock}`;
 }
 
 function connectBlock(p: {
