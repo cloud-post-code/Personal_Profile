@@ -22,14 +22,6 @@ function shortLabel(q: string): string {
   return map[q] ?? q.split(" ").slice(0, 2).join(" ");
 }
 
-/** The four quick actions shown above the chat, each sending a question. */
-const QUICK_ACTIONS: { label: string; q: string }[] = [
-  { label: "Background", q: "What's your background and past experience?" },
-  { label: "About me", q: "Tell me about yourself and how you see the world." },
-  { label: "Connect", q: "How can I connect with you?" },
-  { label: "Projects", q: "What are your recent projects?" },
-];
-
 export default function Chat({
   name,
   tagline,
@@ -124,6 +116,11 @@ export default function Chat({
     }
   }
 
+  function goHome() {
+    setMessages([]);
+    setInput("");
+  }
+
   return (
     <main style={styles.shell}>
       {!started ? (
@@ -151,30 +148,19 @@ export default function Chat({
       ) : (
         <section style={styles.chatWrap}>
           <div style={styles.chatHeader}>
-            {headshot ? (
-              <img src={headshot} alt={name} style={styles.headerAvatar} />
-            ) : (
-              <div style={styles.headerAvatarFallback}>{name.slice(0, 1)}</div>
-            )}
-            <div style={styles.quickActions}>
-              {QUICK_ACTIONS.map((a) => (
-                <button
-                  key={a.label}
-                  style={styles.quickBtn}
-                  onClick={() => send(a.q)}
-                  title={a.q}
-                >
-                  {a.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div style={styles.startersRow}>
-            {starters.slice(0, 5).map((s) => (
-              <button key={s.q} style={styles.chipSmall} onClick={() => send(s.q)} title={s.q}>
-                {shortLabel(s.q)}
-              </button>
-            ))}
+            <button
+              onClick={goHome}
+              style={styles.homeBtn}
+              title="Back to home"
+              aria-label="Back to home"
+            >
+              {headshot ? (
+                <img src={headshot} alt={name} style={styles.headerAvatar} />
+              ) : (
+                <div style={styles.headerAvatarFallback}>{name.slice(0, 1)}</div>
+              )}
+              <span style={styles.homeLabel}>Home</span>
+            </button>
           </div>
           <div ref={scrollRef} style={styles.thread}>
             {messages.map((m, i) => (
@@ -188,6 +174,13 @@ export default function Chat({
             ))}
           </div>
           <div style={styles.composerDock}>
+            <div style={styles.startersRow}>
+              {starters.slice(0, 5).map((s) => (
+                <button key={s.q} style={styles.chipSmall} onClick={() => send(s.q)} title={s.q}>
+                  {shortLabel(s.q)}
+                </button>
+              ))}
+            </div>
             <Composer input={input} setInput={setInput} onSend={() => send(input)} loading={loading} />
           </div>
         </section>
@@ -349,6 +342,21 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 12,
     padding: "16px 0 8px",
   },
+  homeBtn: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 6,
+    background: "transparent",
+    border: "none",
+    padding: 0,
+    cursor: "pointer",
+  },
+  homeLabel: {
+    color: "var(--text-muted)",
+    fontSize: 13,
+    fontWeight: 500,
+  },
   headerAvatar: {
     width: 72,
     height: 72,
@@ -369,16 +377,6 @@ const styles: Record<string, React.CSSProperties> = {
     color: "var(--on-primary)",
     background: "var(--primary)",
     border: "2px solid var(--border)",
-  },
-  quickActions: { display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" },
-  quickBtn: {
-    background: "var(--bg-soft)",
-    border: "1px solid var(--border)",
-    color: "var(--text)",
-    borderRadius: 999,
-    padding: "8px 16px",
-    fontSize: 14,
-    fontWeight: 500,
   },
   thread: { flex: 1, overflowY: "auto", padding: "12px 4px", display: "flex", flexDirection: "column", gap: 14 },
   row: { display: "flex", width: "100%" },
@@ -409,14 +407,24 @@ const styles: Record<string, React.CSSProperties> = {
   },
 
   composerDock: { paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 },
-  startersRow: { display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", padding: "0 0 10px" },
+  startersRow: {
+    display: "flex",
+    gap: 8,
+    justifyContent: "center",
+    flexWrap: "nowrap",
+    overflowX: "auto",
+    padding: "0 0 10px",
+  },
   chipSmall: {
     background: "var(--bg-soft)",
     border: "1px solid var(--border)",
-    color: "var(--text-muted)",
+    color: "var(--text)",
     borderRadius: 999,
-    padding: "6px 12px",
-    fontSize: 13,
+    padding: "8px 16px",
+    fontSize: 14,
+    fontWeight: 500,
     lineHeight: 1.2,
+    whiteSpace: "nowrap",
+    flexShrink: 0,
   },
 };
