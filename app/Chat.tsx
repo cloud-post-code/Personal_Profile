@@ -48,7 +48,13 @@ export default function Chat({
   const started = messages.length > 0;
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    // Scroll the thread to the newest message after the DOM has painted it, so
+    // a freshly added query (and its streaming answer) stays in view.
+    const id = requestAnimationFrame(() => {
+      const el = scrollRef.current;
+      if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    });
+    return () => cancelAnimationFrame(id);
   }, [messages, loading]);
 
   async function send(text: string) {
@@ -163,6 +169,13 @@ export default function Chat({
               ))}
             </div>
           </div>
+          <div style={styles.startersRow}>
+            {starters.slice(0, 5).map((s) => (
+              <button key={s.q} style={styles.chipSmall} onClick={() => send(s.q)} title={s.q}>
+                {shortLabel(s.q)}
+              </button>
+            ))}
+          </div>
           <div ref={scrollRef} style={styles.thread}>
             {messages.map((m, i) => (
               <Bubble
@@ -176,13 +189,6 @@ export default function Chat({
           </div>
           <div style={styles.composerDock}>
             <Composer input={input} setInput={setInput} onSend={() => send(input)} loading={loading} />
-            <div style={styles.startersRow}>
-              {starters.slice(0, 5).map((s) => (
-                <button key={s.q} style={styles.chipSmall} onClick={() => send(s.q)} title={s.q}>
-                  {shortLabel(s.q)}
-                </button>
-              ))}
-            </div>
           </div>
         </section>
       )}
@@ -403,7 +409,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
 
   composerDock: { paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 },
-  startersRow: { display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" },
+  startersRow: { display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", padding: "0 0 10px" },
   chipSmall: {
     background: "var(--bg-soft)",
     border: "1px solid var(--border)",
