@@ -1,0 +1,163 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { field, btn } from "./ui";
+
+type ImportedProject = {
+  id: string;
+  name: string;
+  blurb: string;
+  detail: string;
+  tags: string[];
+  githubUrl: string | null;
+  liveUrl: string | null;
+  stars: number;
+};
+
+type Status =
+  | { kind: "idle" }
+  | { kind: "running"; total: number | null; skipped: number }
+  | { kind: "done"; total: number; skipped: number }
+  | { kind: "error"; message: string };
+
+/**
+ * GitHub import with live streaming: posts to /api/admin/import-github and
+ * renders each project card the moment its line arrives, enrichment and all.
+ */
+export function GithubImport() {
+  const router = useRouter();
+  const [profile, setProfile] = useState("");
+  const [status, setStatus] = useState<Status>({ kind: "idle" });
+  const [imported, setImported] = useState<ImportedProject[]>([]);
+
+  const running = status.kind === "running";
+
+  async function runImport(e: React.FormEvent) {
+    e.preventDefault();
+    if (running || !profile.trim()) return;
+    setImported([]);
+    setStatus({ kind: "running", total: null, skipped: 0 });
+
+    let total = 0;
+    let skipped = 0;
+    try {
+      const res = await fetch("/api/admin/import-github", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profile }),
+      });
+      if (!res.ok || !res.body) throw new Error(`Import failed (${res.status}).`);
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const raw of lines) {
+          if (!raw.trim()) continue;
+          const msg = JSON.parse(raw);
+          if (msg.t === "start") {
+            total = msg.total;
+            skipped = msg.skipped;
+            setStatus({ kind: "running", total, skipped });
+          } else if (msg.t === "project") {
+            setImported((prev) => [...prev, msg.v as ImportedProject]);
+          } else if (msg.t === "error") {
+            throw new Error(String(msg.v));
+          }
+        }
+      }
+      setStatus({ kind: "done", total, skipped });
+      // Refresh the server-rendered project list below so it includes the new rows.
+      router.refresh();
+    } catch (err) {
+      setStatus({ kind: "error", message: err instanceof Error ? err.message : "Import failed." });
+    }
+  }
+
+  return (
+    <div>
+      <form onSubmit={runImport} style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <input
+          name="profile"
+          value={profile}
+          onChange={(e) => setProfile(e.target.value)}
+          placeholder="https://github.com/your-username"
+          required
+          disabled={running}
+          style={{ ...field, marginBottom: 0, flex: 1, minWidth: 240 }}
+        />
+        <button style={{ ...btn, opacity: running ? 0.6 : 1 }} disabled={running}>
+          {running ? "Importing…" : "Import repos"}
+        </button>
+      </form>
+
+      {status.kind !== "idle" && (
+        <p style={{ color: "var(--text-muted)", fontSize: 13, marginTop: 10 }} aria-live="polite">
+          {status.kind === "running" &&
+            (status.total === null
+              ? "Fetching repos from GitHub…"
+              : `Enriching ${imported.length}/${status.total} projects with Claude…` +
+                (status.skipped ? ` (${status.skipped} already imported, skipped)` : ""))}
+          {status.kind === "done" &&
+            (status.total === 0
+              ? `Nothing new to import${status.skipped ? ` — all ${status.skipped} repos already imported` : ""}.`
+              : `Imported ${imported.length} project${imported.length === 1 ? "" : "s"}` +
+                (status.skipped ? ` (${status.skipped} already imported, skipped)` : "") +
+                ".")}
+          {status.kind === "error" && <span style={{ color: "var(--danger)" }}>{status.message}</span>}
+        </p>
+      )}
+
+      {imported.length > 0 && (
+        <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+          {imported.map((p) => (
+            <div
+              key={p.id}
+              style={{
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-sm)",
+                padding: "10px 12px",
+                background: "var(--bg-soft)",
+              }}
+            >
+              <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
+                <strong style={{ fontSize: 14 }}>{p.name}</strong>
+                {p.stars > 0 && (
+                  <span style={{ color: "var(--text-muted)", fontSize: 12 }}>★ {p.stars}</span>
+                )}
+              </div>
+              <p style={{ fontSize: 13, marginTop: 2 }}>{p.blurb}</p>
+              {p.detail && (
+                <p style={{ color: "var(--text-muted)", fontSize: 13, marginTop: 4 }}>{p.detail}</p>
+              )}
+              {p.tags.length > 0 && (
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
+                  {p.tags.map((t) => (
+                    <span
+                      key={t}
+                      style={{
+                        fontSize: 11,
+                        padding: "2px 8px",
+                        borderRadius: 999,
+                        border: "1px solid var(--border)",
+                        color: "var(--text-muted)",
+                      }}
+                    >
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

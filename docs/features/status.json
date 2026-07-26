@@ -13,6 +13,12 @@
       "notes": "ExperienceEditor: role/company/dates/description entries added one at a time, each box animates in like a chat message. Stored on Profile.experience (JSON) and fed into the chatbot system prompt. Live."
     },
     {
+      "id": "retrieval-engine-v1",
+      "title": "Retrieval engine v1: chunk/entity/edge tables, hybrid retrieval + one-hop graph expansion, persona-core prompt",
+      "status": "done",
+      "notes": "Sources are chunked+embedded+entity-extracted inline at ingest (lib/retrieval/*); chat builds persona-core prompt + retrieved context for the visitor's question (buildSystemPrompt(query)). Embeddings: VOYAGE_API_KEY/OPENAI_API_KEY if set, else local hashed n-grams; hybrid BM25+cosine with EntityEdge one-hop expansion. Backfill: npx tsx scripts/reindex.ts. Proof: docs/features/retrieval-engine-v1/proof.ts (green); gate PASS; verified live in browser."
+    },
+    {
       "id": "github-profile-import",
       "title": "Import all projects from a GitHub profile link",
       "status": "done",

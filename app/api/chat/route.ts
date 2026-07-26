@@ -86,9 +86,13 @@ export async function POST(req: Request) {
 
   if (incoming.length === 0) return new Response("No messages", { status: 400 });
 
+  const lastUser = [...incoming].reverse().find((m) => m.role === "user");
+
   let system: string;
   try {
-    system = await buildSystemPrompt();
+    // The visitor's latest question drives retrieval: the prompt carries only
+    // the knowledge relevant to it, not the whole source library.
+    system = await buildSystemPrompt(lastUser?.content);
   } catch {
     return new Response("Knowledge base unavailable", { status: 500 });
   }
@@ -160,7 +164,6 @@ export async function POST(req: Request) {
         controller.close();
         // Record this turn for the admin "Activity" tab. Best-effort: never let
         // a logging failure affect the visitor's chat.
-        const lastUser = [...incoming].reverse().find((m) => m.role === "user");
         recordTurn({
           sessionId,
           question: lastUser?.content ?? "",

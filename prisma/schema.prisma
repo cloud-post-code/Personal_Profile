@@ -37,6 +37,69 @@ model Source {
   featured  Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  chunks    Chunk[]
+}
+
+/// A passage of a Source's raw text, embedded for retrieval. Chunks are
+/// rebuilt wholesale whenever their source is (re)indexed and cascade-delete
+/// with it.
+model Chunk {
+  id         String   @id @default(cuid())
+  source     Source   @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  sourceId   String
+  /// 0-based position within the source.
+  seq        Int      @default(0)
+  text       String @db.Text
+  /// Float32Array bytes; null when embedding failed.
+  embedding  Bytes?
+  /// Which embedder produced `embedding`. Cosine only compares same-model
+  /// vectors, so mixing providers over time degrades gracefully.
+  embedModel String?
+  createdAt  DateTime @default(now())
+  mentions   EntityMention[]
+
+  @@index([sourceId])
+}
+
+/// A named thing the knowledge base talks about (person, org, project, ...).
+/// `key` is the normalized lookup form (lowercased, single-spaced).
+model Entity {
+  id        String   @id @default(cuid())
+  name      String
+  key       String   @unique
+  /// person | org | project | skill | place | topic | event | other
+  type      String   @default("topic")
+  createdAt DateTime @default(now())
+  mentions  EntityMention[]
+  edgesOut  EntityEdge[] @relation("EdgeFrom")
+  edgesIn   EntityEdge[] @relation("EdgeTo")
+}
+
+/// Which chunks mention which entities. Used to hop from retrieved text to
+/// the graph and back.
+model EntityMention {
+  id       String @id @default(cuid())
+  chunk    Chunk  @relation(fields: [chunkId], references: [id], onDelete: Cascade)
+  chunkId  String
+  entity   Entity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  entityId String
+
+  @@unique([chunkId, entityId])
+  @@index([entityId])
+}
+
+/// A directed, labeled relation between two entities ("Zephyrwind —developed
+/// at→ Aeolus Labs"). Powers one-hop expansion at retrieval time.
+model EntityEdge {
+  id       String @id @default(cuid())
+  from     Entity @relation("EdgeFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  fromId   String
+  to       Entity @relation("EdgeTo", fields: [toId], references: [id], onDelete: Cascade)
+  toId     String
+  relation String
+
+  @@unique([fromId, toId, relation])
+  @@index([toId])
 }
 
 /// An uploaded photo. On upload we ask Claude vision for a one-paragraph
@@ -93,7 +156,7 @@ model ChatMessage {
   sessionId String
   /// user | assistant
   role      String
-  content   String      @db.Text
+  content   String @db.Text
   createdAt DateTime    @default(now())
 
   // ── Admin feedback (set from the Activity tab, only on assistant messages) ──
@@ -101,7 +164,7 @@ model ChatMessage {
   rating    String?
   /// Blake's correction: what the bot should have done instead. When set on a
   /// "down"-rated message, it's injected into future system prompts as guidance.
-  note      String?     @db.Text
+  note      String? @db.Text
 
   @@index([sessionId])
 }

@@ -13,15 +13,28 @@ import { redirect } from "next/navigation";
 import { prisma, getProfile } from "@/lib/db";
 import { checkPassword, createSession, destroySession, isAuthed } from "@/lib/auth";
 import { extractLink, extractDocument, extractText, fileToText, writeProfileFromResume } from "@/lib/scrape";
+import { indexSource } from "@/lib/retrieval/indexer";
 import { safeExperience, safeSocials } from "@/lib/knowledge";
 import { COLOR_ROLES } from "@/lib/theme";
-import { fetchGithubProjects, enrichProject } from "@/lib/github";
 import { saveUpload, saveBytes } from "@/lib/uploads";
 import { describeImage } from "@/lib/vision";
 import path from "node:path";
 
 async function requireAuth() {
   if (!(await isAuthed())) redirect("/admin");
+}
+
+/**
+ * Chunk + embed + entity-extract a freshly scanned source, inline with the
+ * ingest request. Best-effort: an indexing failure must never un-scan the
+ * source (retrieval falls back to its summary until a rescan/reindex).
+ */
+async function indexScanned(sourceId: string): Promise<void> {
+  try {
+    await indexSource(sourceId);
+  } catch (e) {
+    console.error(`indexSource(${sourceId}) failed:`, e);
+  }
 }
 
 /**
@@ -227,6 +240,7 @@ export async function addSource(formData: FormData) {
         where: { id: src.id },
         data: { ...toData(r), status: "scanned", error: null },
       });
+      await indexScanned(src.id);
     } catch (e) {
       await prisma.source.update({
         where: { id: src.id },
@@ -247,6 +261,7 @@ export async function addSource(formData: FormData) {
         where: { id: src.id },
         data: { ...toData(r), status: "scanned", error: null },
       });
+      await indexScanned(src.id);
     } catch (e) {
       await prisma.source.update({
         where: { id: src.id },
@@ -266,6 +281,7 @@ export async function addSource(formData: FormData) {
         where: { id: src.id },
         data: { ...toData(r), status: "scanned", error: null },
       });
+      await indexScanned(src.id);
     } catch (e) {
       await prisma.source.update({
         where: { id: src.id },
@@ -287,6 +303,7 @@ export async function rescanSource(formData: FormData) {
       where: { id: src.id },
       data: { ...toData(r), status: "scanned", error: null },
     });
+    await indexScanned(src.id);
   } catch (e) {
     await prisma.source.update({ where: { id: src.id }, data: { status: "failed", error: err(e) } });
   }
@@ -301,6 +318,8 @@ export async function updateSourceSummary(formData: FormData) {
     where: { id },
     data: { summary: String(formData.get("summary") ?? ""), status: "scanned" },
   });
+  // Re-index: for summary-only sources the summary IS the chunked content.
+  await indexScanned(id);
   revalidateAll();
 }
 
@@ -361,50 +380,6 @@ export async function deleteProject(formData: FormData) {
   await requireAuth();
   const id = String(formData.get("id") ?? "");
   if (id) await prisma.project.delete({ where: { id } }).catch(() => {});
-  revalidateAll();
-}
-
-/**
- * Import a GitHub user's public repos as projects. Paste a profile URL (or
- * username); each top repo becomes a Project. Skips repos already imported
- * (matched by githubUrl) so re-running is safe.
- */
-export async function importGithub(formData: FormData) {
-  await requireAuth();
-  const input = String(formData.get("profile") ?? "").trim();
-  if (!input) return;
-
-  const repos = await fetchGithubProjects(input).catch(() => []);
-  if (!repos.length) {
-    revalidateAll();
-    return;
-  }
-
-  // Avoid duplicates: skip repos whose githubUrl is already a project.
-  const existing = await prisma.project.findMany({ select: { githubUrl: true } });
-  const seen = new Set(existing.map((p) => p.githubUrl).filter(Boolean));
-  const fresh = repos.filter((r) => !seen.has(r.githubUrl));
-
-  if (fresh.length) {
-    // Enrich each repo with Haiku (concurrently) so imported cards get a
-    // polished blurb, a "Learn more" detail, and topic tags instead of the
-    // raw GitHub description. enrichProject falls back per-project on failure.
-    const enriched = await Promise.all(fresh.map((r) => enrichProject(r)));
-
-    // Most-starred first (fetch already sorted); order them after existing.
-    const base = await prisma.project.count();
-    await prisma.project.createMany({
-      data: fresh.map((r, i) => ({
-        name: r.name,
-        blurb: enriched[i].blurb,
-        detail: enriched[i].detail || null,
-        tags: JSON.stringify(enriched[i].tags),
-        githubUrl: r.githubUrl,
-        liveUrl: r.liveUrl,
-        order: base + i,
-      })),
-    });
-  }
   revalidateAll();
 }
 

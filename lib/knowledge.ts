@@ -1,23 +1,23 @@
 import { prisma, getProfile } from "./db";
+import { retrieve, formatContext } from "./retrieval/search";
 
 /**
- * Assembles everything the chatbot knows about Blake into a system prompt:
- * the editable profile/persona, curated projects (with GitHub + live links),
- * photos, and extracted sources (links/PDFs/notes). The admin controls all of
- * this content, so the bot only speaks from it.
+ * Assembles the chatbot's system prompt: a persona core (profile, projects,
+ * photos, contact, A2UI instructions, corrections) plus knowledge for THIS
+ * question, retrieved from the chunk/entity index built at ingest time.
+ * The admin controls all of this content, so the bot only speaks from it.
+ *
+ * When no query is given, or nothing has been indexed yet (pre-backfill),
+ * we fall back to the legacy dump of recent source summaries so the bot is
+ * never knowledge-blind.
  *
  * The prompt also tells Claude HOW to use the A2UI tools (show_projects,
  * show_project, show_gallery) so it can render rich cards in chat.
  */
-export async function buildSystemPrompt(): Promise<string> {
-  const [profile, projects, sources, photos, corrections] = await Promise.all([
+export async function buildSystemPrompt(query?: string): Promise<string> {
+  const [profile, projects, photos, corrections, chunkCount] = await Promise.all([
     getProfile(),
     prisma.project.findMany({ orderBy: { order: "asc" } }),
-    prisma.source.findMany({
-      where: { status: "scanned" },
-      orderBy: { createdAt: "desc" },
-      take: 60,
-    }),
     prisma.photo.findMany({ orderBy: { order: "asc" } }),
     // Admin corrections: bad answers Blake flagged with a note on the Activity
     // tab. These steer the bot away from repeating mistakes.
@@ -27,6 +27,7 @@ export async function buildSystemPrompt(): Promise<string> {
       take: 30,
       select: { note: true },
     }),
+    prisma.chunk.count(),
   ]);
 
   const projectBlock = projects.length
@@ -43,17 +44,7 @@ export async function buildSystemPrompt(): Promise<string> {
         .join("\n")
     : "(No projects added yet.)";
 
-  const sourceBlock = sources.length
-    ? sources
-        .map((s) => {
-          const tags = safeTags(s.tags);
-          const ref = s.url ?? s.filename ?? s.title ?? "(source)";
-          return `- [${s.kind}/${s.type}] ${s.title ?? ref} — ${s.summary}${
-            tags.length ? ` (tags: ${tags.join(", ")})` : ""
-          }${s.url ? `\n  ${s.url}` : ""}`;
-        })
-        .join("\n")
-    : "(No sources extracted yet.)";
+  const sourceBlock = await knowledgeBlock(query, chunkCount);
 
   const photoBlock = photos.length
     ? `${photos.length} photo(s) available. Use show_gallery to display them.`
@@ -111,6 +102,35 @@ RULES:
 - For questions about Blake's history, background, or opinions, synthesize naturally from the ABOUT and KNOWLEDGE SOURCES sections.
 - Keep answers concise and conversational.
 - Never invent projects, jobs, dates, or credentials.${correctionBlock}`;
+}
+
+/**
+ * The knowledge section: retrieved chunks + entity relations when we have a
+ * query and an index; the legacy summary dump otherwise.
+ */
+async function knowledgeBlock(query: string | undefined, chunkCount: number): Promise<string> {
+  if (query?.trim() && chunkCount > 0) {
+    try {
+      return formatContext(await retrieve(query));
+    } catch {
+      // Retrieval trouble shouldn't kill the chat — fall through to the dump.
+    }
+  }
+  const sources = await prisma.source.findMany({
+    where: { status: "scanned" },
+    orderBy: { createdAt: "desc" },
+    take: 60,
+  });
+  if (!sources.length) return "(No sources extracted yet.)";
+  return sources
+    .map((s) => {
+      const tags = safeTags(s.tags);
+      const ref = s.url ?? s.filename ?? s.title ?? "(source)";
+      return `- [${s.kind}/${s.type}] ${s.title ?? ref} — ${s.summary}${
+        tags.length ? ` (tags: ${tags.join(", ")})` : ""
+      }${s.url ? `\n  ${s.url}` : ""}`;
+    })
+    .join("\n");
 }
 
 function connectBlock(p: {

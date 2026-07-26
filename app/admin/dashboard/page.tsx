@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { isAuthed } from "@/lib/auth";
 import { prisma, getProfile } from "@/lib/db";
 import { safeTags, safeSocials, safeExperience } from "@/lib/knowledge";
@@ -17,7 +18,6 @@ import {
   updateSourceSummary,
   deleteSource,
   addProject,
-  importGithub,
   deleteProject,
   uploadPhoto,
   updatePhoto,
@@ -28,6 +28,7 @@ import {
   saveChatFeedback,
 } from "../actions";
 import { Extractor } from "../Extractor";
+import { GithubImport } from "../GithubImport";
 import { Tabs } from "../Tabs";
 import { SaveButton } from "../SaveButton";
 import { AutoUploadFile } from "../AutoUploadFile";
@@ -218,18 +219,11 @@ export default async function Dashboard() {
           Import from GitHub
         </strong>
         <p style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 10 }}>
-          Paste your GitHub profile link — your top public repos become project cards
-          (name, description, and live link). Re-running skips ones already imported.
+          Paste your GitHub profile link — your top public repos become project cards, each
+          enriched by Claude with a blurb, a &ldquo;Learn more&rdquo; write-up, and tags. Cards
+          stream in one by one as they finish. Re-running skips ones already imported.
         </p>
-        <form action={importGithub} style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <input
-            name="profile"
-            placeholder="https://github.com/your-username"
-            required
-            style={{ ...field, marginBottom: 0, flex: 1, minWidth: 240 }}
-          />
-          <button style={btn}>Import repos</button>
-        </form>
+        <GithubImport />
       </div>
 
       <form action={addProject}>
@@ -262,7 +256,33 @@ export default async function Dashboard() {
             <div style={{ minWidth: 0 }}>
               <strong style={{ fontSize: 14 }}>{p.name}</strong>
               <p style={{ color: "var(--text-muted)", fontSize: 13 }}>{p.blurb}</p>
-              <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
+              {p.detail && (
+                <details style={{ marginTop: 4 }}>
+                  <summary style={{ fontSize: 12, color: "var(--text-muted)", cursor: "pointer" }}>
+                    Learn more
+                  </summary>
+                  <p style={{ color: "var(--text-muted)", fontSize: 13, marginTop: 4 }}>{p.detail}</p>
+                </details>
+              )}
+              {safeTags(p.tags).length > 0 && (
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
+                  {safeTags(p.tags).map((t) => (
+                    <span
+                      key={t}
+                      style={{
+                        fontSize: 11,
+                        padding: "2px 8px",
+                        borderRadius: 999,
+                        border: "1px solid var(--border)",
+                        color: "var(--text-muted)",
+                      }}
+                    >
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
                 {p.githubUrl && (
                   <a href={p.githubUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>GitHub</a>
                 )}
@@ -519,7 +539,7 @@ export default async function Dashboard() {
           <p style={{ color: "var(--text-muted)", fontSize: 14 }}>Everything here feeds the chatbot & site.</p>
         </div>
         <div style={{ display: "flex", gap: 10 }}>
-          <a href="/" style={btnGhost as React.CSSProperties}>View site</a>
+          <Link href="/" style={btnGhost as React.CSSProperties}>View site</Link>
           <form action={logout}>
             <button style={btnGhost as React.CSSProperties}>Log out</button>
           </form>

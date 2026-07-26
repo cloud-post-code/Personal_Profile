@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { isAuthed } from "@/lib/auth";
 import { login } from "./actions";
 
@@ -72,9 +73,9 @@ export default async function AdminLogin({
         >
           Enter →
         </button>
-        <a href="/" style={{ display: "block", textAlign: "center", marginTop: 16, fontSize: 13 }}>
+        <Link href="/" style={{ display: "block", textAlign: "center", marginTop: 16, fontSize: 13 }}>
           ← back to site
-        </a>
+        </Link>
       </form>
     </main>
   );
