@@ -90,6 +90,8 @@ channel therefore needs a transport, not a second brain.
 - No WhatsApp channel in this feature — only the seam that makes one cheap.
 - No fuzzy/semantic matching of visitor questions to canned answers.
 - No auto-generation of canned answers from the model or from rated activity.
+  (Superseded: `docs/features/ai-drafted-answers` later made blank rows draft
+  themselves from the knowledge base.)
 - No change to retrieval, embeddings, or the knowledge graph.
 
 ## Acceptance

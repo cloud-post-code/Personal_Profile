@@ -24,6 +24,7 @@ import {
   indexApprovedAnswer,
 } from "@/lib/retrieval/origins";
 import { saveCannedAnswer, deleteCannedAnswer } from "@/lib/canned";
+import { redraftAnswer } from "@/lib/answerDrafts";
 import { safeExperience, safeSocials } from "@/lib/knowledge";
 import { PERSONA_SECTIONS, writePersonaSections } from "@/lib/persona";
 import { COLOR_ROLES } from "@/lib/theme";
@@ -649,6 +650,23 @@ export async function deleteCanned(formData: FormData) {
   await requireAuth();
   const id = String(formData.get("id") ?? "").trim();
   if (id) await deleteCannedAnswer(id);
+  revalidatePath("/admin/dashboard");
+}
+
+/**
+ * Throw away a row's text and write a fresh draft. Best-effort like the
+ * indexing wrappers above: a provider failure leaves the existing text in place
+ * and logs, rather than throwing an error page over the whole dashboard.
+ */
+export async function redraftCanned(formData: FormData) {
+  await requireAuth();
+  const id = String(formData.get("id") ?? "").trim();
+  if (!id) return;
+  try {
+    await redraftAnswer(id);
+  } catch (e) {
+    console.error(`redraftCanned(${id}) failed:`, e);
+  }
   revalidatePath("/admin/dashboard");
 }
 

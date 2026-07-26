@@ -1,12 +1,15 @@
 import { CARD_TOOLS, cannedStats } from "@/lib/canned";
-import { saveCanned, deleteCanned } from "./actions";
-import { panel, field, btn, btnDanger, SectionTitle, Label } from "./ui";
+import { saveCanned, deleteCanned, redraftCanned } from "./actions";
+import { panel, field, btn, btnGhost, btnDanger, SectionTitle, Label } from "./ui";
 
 /**
- * The "Answers" tab: hand-written replies to the questions visitors ask over
- * and over. A filled-in row is served straight from the database with no model
- * call; a blank one is just a to-do and falls through to the chatbot, so the
- * tab is safe to leave half-finished.
+ * The "Answers" tab: replies to the questions visitors ask over and over,
+ * served straight from the database with no model call.
+ *
+ * A row nobody has written yet arrives as an AI draft, written from the same
+ * knowledge the chatbot would have used — so the tab opens on a review queue
+ * rather than a blank to-do list. A draft is already live; saving it is Blake
+ * putting his name to it, and Redraft asks for a new one.
  */
 
 type Row = {
@@ -18,6 +21,7 @@ type Row = {
   enabled: boolean;
   hits: number;
   order: number;
+  aiDraft: boolean;
 };
 
 export function AnswersPanel({ rows }: { rows: Row[] }) {
@@ -28,12 +32,18 @@ export function AnswersPanel({ rows }: { rows: Row[] }) {
       <div style={panel}>
         <SectionTitle>Answers</SectionTitle>
         <p style={{ fontSize: 13, marginBottom: 12, lineHeight: 1.55 }}>
-          When a visitor&apos;s question matches one of these, they get your words
-          instantly and the model is never called. Matching ignores case, spacing
-          and a trailing question mark — anything else goes to the chatbot.
+          When a visitor&apos;s question matches one of these, they get the stored
+          words instantly and the model is never called. Matching ignores case,
+          spacing and a trailing question mark — anything else goes to the chatbot.
+        </p>
+        <p style={{ fontSize: 13, marginBottom: 12, lineHeight: 1.55 }}>
+          Blank rows are drafted for you from your knowledge base the next time
+          this tab loads, and go live as soon as they&apos;re written. Edit one and
+          hit Save to make it yours; hit Redraft to throw it away and ask again.
         </p>
         <div style={{ display: "flex", gap: 18, fontSize: 13, flexWrap: "wrap" }}>
           <span><strong>{stats.live}</strong> live</span>
+          <span><strong>{stats.unreviewed}</strong> awaiting your review</span>
           <span><strong>{stats.unanswered}</strong> still unanswered</span>
           <span><strong>{stats.callsSaved}</strong> model calls saved</span>
         </div>
@@ -50,6 +60,8 @@ export function AnswersPanel({ rows }: { rows: Row[] }) {
 
 function AnswerForm({ row }: { row?: Row }) {
   const isNew = !row;
+  const draft = !!row?.aiDraft && !!row.answer.trim();
+
   return (
     <form action={saveCanned} style={panel}>
       {row ? <input type="hidden" name="id" value={row.id} /> : null}
@@ -63,13 +75,24 @@ function AnswerForm({ row }: { row?: Row }) {
         style={field}
       />
 
-      <Label>Answer{isNew ? "" : row.answer.trim() ? "" : " — not written yet"}</Label>
+      <Label>
+        Answer
+        {draft ? " — AI draft, live but not reviewed by you yet" : ""}
+        {!isNew && !draft && !row.answer.trim() ? " — not written yet" : ""}
+      </Label>
       <textarea
         name="answer"
         rows={4}
         defaultValue={row?.answer ?? ""}
-        placeholder="Leave blank to let the chatbot answer this one."
-        style={{ ...field, resize: "vertical", fontFamily: "inherit" }}
+        placeholder="Leave this blank and it gets drafted for you on the next load."
+        style={{
+          ...field,
+          resize: "vertical",
+          fontFamily: "inherit",
+          // A draft is somebody else's words in Blake's voice; the field says so
+          // at a glance instead of making him read the label to find out.
+          borderColor: draft ? "var(--accent)" : undefined,
+        }}
       />
 
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
@@ -101,10 +124,13 @@ function AnswerForm({ row }: { row?: Row }) {
           Live
         </label>
         <button type="submit" style={btn}>
-          {isNew ? "Add" : "Save"}
+          {isNew ? "Add" : draft ? "Save as mine" : "Save"}
         </button>
         {row ? (
           <>
+            <button type="submit" formAction={redraftCanned} style={btnGhost}>
+              Redraft
+            </button>
             <button type="submit" formAction={deleteCanned} style={btnDanger}>
               Delete
             </button>

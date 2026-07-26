@@ -63,6 +63,15 @@
       "next": "Deploy (prisma db push runs on start, so CannedAnswer is created automatically), then fill the five starter answers on the Answers tab — every one left blank is still costing a model call. Admin tab itself not yet clicked through by Claude (admin login required). The WhatsApp channel this refactor was for is still unbuilt."
     },
     {
+      "id": "ai-drafted-answers",
+      "feature_dir": "docs/features/ai-drafted-answers",
+      "proof": "docs/features/ai-drafted-answers/PROOF.md",
+      "priority": 2,
+      "status": "passing",
+      "notes": "Blank Answers-tab rows draft themselves from the knowledge base (lib/answerDrafts.ts: buildSystemPrompt(question) + a stored-answer brief, no tools) when the dashboard loads, and a draft is served to visitors immediately with zero model calls — it is the same answer the chatbot would have given, only instant and free. CannedAnswer gains aiDraft (unreviewed marker, cleared by saving) and draftedAt (the auto pass gets one shot per row, ever, so a row Blake empties stays empty). Per-row Redraft button; failures are swallowed and retryable; a pass is capped at 8 rows and hands the page back at DRAFT_DEADLINE_MS (12s) while in-flight drafts still land. Proof: docs/features/ai-drafted-answers/proof.ts (22 assertions green, offline, 2.4s); gate PASS; verified live in the browser — the drafted starter answer is served instantly on the public chat.",
+      "next": "Admin tab not clicked through by Claude (login required — Claude does not enter passwords). Redraft failures are logged, not surfaced in the UI."
+    },
+    {
       "id": "a2a-agent-interface",
       "title": "Expose the agent to other agents over A2A, plus a hosted agent facts card",
       "feature_dir": "docs/features/a2a-agent-interface",

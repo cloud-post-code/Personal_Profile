@@ -34,6 +34,7 @@ import { GraphPanel } from "../GraphPanel";
 import { AnswersPanel } from "../AnswersPanel";
 import { graphStats, listEntities, listEdges } from "@/lib/retrieval/graph";
 import { seedStarterAnswers, listCannedAnswers } from "@/lib/canned";
+import { draftBlankAnswers } from "@/lib/answerDrafts";
 import { ProjectRow } from "../ProjectRow";
 import { Tabs } from "../Tabs";
 import { SaveButton } from "../SaveButton";
@@ -74,8 +75,12 @@ export default async function Dashboard() {
       listEntities(),
       listEdges(),
       // The starter chips ask the same five questions forever, so they're
-      // pre-created as blank rows: the tab opens on a to-do list, not nothing.
-      seedStarterAnswers().then(listCannedAnswers),
+      // pre-created — and any row still blank gets a first draft written from
+      // the knowledge base, so the tab opens on a review queue rather than a
+      // to-do list. Best-effort: a provider outage must not take down the admin.
+      seedStarterAnswers()
+        .then(() => draftBlankAnswers().catch(() => 0))
+        .then(listCannedAnswers),
     ]);
   const metrics = chatMetrics(chatSessions);
   const unhandled = contacts.filter((c) => !c.handled).length;

@@ -103,6 +103,10 @@ export async function saveCannedAnswer(input: {
     cardInput: cardTool ? input.cardInput?.trim() || null : null,
     enabled: input.enabled,
     order: input.order ?? 0,
+    // Saving through the form is Blake's review, whether or not he changed a
+    // word: the text is his now. `draftedAt` is deliberately untouched, so a
+    // row he saves empty stays empty instead of drafting itself again.
+    aiDraft: false,
   };
   // `matchKey` is unique, so two rows can never claim the same question. When
   // one already owns this key, write into it and drop the row being edited —
@@ -128,12 +132,16 @@ export async function deleteCannedAnswer(id: string) {
 }
 
 /** The numbers the admin tab's header reports. */
-export function cannedStats(rows: { answer: string; enabled: boolean; hits: number }[]) {
+export function cannedStats(
+  rows: { answer: string; enabled: boolean; hits: number; aiDraft: boolean }[],
+) {
   const live = rows.filter((r) => r.enabled && r.answer.trim());
   return {
     total: rows.length,
     live: live.length,
     unanswered: rows.filter((r) => !r.answer.trim()).length,
+    // Drafts are live like any other answer; this is the review backlog.
+    unreviewed: rows.filter((r) => r.aiDraft && r.answer.trim()).length,
     callsSaved: rows.reduce((n, r) => n + r.hits, 0),
   };
 }

@@ -191,8 +191,18 @@ model CannedAnswer {
   question  String @db.Text
   /// `question` run through normalizeQuestion() — the actual lookup key.
   matchKey  String   @unique
-  /// Blake's answer. Empty means "not written yet": falls through to the model.
+  /// The answer text. Empty means "not written yet": falls through to the model.
   answer    String   @default("") @db.Text
+  /// True while `answer` is a model-written draft Blake hasn't reviewed. A
+  /// draft is served exactly like a hand-written answer — it comes from the
+  /// same retrieval + persona prompt the chatbot would have used — so this is
+  /// an admin-facing distinction only: it drives the "unreviewed" marker and is
+  /// cleared the moment Blake saves the row.
+  aiDraft   Boolean  @default(false)
+  /// When a draft was last generated for this row. Non-null means the automatic
+  /// pass has already spent its one shot here and must never fire again — so a
+  /// row Blake deliberately empties stays empty instead of refilling itself.
+  draftedAt DateTime?
   /// Optional card to render alongside the answer, named by the tool that
   /// would have drawn it: show_projects | show_project | show_gallery |
   /// show_contact_form. Hydrated through the same path the model path uses.
