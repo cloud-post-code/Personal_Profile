@@ -1,6 +1,12 @@
-import { clientIp, isAuthorized, underRateLimit } from "@/lib/a2a/guard";
+import { authorize, clientIp, underRateLimit } from "@/lib/a2a/guard";
 import { dispatch, negotiateVersion } from "@/lib/a2a/rpc";
-import { httpError, renderResult, sseResponse, versionHeaders } from "@/lib/a2a/transport";
+import {
+  httpError,
+  renderResult,
+  sseResponse,
+  unauthorized,
+  versionHeaders,
+} from "@/lib/a2a/transport";
 import { A2A_ERRORS } from "@/lib/a2a/types";
 
 /**
@@ -60,7 +66,13 @@ function route(
 }
 
 async function handle(req: Request, ctx: Ctx, httpMethod: "GET" | "POST" | "DELETE") {
-  if (!isAuthorized(req.headers)) return httpError(401, "Unauthorized");
+  const auth = authorize(req.headers);
+  if (auth === "locked-out") {
+    return httpError(429, "Too many failed authentication attempts. Try again later.");
+  }
+  if (auth === "unauthorized") {
+    return unauthorized("This agent requires a bearer token. See /agent.");
+  }
   if (!underRateLimit(clientIp(req.headers))) {
     return httpError(429, "Too many requests — this agent is rate limited.");
   }

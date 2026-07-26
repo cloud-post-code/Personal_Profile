@@ -62,6 +62,18 @@ export function httpError(status: number, message: string): Response {
   return Response.json({ error: message }, { status });
 }
 
+/**
+ * 401 with the `WWW-Authenticate` challenge RFC 9110 requires. A2A clients read
+ * it to learn which scheme to present, so omitting it turns "you need a token"
+ * into an unexplained failure.
+ */
+export function unauthorized(message: string): Response {
+  return Response.json(
+    { error: message },
+    { status: 401, headers: { "WWW-Authenticate": 'Bearer realm="a2a"' } },
+  );
+}
+
 /** The error a caller gets when it asks for a protocol generation we don't speak. */
 export function versionNotSupported(id: unknown): Response {
   return jsonRpcError(

@@ -16,6 +16,8 @@
 - The same context id carries conversation history across calls.
 - An AgentFacts document is served with every required field of the published
   schema, and with no fabricated audit claims.
+- The endpoint is closed: no credential, no answer; the admin password and a
+  dedicated key both work; a guessing loop is locked out.
 - The endpoint is rate limited.
 
 ## Primary Proof
@@ -92,9 +94,18 @@ every task in the contexts it opens) is deleted afterwards.
     interfaces.
 26. **Rate limiting bites** — calls past the configured limit are rejected, and
     a different caller is unaffected.
-27. **Part normalization round-trips** — a 0.3 `{kind:"text"}` part and a 1.0
+27. **The endpoint is closed** — no `Authorization` header, a wrong token, and a
+    non-bearer scheme are all refused; the admin password is accepted; a
+    dedicated `A2A_API_KEY` is accepted; both work side by side.
+28. **Guessing is locked out** — six wrong tokens from one address yield five
+    `unauthorized` then `locked-out`, the lockout holds even when the correct
+    password finally arrives, and a different address is unaffected.
+29. **The card and facts advertise the requirement** — the card declares the
+    bearer scheme and requires it, the 0.3 card declares it the 0.3 way, and the
+    AgentFacts document reports `authentication.methods: ["bearer"]`.
+30. **Part normalization round-trips** — a 0.3 `{kind:"text"}` part and a 1.0
     `{text}` part both read as the same internal part.
-28. **Cleanup** — every seeded row and every task created by the proof is gone,
+31. **Cleanup** — every seeded row and every task created by the proof is gone,
     and the tables return to their starting counts.
 
 ## Secondary checks (not proof)

@@ -1,5 +1,5 @@
 import { getProfile } from "@/lib/db";
-import { A2A_RPC_PATH, A2A_REST_PATH, a2aApiKey, agentCardV1 } from "./card";
+import { A2A_RPC_PATH, A2A_REST_PATH, agentCardV1 } from "./card";
 
 /**
  * The agent's "facts card", in NANDA AgentFacts format.
@@ -53,9 +53,9 @@ export async function agentFacts(origin: string): Promise<AgentFacts> {
       modalities: ["text"],
       streaming: true,
       batch: false,
-      authentication: a2aApiKey()
-        ? { methods: ["bearer"], requiredScopes: [] }
-        : { methods: ["none"], requiredScopes: [] },
+      // The endpoint is closed; anyone reading these facts should know a
+      // token is required before they try.
+      authentication: { methods: ["bearer"], requiredScopes: [] },
     },
     skills: card.skills.map((skill) => ({
       id: skill.id,

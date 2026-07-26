@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { getProfile } from "@/lib/db";
-import { agentCardV1, siteOrigin, a2aApiKey } from "@/lib/a2a/card";
+import { agentCardV1, siteOrigin } from "@/lib/a2a/card";
+import { a2aApiKey } from "@/lib/a2a/guard";
 
 /**
  * The human-readable side of the agent's identity: the page a person lands on
@@ -25,7 +26,8 @@ export async function generateMetadata() {
 export default async function AgentPage() {
   const origin = siteOrigin(await headers());
   const [profile, card] = await Promise.all([getProfile(), agentCardV1(origin)]);
-  const locked = !!a2aApiKey();
+  // Always closed now; this only decides which credential to name.
+  const hasDedicatedKey = !!a2aApiKey();
 
   const files = [
     {
@@ -47,7 +49,8 @@ export default async function AgentPage() {
 
   const curl = `curl -X POST ${origin}/api/a2a \\
   -H 'Content-Type: application/json' \\
-  -H 'A2A-Version: 1.0' \\${locked ? "\n  -H 'Authorization: Bearer <token>' \\" : ""}
+  -H 'A2A-Version: 1.0' \\
+  -H 'Authorization: Bearer <token>' \\
   -d '{"jsonrpc":"2.0","id":1,"method":"SendMessage","params":{
         "message":{"messageId":"1","role":"ROLE_USER",
                    "parts":[{"text":"What is ${profile.name} working on?"}]}}}'`;
@@ -94,10 +97,16 @@ export default async function AgentPage() {
             ))}
           </ul>
           <p style={s.dim}>
-            Streaming is supported (Server-Sent Events). Push notifications are not.{" "}
-            {locked
-              ? "This agent requires a bearer token."
-              : "This agent is open — no credentials needed — and rate limited per caller."}
+            Streaming is supported (Server-Sent Events). Push notifications are not.
+          </p>
+          <p style={s.locked}>
+            🔒 <strong>This agent does not accept anonymous requests.</strong> Every call must
+            carry <code style={s.code}>Authorization: Bearer &lt;token&gt;</code>
+            {hasDedicatedKey
+              ? ", using a token issued by " + profile.name + "."
+              : ". Contact " + profile.name + " if you need access."}{" "}
+            Requests are also rate limited per caller, and repeated bad credentials lock an
+            address out.
           </p>
         </section>
 
@@ -183,5 +192,15 @@ const s: Record<string, React.CSSProperties> = {
     color: "var(--on-bg-soft)",
   },
   footnote: { marginTop: 40, fontSize: 13, opacity: 0.6, lineHeight: 1.6 },
+  locked: {
+    fontSize: 14,
+    lineHeight: 1.6,
+    marginTop: 12,
+    padding: "12px 14px",
+    background: "var(--bg-soft)",
+    border: "1px solid var(--border)",
+    borderRadius: "var(--radius-md)",
+    color: "var(--on-bg-soft)",
+  },
   link: { color: "var(--accent-on-bg)" },
 };

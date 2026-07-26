@@ -1,4 +1,5 @@
 import { prisma, getProfile } from "@/lib/db";
+import { a2aApiKey } from "./guard";
 import type { AgentCardV1, AgentSkill } from "./types";
 
 /**
@@ -19,15 +20,6 @@ const AGENT_VERSION = "1.0.0";
 export const A2A_RPC_PATH = "/api/a2a";
 /** Where the equivalent HTTP+JSON (REST) binding lives. */
 export const A2A_REST_PATH = "/api/a2a/rest";
-
-/**
- * True when the endpoint is gated behind a bearer token. A personal agent is
- * usually meant to be public — that's the point of publishing a card — but the
- * endpoint spends model credits, so an operator can lock it with one env var.
- */
-export function a2aApiKey(): string {
-  return (process.env.A2A_API_KEY ?? "").trim();
-}
 
 /**
  * The site's public origin. Prefers the configured URL; falls back to the
@@ -125,13 +117,22 @@ async function buildSkills(name: string): Promise<AgentSkill[]> {
   return skills;
 }
 
-/** Security block: empty when open, a bearer scheme when A2A_API_KEY is set. */
+/**
+ * The endpoint is closed, so the card always declares the bearer scheme. This
+ * is the honest thing to publish and also the useful one: a calling agent reads
+ * it and knows to ask for a token instead of retrying a 401 forever.
+ */
 function securityBlock(): Pick<AgentCardV1, "securitySchemes" | "securityRequirements"> {
-  if (!a2aApiKey()) return { securitySchemes: {}, securityRequirements: [] };
   return {
     // v1.0 wraps each scheme in its oneof member name; 0.3 used a `type` field.
     securitySchemes: {
-      bearer: { httpAuthSecurityScheme: { scheme: "Bearer", description: "Shared bearer token." } },
+      bearer: {
+        httpAuthSecurityScheme: {
+          scheme: "Bearer",
+          description:
+            "A token issued by the agent's owner. This agent does not accept anonymous requests.",
+        },
+      },
     },
     securityRequirements: [{ schemes: { bearer: { list: [] } } }],
   };
@@ -188,12 +189,10 @@ function absolute(origin: string, path: string): string {
  */
 export async function agentCardV03(origin: string): Promise<Record<string, unknown>> {
   const v1 = await agentCardV1(origin);
-  const legacySecurity = a2aApiKey()
-    ? {
-        securitySchemes: { bearer: { type: "http", scheme: "bearer" } },
-        security: [{ bearer: [] }],
-      }
-    : { securitySchemes: {}, security: [] };
+  const legacySecurity = {
+    securitySchemes: { bearer: { type: "http", scheme: "bearer" } },
+    security: [{ bearer: [] }],
+  };
 
   return {
     protocolVersion: "0.3.0",

@@ -1,5 +1,5 @@
 import { agentCardV1, siteOrigin } from "@/lib/a2a/card";
-import { clientIp, isAuthorized, underRateLimit } from "@/lib/a2a/guard";
+import { authorize, clientIp, underRateLimit } from "@/lib/a2a/guard";
 import { canonicalMethod, dispatch, negotiateVersion } from "@/lib/a2a/rpc";
 import {
   httpError,
@@ -7,6 +7,7 @@ import {
   jsonRpcResult,
   renderResult,
   sseResponse,
+  unauthorized,
   versionHeaders,
   versionNotSupported,
 } from "@/lib/a2a/transport";
@@ -28,7 +29,15 @@ export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
-  if (!isAuthorized(req.headers)) return httpError(401, "Unauthorized");
+  // Credentials are checked at the HTTP layer, never in the JSON-RPC payload
+  // (§7). A caller that fails here learns nothing about the agent's methods.
+  const auth = authorize(req.headers);
+  if (auth === "locked-out") {
+    return httpError(429, "Too many failed authentication attempts. Try again later.");
+  }
+  if (auth === "unauthorized") {
+    return unauthorized("This agent requires a bearer token. See /agent.");
+  }
   if (!underRateLimit(clientIp(req.headers))) {
     return httpError(429, "Too many requests — this agent is rate limited.");
   }

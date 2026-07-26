@@ -42,9 +42,16 @@ durable, linkable "here is what this agent is" document — is what the NANDA
   `pushNotifications: false` and the endpoint returns the specific
   `PushNotificationNotSupportedError`, which is the correct, discoverable answer
   rather than a 404.
-- **Open by default, rate limited always.** Publishing a card is an invitation,
-  and every accepted call spends model credits. `A2A_API_KEY` closes the
-  endpoint; `A2A_RATE_LIMIT` (default 30/min/IP) bounds it either way.
+- **Closed, rate limited always.** Every call must present a bearer token
+  matching `A2A_API_KEY` or the admin password; there is no anonymous access,
+  and if neither is configured the endpoint refuses everyone rather than
+  falling open. The card still publishes and declares the bearer scheme —
+  that is how another agent learns this one exists and needs credentials.
+  Because the endpoint validates the admin password it is a guessing oracle,
+  so failed credentials get their own much tighter budget (5 per 15 min per
+  IP) on top of `A2A_RATE_LIMIT` (default 30/min/IP), and comparisons are
+  constant-time. Only the `Authorization` header is accepted — never the admin
+  session cookie, which would make the endpoint cross-site forgeable.
 - **No fabricated trust signals.** The AgentFacts document omits `evaluations`
   entirely and marks `certification.level` as `self-declared`. Nothing here has
   been audited, and claiming otherwise is the exact failure the format exists to

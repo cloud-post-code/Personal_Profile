@@ -1,14 +1,27 @@
-import { a2aApiKey } from "./card";
+import { timingSafeEqual } from "node:crypto";
+import { checkPassword } from "@/lib/auth";
 
 /**
- * The two things that stand between a public A2A endpoint and a surprise
- * Anthropic bill.
+ * Who is allowed to talk to the agent, and how often.
  *
- * Publishing an Agent Card is an invitation: any agent that finds the card is
- * meant to be able to call the endpoint, and every call it makes spends model
- * credits. So the endpoint is open by default (that's the point) but rate
- * limited always, and can be closed entirely with one env var.
+ * The endpoint is CLOSED. Every A2A call must present a bearer token matching
+ * either `A2A_API_KEY` or the admin password — no credential, no answer. The
+ * Agent Card still publishes, because that is how another agent learns this
+ * one exists and that it needs credentials; publishing a card is not the same
+ * as accepting anonymous work.
+ *
+ * Two things follow from accepting the admin password here:
+ *
+ *  1. The endpoint becomes an oracle for guessing that password, so failed
+ *     attempts are throttled far harder than ordinary traffic (5 per 15
+ *     minutes per IP) and every comparison is constant-time.
+ *  2. Only the `Authorization` header is accepted — never the admin session
+ *     cookie. A cookie-authenticated POST endpoint would be cross-site
+ *     forgeable: any page Blake visits while logged in could spend his model
+ *     credits. A bearer token has to be sent deliberately.
  */
+
+export type AuthResult = "ok" | "unauthorized" | "locked-out";
 
 /** Requests allowed per IP per minute. `A2A_RATE_LIMIT=0` disables the limit. */
 function limitPerMinute(): number {
@@ -19,6 +32,11 @@ function limitPerMinute(): number {
 const WINDOW_MS = 60_000;
 const hits = new Map<string, { count: number; resetAt: number }>();
 
+/** Failed credentials are budgeted separately, and much more tightly. */
+const AUTH_WINDOW_MS = 15 * 60_000;
+const MAX_AUTH_FAILURES = 5;
+const authFailures = new Map<string, { count: number; resetAt: number }>();
+
 /**
  * In-memory because it only has to be good enough to stop a runaway loop, and
  * because a shared store would put a database round-trip in front of every
@@ -28,20 +46,23 @@ const hits = new Map<string, { count: number; resetAt: number }>();
 export function underRateLimit(ip: string): boolean {
   const limit = limitPerMinute();
   if (limit === 0) return true;
-
-  const now = Date.now();
-  const entry = hits.get(ip);
-  if (!entry || now >= entry.resetAt) {
-    hits.set(ip, { count: 1, resetAt: now + WINDOW_MS });
-    if (hits.size > 5_000) sweep(now); // bound the map against churning IPs
-    return true;
-  }
-  entry.count += 1;
-  return entry.count <= limit;
+  return bump(hits, ip, WINDOW_MS) <= limit;
 }
 
-function sweep(now: number): void {
-  for (const [key, entry] of hits) if (now >= entry.resetAt) hits.delete(key);
+function bump(store: Map<string, { count: number; resetAt: number }>, key: string, windowMs: number): number {
+  const now = Date.now();
+  const entry = store.get(key);
+  if (!entry || now >= entry.resetAt) {
+    store.set(key, { count: 1, resetAt: now + windowMs });
+    if (store.size > 5_000) sweep(store, now); // bound it against churning IPs
+    return 1;
+  }
+  entry.count += 1;
+  return entry.count;
+}
+
+function sweep(store: Map<string, { count: number; resetAt: number }>, now: number): void {
+  for (const [key, entry] of store) if (now >= entry.resetAt) store.delete(key);
 }
 
 export function clientIp(headers: Headers): string {
@@ -50,15 +71,47 @@ export function clientIp(headers: Headers): string {
   return headers.get("x-real-ip") ?? "unknown";
 }
 
-/**
- * True when the caller may proceed. With no `A2A_API_KEY` configured the agent
- * is public and everyone may; with one configured, the bearer token must match
- * the scheme the Agent Card advertises.
- */
-export function isAuthorized(headers: Headers): boolean {
+/** The optional dedicated token, preferred over handing out the admin password. */
+export function a2aApiKey(): string {
+  return (process.env.A2A_API_KEY ?? "").trim();
+}
+
+function matchesApiKey(token: string): boolean {
   const key = a2aApiKey();
-  if (!key) return true;
-  const header = headers.get("authorization") ?? "";
-  const [scheme, token] = header.split(" ");
-  return scheme?.toLowerCase() === "bearer" && token === key;
+  if (!key) return false;
+  const a = Buffer.from(token);
+  const b = Buffer.from(key);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+/**
+ * Checks the caller's credentials. Returns "locked-out" once an IP has burned
+ * its failure budget, so a guessing loop stops getting answers long before it
+ * could work through a password.
+ */
+export function authorize(headers: Headers): AuthResult {
+  const ip = clientIp(headers);
+  const failures = authFailures.get(ip);
+  if (failures && Date.now() < failures.resetAt && failures.count >= MAX_AUTH_FAILURES) {
+    return "locked-out";
+  }
+
+  const [scheme, token] = (headers.get("authorization") ?? "").split(" ");
+  const presented = scheme?.toLowerCase() === "bearer" ? (token ?? "") : "";
+
+  // checkPassword is the same constant-time comparison /admin logs in with, so
+  // there is exactly one place that knows how the admin password is checked.
+  if (presented && (matchesApiKey(presented) || checkPassword(presented))) {
+    authFailures.delete(ip);
+    return "ok";
+  }
+
+  bump(authFailures, ip, AUTH_WINDOW_MS);
+  return "unauthorized";
+}
+
+/** Test seam: clears the in-memory counters between proof runs. */
+export function resetGuards(): void {
+  hits.clear();
+  authFailures.clear();
 }

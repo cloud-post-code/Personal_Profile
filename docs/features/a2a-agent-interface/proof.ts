@@ -47,7 +47,7 @@ async function main() {
   const { renderResult } = await import("../../../lib/a2a/transport");
   const { agentCardV1, agentCardV03 } = await import("../../../lib/a2a/card");
   const { agentFacts } = await import("../../../lib/a2a/facts");
-  const { underRateLimit } = await import("../../../lib/a2a/guard");
+  const { underRateLimit, authorize, resetGuards } = await import("../../../lib/a2a/guard");
   const { normalizeIncomingMessage, streamEventV03 } = await import(
     "../../../lib/a2a/downgrade"
   );
@@ -160,12 +160,29 @@ async function main() {
         card.capabilities.extendedAgentCard === false,
     );
 
+    check(
+      "card advertises the bearer scheme, so callers know to bring a token",
+      asJson(asJson(asJson(card.securitySchemes ?? {}).bearer).httpAuthSecurityScheme).scheme ===
+        "Bearer",
+      JSON.stringify(card.securitySchemes),
+    );
+    check(
+      "card requires that scheme rather than merely offering it",
+      (card.securityRequirements ?? []).length === 1,
+      JSON.stringify(card.securityRequirements),
+    );
+
     const legacy = asJson(await agentCardV03("https://proof.example"));
     check(
       "legacy card uses the fields 1.0 removed",
       typeof legacy.protocolVersion === "string" &&
         typeof legacy.url === "string" &&
         legacy.preferredTransport === "JSONRPC",
+    );
+    check(
+      "legacy card declares security the 0.3 way",
+      (legacy.security as unknown[]).length === 1 &&
+        asJson(asJson(legacy.securitySchemes).bearer).scheme === "bearer",
     );
 
     // ── 5-7 ── SendMessage. ─────────────────────────────────────────────
@@ -433,6 +450,10 @@ async function main() {
     );
     check("no fabricated evaluations block", facts.evaluations === undefined);
     check(
+      "facts tell a reader the endpoint needs a token",
+      (asJson(asJson(facts.capabilities).authentication).methods as string[])[0] === "bearer",
+    );
+    check(
       "certification is honestly self-declared",
       asJson(facts.certification).level === "self-declared",
     );
@@ -450,7 +471,7 @@ async function main() {
     );
 
     // ── 26 ── Rate limiting. ────────────────────────────────────────────
-    console.log("\n[guard]");
+    console.log("\n[guard: rate limit]");
     const ip = `${PREFIX}-1.2.3.4`;
     const verdicts = [1, 2, 3, 4].map(() => underRateLimit(ip));
     check(
@@ -459,6 +480,61 @@ async function main() {
       JSON.stringify(verdicts),
     );
     check("a different caller is unaffected", underRateLimit(`${PREFIX}-5.6.7.8`) === true);
+
+    // ── 27 ── The endpoint is closed. ───────────────────────────────────
+    console.log("\n[guard: credentials]");
+    const adminPassword = process.env.ADMIN_PASSWORD ?? "";
+    const from = (init: Record<string, string>) =>
+      new Headers({ "x-forwarded-for": `${PREFIX}-auth-${Math.random()}`, ...init });
+
+    check("no Authorization header is refused", authorize(from({})) === "unauthorized");
+    check(
+      "a wrong token is refused",
+      authorize(from({ Authorization: "Bearer not-the-password" })) === "unauthorized",
+    );
+    check(
+      "a non-bearer scheme is refused",
+      authorize(from({ Authorization: `Basic ${adminPassword}` })) === "unauthorized",
+    );
+    check(
+      "the admin password is accepted",
+      authorize(from({ Authorization: `Bearer ${adminPassword}` })) === "ok",
+    );
+
+    process.env.A2A_API_KEY = `${PREFIX}-dedicated-key`;
+    check(
+      "a dedicated A2A_API_KEY is accepted too",
+      authorize(from({ Authorization: `Bearer ${PREFIX}-dedicated-key` })) === "ok",
+    );
+    check(
+      "the admin password still works alongside a dedicated key",
+      authorize(from({ Authorization: `Bearer ${adminPassword}` })) === "ok",
+    );
+    delete process.env.A2A_API_KEY;
+
+    // The endpoint validates the admin password, so it is a guessing oracle
+    // unless failures are budgeted separately from ordinary traffic.
+    const attacker = { "x-forwarded-for": `${PREFIX}-attacker` };
+    const guesses = [1, 2, 3, 4, 5, 6].map(
+      (n) => authorize(new Headers({ ...attacker, Authorization: `Bearer guess-${n}` })),
+    );
+    check(
+      "a guessing loop is locked out after 5 failures",
+      guesses.slice(0, 5).every((g) => g === "unauthorized") && guesses[5] === "locked-out",
+      JSON.stringify(guesses),
+    );
+    check(
+      "lockout holds even when the right password finally arrives",
+      authorize(new Headers({ ...attacker, Authorization: `Bearer ${adminPassword}` })) ===
+        "locked-out",
+    );
+    check(
+      "a different address is not locked out by someone else's guessing",
+      authorize(
+        new Headers({ "x-forwarded-for": `${PREFIX}-bystander`, Authorization: `Bearer ${adminPassword}` }),
+      ) === "ok",
+    );
+    resetGuards();
 
     // ── 27 ── Part normalization across generations. ────────────────────
     console.log("\n[normalization]");
