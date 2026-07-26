@@ -4,7 +4,7 @@ import { isAuthed } from "@/lib/auth";
 import { prisma, getProfile } from "@/lib/db";
 import { safeTags, safeSocials, safeExperience } from "@/lib/knowledge";
 import { safeJson } from "@/lib/util";
-import { PERSONA_GROUPS, safePersonaSections } from "@/lib/persona";
+import { PERSONA_BLURB, PERSONA_SECTIONS, safePersonaSections } from "@/lib/persona";
 import { FONT_OPTIONS, BODY_FONT_OPTIONS } from "@/lib/fonts";
 import { RADIUS_OPTIONS } from "@/lib/theme";
 import { SocialsEditor } from "../SocialsEditor";
@@ -179,43 +179,32 @@ export default async function Dashboard() {
     </section>
   );
 
-  // ── PERSONA TAB — one text box per section of the persona catalogue ──
+  // ── PERSONA TAB — the tagline, plus one free-prose field ──
   const personaTab = (
     <section data-fill="surface" style={panel}>
       <SectionTitle>Persona</SectionTitle>
       <p style={{ color: "var(--on-surface)", fontStyle: "italic", fontSize: 13, marginBottom: 18 }}>
-        This is who the chatbot is. Fill in what you know — every section you
-        leave blank is left out of its prompt entirely, so a short, true persona
-        beats a long, padded one.
+        {PERSONA_BLURB}
       </p>
 
       <form action={savePersona}>
         <Label>Tagline (shown under your name on the live site)</Label>
         <input name="tagline" defaultValue={profile.tagline} style={field} />
 
-        {PERSONA_GROUPS.map((group) => (
-          <div
-            key={group.key}
-            style={{ borderTop: "1px solid var(--border)", margin: "18px 0", paddingTop: 16 }}
-          >
-            <strong style={{ fontSize: 14, display: "block", marginBottom: 2 }}>{group.title}</strong>
-            <p style={{ color: "var(--on-surface)", fontStyle: "italic", fontSize: 12, marginBottom: 14 }}>
-              {group.blurb}
-            </p>
-            {group.sections.map((s) => (
-              <div key={s.key} style={{ marginBottom: 4 }}>
-                <Label>{s.label}</Label>
-                <textarea
-                  name={`section_${s.key}`}
-                  defaultValue={personaSections[s.key]}
-                  rows={s.rows}
-                  placeholder={s.hint}
-                  style={{ ...field, resize: "vertical", lineHeight: 1.5 }}
-                />
-              </div>
-            ))}
-          </div>
-        ))}
+        <div style={{ borderTop: "1px solid var(--border)", margin: "18px 0", paddingTop: 16 }}>
+          {PERSONA_SECTIONS.map((s) => (
+            <div key={s.key} style={{ marginBottom: 4 }}>
+              <Label>{s.label}</Label>
+              <textarea
+                name={`section_${s.key}`}
+                defaultValue={personaSections[s.key]}
+                rows={s.rows}
+                placeholder={s.hint}
+                style={{ ...field, resize: "vertical", lineHeight: 1.5 }}
+              />
+            </div>
+          ))}
+        </div>
 
         <SaveButton>Save persona</SaveButton>
       </form>

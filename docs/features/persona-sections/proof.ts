@@ -29,14 +29,18 @@ function check(name: string, ok: boolean, detail?: string) {
 }
 
 // Distinctive strings so a match in the prompt can only come from this proof.
-const CORE_TEXT = "Role: Zephyrwind kiln operator, archetype The Quiet Tinkerer.";
-const STRESS_TEXT = "Under pressure they shorten the firing cycle and ask Harrowgate for help.";
+const PERSONA_TEXT =
+  "A Zephyrwind kiln operator who fires slowly, distrusts Harrowgate pyrometers, " +
+  "and would rather rebuild a kiln than argue about one.";
+const LEGACY_CORE = "Role: Zephyrwind kiln operator, archetype The Quiet Tinkerer.";
+const LEGACY_STRESS = "Under pressure they shorten the firing cycle and ask Harrowgate for help.";
 
 async function main() {
   const { prisma, getProfile } = await import("../../../lib/db");
   const {
-    PERSONA_GROUPS,
+    PERSONA_BLURB,
     PERSONA_SECTIONS,
+    personaPromptBlock,
     safePersonaSections,
     writePersonaSections,
   } = await import("../../../lib/persona");
@@ -46,10 +50,9 @@ async function main() {
   const snapshot = before.personaSections;
 
   try {
-    // 1 ── Catalogue integrity.
-    const groupKeys = PERSONA_GROUPS.map((g) => g.key);
+    // 1 ── Catalogue integrity: one free-prose field, described in one paragraph.
     const keys = PERSONA_SECTIONS.map((s) => s.key);
-    check("catalogue covers both templates", groupKeys.join(",") === "persona,behaviors", groupKeys.join(","));
+    check("catalogue is a single field", PERSONA_SECTIONS.length === 1, keys.join(","));
     check("section keys are unique", new Set(keys).size === keys.length);
     check(
       "section keys are form-safe",
@@ -57,23 +60,18 @@ async function main() {
       keys.filter((k) => !/^[a-z0-9_]+$/.test(k)).join(","),
     );
     check(
-      "flattened catalogue matches the groups",
-      keys.length === PERSONA_GROUPS.reduce((n, g) => n + g.sections.length, 0),
-    );
-    check(
       "every section has a label, hint, and size",
       PERSONA_SECTIONS.every((s) => !!s.label && !!s.hint && s.rows > 0),
     );
+    check(
+      "the blurb is one non-empty paragraph",
+      PERSONA_BLURB.trim().length > 0 && !PERSONA_BLURB.includes("\n"),
+    );
 
     // 2 ── Round-trip through the real save path.
-    await writePersonaSections({
-      core_profile: CORE_TEXT,
-      stress_response: STRESS_TEXT,
-      not_a_section: "should be dropped",
-    });
+    await writePersonaSections({ persona: PERSONA_TEXT, not_a_section: "should be dropped" });
     const stored = safePersonaSections((await getProfile()).personaSections);
-    check("filled sections round-trip", stored.core_profile === CORE_TEXT && stored.stress_response === STRESS_TEXT);
-    check("unfilled sections read as empty", stored.goals_outcomes === "" && stored.notes === "");
+    check("the persona field round-trips", stored.persona === PERSONA_TEXT);
     check("every catalogue key is present", keys.every((k) => k in stored));
     check("unknown keys are dropped", !("not_a_section" in stored));
 
@@ -86,22 +84,28 @@ async function main() {
       );
     }
 
-    // 4 ── Prompt render.
-    const prompt = await buildSystemPrompt();
-    const core = PERSONA_SECTIONS.find((s) => s.key === "core_profile")!;
-    const stress = PERSONA_SECTIONS.find((s) => s.key === "stress_response")!;
-    check("prompt carries the filled section text", prompt.includes(CORE_TEXT) && prompt.includes(STRESS_TEXT));
+    // 4 ── Text written under the retired 21-section catalogue folds forward.
+    const legacy = JSON.stringify({ core_profile: LEGACY_CORE, stress_response: LEGACY_STRESS });
+    const folded = safePersonaSections(legacy).persona;
     check(
-      "prompt labels the filled sections",
-      prompt.includes(`### ${core.label}`) && prompt.includes(`### ${stress.label}`),
+      "legacy sections fold into the single field",
+      folded.includes(LEGACY_CORE) && folded.includes(LEGACY_STRESS),
     );
-    check("prompt groups the sections", prompt.includes("## Persona") && prompt.includes("## Agent behaviors"));
+    check("folded legacy text keeps its section labels", folded.includes("Core profile"));
+    check(
+      "a filled persona field wins over legacy sections",
+      safePersonaSections(JSON.stringify({ persona: PERSONA_TEXT, core_profile: LEGACY_CORE }))
+        .persona === PERSONA_TEXT,
+    );
 
-    // 5 ── Empty sections omitted; the retired heading is gone.
-    const leaked = PERSONA_SECTIONS.filter(
-      (s) => !stored[s.key] && prompt.includes(`### ${s.label}`),
-    ).map((s) => s.key);
-    check("empty sections are omitted from the prompt", leaked.length === 0, leaked.join(","));
+    // 5 ── Prompt render: the paragraph goes in as written, with no headings.
+    const prompt = await buildSystemPrompt();
+    check("prompt carries the persona text", prompt.includes(PERSONA_TEXT));
+    check("single field renders without a section heading", !prompt.includes("### Persona"));
+    check("retired group headings are gone", !prompt.includes("## Agent behaviors"));
+
+    // 6 ── An empty persona renders as "" so the caller can fall back.
+    check("empty persona renders as nothing", personaPromptBlock("{}") === "");
     check("retired VOICE & WORLDVIEW block is gone", !prompt.includes("VOICE & WORLDVIEW"));
   } finally {
     // 6 ── Restore.

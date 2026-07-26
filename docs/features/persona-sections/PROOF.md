@@ -10,19 +10,22 @@ throwaway section text through the real save path, asserts, and restores the
 snapshot.
 
 ## Assertions (all must pass)
-1. **Catalogue integrity** — `PERSONA_GROUPS` covers both templates, every
-   section key is unique, non-empty, and form-safe (`[a-z0-9_]+`), and
-   `PERSONA_SECTIONS` is the flattened catalogue.
+1. **Catalogue integrity** — `PERSONA_SECTIONS` is exactly one field, its key
+   is unique and form-safe (`[a-z0-9_]+`), it has a label, hint, and size, and
+   `PERSONA_BLURB` is a single non-empty paragraph.
 2. **Round-trip** — `writePersonaSections()` persists a map of
    `key -> text` and `safePersonaSections()` reads it back exactly; unknown
    keys in stored JSON are dropped and missing keys read as `""`.
 3. **Malformed storage** — `safePersonaSections()` on `""`, `"not json"`, and
    `"[1,2]"` returns an all-empty map instead of throwing.
-4. **Prompt render** — with two sections filled, `buildSystemPrompt()` contains
-   both section labels and both texts.
-5. **Empty sections omitted** — no unfilled section's label appears in the
-   prompt, and the retired `VOICE & WORLDVIEW` heading is gone.
-6. **Restore** — the Profile row is returned to its pre-proof state.
+4. **Legacy fold-forward** — text stored under the retired 21-section
+   catalogue reads back inside the single field with its section labels
+   intact, and a filled `persona` field takes precedence over it.
+5. **Prompt render** — with the field filled, `buildSystemPrompt()` contains
+   the text verbatim and no `### Persona` or `## Agent behaviors` headings.
+6. **Empty persona** — `personaPromptBlock("{}")` is `""` so the caller can
+   fall back, and the retired `VOICE & WORLDVIEW` heading is gone.
+7. **Restore** — the Profile row is returned to its pre-proof state.
 
 ## Red expectation
 Before implementation the script fails at import time (`lib/persona` does not

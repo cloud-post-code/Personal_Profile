@@ -47,10 +47,10 @@
     },
     {
       "id": "persona-sections",
-      "title": "Persona sections: high-fidelity persona + agent behaviors, one text box per section; Persona and Theme split into two tabs",
+      "title": "Persona: one free-prose field (collapsed from the 21-section persona + agent-behaviors catalogue); Persona and Theme split into two tabs",
       "status": "done",
-      "notes": "lib/persona.ts is the catalogue (9 persona sections + 12 agent-behavior sections, each with label/hint/rows); the admin form, savePersona, and the chat prompt all iterate it. Stored as JSON in Profile.personaSections. Admin 'Persona & Theme' split into 'Persona' (tagline + 21 textareas, one form) and 'Theme' (aesthetic + ThemePicker, saveTheme). buildSystemPrompt renders only filled sections (grouped, labeled); retired VOICE & WORLDVIEW / Overview / Values lines. Legacy persona/overview/values/tone columns kept unused pending the ingestion pass. Proof: docs/features/persona-sections/proof.ts (green); verified live in browser (save + reload round-trip).",
-      "next": "Ingestion: fill sections from an uploaded document / existing knowledge, incl. mapping the legacy persona columns."
+      "notes": "lib/persona.ts is the catalogue, now a SINGLE section (`persona`) plus PERSONA_BLURB, the one-paragraph brief rendered above the field; the admin form, savePersona, and the chat prompt all iterate it. Stored as JSON in Profile.personaSections (map shape unchanged, no migration). The 21 template sections were retired 2026-07-26: they came from buyer-persona instruments whose fields (purchasing approval, budget cuts, onboarding tolerance, crisis mode) either don't apply to a personal site or can't be known without inventing them, and an invented section enters the prompt with the same authority as a true one. safePersonaSections folds any text stored under the 21 retired keys forward into the single field on read (LEGACY_SECTIONS, deletable once the live row is saved again), so prod persona text can't silently vanish. buildSystemPrompt renders the field verbatim with no headings; an empty field renders as \"\" so the hardcoded fallback still applies. Proof: docs/features/persona-sections/proof.ts (21 assertions green); tsc + next lint clean; admin markup verified server-rendered (one section_persona textarea, blurb present, zero retired labels).",
+      "next": "Ingestion: fill the field from an uploaded document, existing knowledge, or sent email (see the persona-from-email design), incl. mapping the legacy persona/overview/values/tone columns."
     },
     {
       "id": "canned-answers-and-brain",
