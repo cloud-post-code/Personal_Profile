@@ -126,13 +126,23 @@ export async function indexApprovedAnswer(messageId: string, opts: IndexOpts = {
   );
 }
 
-/** Re-index every origin. Used by scripts/reindex.ts. */
+/**
+ * Re-index every origin. Used by scripts/reindex.ts.
+ *
+ * Paced: a backfill fires one embedding request per origin back to back, which
+ * trips entry-tier per-minute limits and leaves chunks unembedded. The pause
+ * lives here rather than in the embedding layer on purpose — live chat embeds
+ * the visitor's question on every message and must never be throttled.
+ * Override with EMBED_PACE_MS (0 disables) when on a higher-limit plan.
+ */
 export async function indexEverything(
-  opts: IndexOpts & { onProgress?: (label: string) => void } = {},
+  opts: IndexOpts & { onProgress?: (label: string) => void; paceMs?: number } = {},
 ): Promise<number> {
-  const { onProgress, ...indexOpts } = opts;
+  const { onProgress, paceMs, ...indexOpts } = opts;
+  const pause = paceMs ?? Number(process.env.EMBED_PACE_MS ?? 21_000);
   let done = 0;
   const step = async (label: string, run: () => Promise<void>) => {
+    if (done > 0 && pause > 0) await new Promise((r) => setTimeout(r, pause));
     await run();
     done++;
     onProgress?.(label);

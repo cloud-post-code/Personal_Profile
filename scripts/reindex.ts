@@ -42,10 +42,13 @@ async function main() {
   });
 
   console.log(`${sources.length} source(s) to index${all ? " (--all)" : ""}`);
+  const pace = Number(process.env.EMBED_PACE_MS ?? 21_000);
   let ok = 0;
   for (const s of sources) {
     const label = s.title ?? s.url ?? s.filename ?? s.id;
     try {
+      // Same per-minute-limit pacing as indexEverything.
+      if (ok > 0 && pace > 0) await new Promise((r) => setTimeout(r, pace));
       await indexSource(s.id);
       ok++;
       console.log(`  indexed  ${label}`);
