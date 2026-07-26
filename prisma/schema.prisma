@@ -204,13 +204,20 @@ model Profile {
 
   // ── Persona & brand ──
   tagline   String   @default("")
-  /// How the bot should talk — voice, worldview, opinions.
+  /// JSON {sectionKey: text} for the persona + agent-behavior sections
+  /// catalogued in lib/persona.ts. This is the persona the chatbot speaks from.
+  personaSections String @default("{}") @db.Text
+  /// Free-text description of the visual feeling — edited on the Theme tab.
+  aesthetic String   @default("") @db.Text
+  headshot  String?  // /api/uploads/<file>
+
+  // ── Retired persona fields ──
+  // Superseded by personaSections; kept so existing text survives until it can
+  // be mapped into sections. Nothing reads these.
   persona   String   @default("") @db.Text
   overview  String   @default("") @db.Text
   values    String   @default("") @db.Text
-  aesthetic String   @default("") @db.Text
   tone      String   @default("") @db.Text
-  headshot  String?  // /api/uploads/<file>
 
   // ── Theme (drives the live site's CSS variables) ──
   /// Curated heading font key (see lib/fonts).

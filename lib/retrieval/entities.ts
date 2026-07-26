@@ -17,9 +17,11 @@ export type EntityExtractor = (
   title: string | null,
 ) => Promise<ExtractedGraph>;
 
-const ENTITY_TYPES = new Set([
+export const ENTITY_TYPES_LIST = [
   "person", "org", "project", "skill", "place", "topic", "event", "other",
-]);
+] as const;
+
+const ENTITY_TYPES = new Set<string>(ENTITY_TYPES_LIST);
 
 /** Normalized lookup key for an entity name. */
 export function entityKey(name: string): string {

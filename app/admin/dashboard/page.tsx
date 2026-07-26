@@ -4,6 +4,7 @@ import { isAuthed } from "@/lib/auth";
 import { prisma, getProfile } from "@/lib/db";
 import { safeTags, safeSocials, safeExperience } from "@/lib/knowledge";
 import { safeJson } from "@/lib/util";
+import { PERSONA_GROUPS, safePersonaSections } from "@/lib/persona";
 import { FONT_OPTIONS, BODY_FONT_OPTIONS } from "@/lib/fonts";
 import { RADIUS_OPTIONS } from "@/lib/theme";
 import { SocialsEditor } from "../SocialsEditor";
@@ -13,6 +14,7 @@ import {
   saveProfile,
   uploadResume,
   savePersona,
+  saveTheme,
   uploadHeadshot,
   rescanSource,
   updateSourceSummary,
@@ -28,6 +30,8 @@ import {
 } from "../actions";
 import { Extractor } from "../Extractor";
 import { GithubImport } from "../GithubImport";
+import { GraphPanel } from "../GraphPanel";
+import { graphStats, listEntities, listEdges } from "@/lib/retrieval/graph";
 import { ProjectRow } from "../ProjectRow";
 import { Tabs } from "../Tabs";
 import { SaveButton } from "../SaveButton";
@@ -42,18 +46,22 @@ export const dynamic = "force-dynamic";
 export default async function Dashboard() {
   if (!(await isAuthed())) redirect("/admin");
 
-  const [profile, projects, sources, photos, contacts, chatSessions] = await Promise.all([
-    getProfile(),
-    prisma.project.findMany({ orderBy: { order: "asc" } }),
-    prisma.source.findMany({ orderBy: { createdAt: "desc" } }),
-    prisma.photo.findMany({ orderBy: { order: "asc" } }),
-    prisma.contact.findMany({ orderBy: { createdAt: "desc" } }),
-    prisma.chatSession.findMany({
-      orderBy: { updatedAt: "desc" },
-      take: 100,
-      include: { messages: { orderBy: { createdAt: "asc" } } },
-    }),
-  ]);
+  const [profile, projects, sources, photos, contacts, chatSessions, gStats, gEntities, gEdges] =
+    await Promise.all([
+      getProfile(),
+      prisma.project.findMany({ orderBy: { order: "asc" } }),
+      prisma.source.findMany({ orderBy: { createdAt: "desc" } }),
+      prisma.photo.findMany({ orderBy: { order: "asc" } }),
+      prisma.contact.findMany({ orderBy: { createdAt: "desc" } }),
+      prisma.chatSession.findMany({
+        orderBy: { updatedAt: "desc" },
+        take: 100,
+        include: { messages: { orderBy: { createdAt: "asc" } } },
+      }),
+      graphStats(),
+      listEntities(),
+      listEdges(),
+    ]);
   const metrics = chatMetrics(chatSessions);
   const unhandled = contacts.filter((c) => !c.handled).length;
   // LinkedIn is now just a social link. If a legacy linkedin value exists and
@@ -65,6 +73,7 @@ export default async function Dashboard() {
       : savedSocials;
   const colors = safeJson<ThemeColors>(profile.themeColors, {});
   const experience = safeExperience(profile.experience);
+  const personaSections = safePersonaSections(profile.personaSections);
 
   // ── PROFILE TAB (Details + Bio merged) ──
   const profileTab = (
@@ -155,39 +164,62 @@ export default async function Dashboard() {
     </section>
   );
 
-  // ── PERSONA & THEME TAB ──
+  // ── PERSONA TAB — one text box per section of the persona catalogue ──
   const personaTab = (
     <section data-fill="surface" style={panel}>
-      <SectionTitle>Persona & brand</SectionTitle>
+      <SectionTitle>Persona</SectionTitle>
+      <p style={{ color: "var(--on-surface)", fontStyle: "italic", fontSize: 13, marginBottom: 18 }}>
+        This is who the chatbot is. Fill in what you know — every section you
+        leave blank is left out of its prompt entirely, so a short, true persona
+        beats a long, padded one.
+      </p>
 
       <form action={savePersona}>
-        <Label>Tagline</Label>
+        <Label>Tagline (shown under your name on the live site)</Label>
         <input name="tagline" defaultValue={profile.tagline} style={field} />
 
-        <Label>Overview (short intro of who you are)</Label>
-        <textarea name="overview" defaultValue={profile.overview} rows={2} style={{ ...field, resize: "vertical" }} />
-
-        <Label>Voice / worldview / opinions (how the bot should talk)</Label>
-        <textarea name="persona" defaultValue={profile.persona} rows={3} style={{ ...field, resize: "vertical" }} />
-
-        <div style={grid2}>
-          <div>
-            <Label>Values</Label>
-            <textarea name="values" defaultValue={profile.values} rows={2} style={{ ...field, resize: "vertical" }} />
+        {PERSONA_GROUPS.map((group) => (
+          <div
+            key={group.key}
+            style={{ borderTop: "1px solid var(--border)", margin: "18px 0", paddingTop: 16 }}
+          >
+            <strong style={{ fontSize: 14, display: "block", marginBottom: 2 }}>{group.title}</strong>
+            <p style={{ color: "var(--on-surface)", fontStyle: "italic", fontSize: 12, marginBottom: 14 }}>
+              {group.blurb}
+            </p>
+            {group.sections.map((s) => (
+              <div key={s.key} style={{ marginBottom: 4 }}>
+                <Label>{s.label}</Label>
+                <textarea
+                  name={`section_${s.key}`}
+                  defaultValue={personaSections[s.key]}
+                  rows={s.rows}
+                  placeholder={s.hint}
+                  style={{ ...field, resize: "vertical", lineHeight: 1.5 }}
+                />
+              </div>
+            ))}
           </div>
-          <div>
-            <Label>Tone / voice</Label>
-            <textarea name="tone" defaultValue={profile.tone} rows={2} style={{ ...field, resize: "vertical" }} />
-          </div>
-        </div>
+        ))}
 
+        <SaveButton>Save persona</SaveButton>
+      </form>
+    </section>
+  );
+
+  // ── THEME TAB ──
+  const themeTab = (
+    <section data-fill="surface" style={panel}>
+      <SectionTitle>Theme</SectionTitle>
+      <p style={{ color: "var(--on-surface)", fontStyle: "italic", fontSize: 13, marginBottom: 18 }}>
+        Everything here restyles the live site.
+      </p>
+
+      <form action={saveTheme}>
         <Label>Aesthetic (describe the visual feeling you want)</Label>
         <textarea name="aesthetic" defaultValue={profile.aesthetic} rows={2} style={{ ...field, resize: "vertical" }} />
 
         <div style={{ borderTop: "1px solid var(--border)", margin: "16px 0", paddingTop: 16 }}>
-          <strong style={{ fontSize: 14, display: "block", marginBottom: 12 }}>
-            Theme — this restyles the live site
-          </strong>
           <ThemePicker
             fontOptions={FONT_OPTIONS}
             bodyFontOptions={BODY_FONT_OPTIONS}
@@ -203,7 +235,7 @@ export default async function Dashboard() {
           />
         </div>
 
-        <SaveButton>Save persona & theme</SaveButton>
+        <SaveButton>Save theme</SaveButton>
       </form>
     </section>
   );
@@ -519,9 +551,15 @@ export default async function Dashboard() {
       <Tabs
         tabs={[
           { key: "profile", label: "Profile", content: profileTab },
-          { key: "persona", label: "Persona & Theme", content: personaTab },
+          { key: "persona", label: "Persona", content: personaTab },
+          { key: "theme", label: "Theme", content: themeTab },
           { key: "projects", label: "Projects", content: projectsTab },
           { key: "knowledge", label: "Knowledge", content: knowledgeTab },
+          {
+            key: "graph",
+            label: "Graph",
+            content: <GraphPanel stats={gStats} entities={gEntities} edges={gEdges} />,
+          },
           { key: "photos", label: "Photos", content: photosTab },
           { key: "activity", label: "Activity", content: activityTab },
           { key: "contacts", label: "Contacts", badge: unhandled, content: contactsTab },

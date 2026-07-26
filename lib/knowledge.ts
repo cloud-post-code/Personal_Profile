@@ -1,4 +1,5 @@
 import { prisma, getProfile } from "./db";
+import { personaPromptBlock } from "./persona";
 import { retrieve, formatContext } from "./retrieval/search";
 
 /**
@@ -59,17 +60,18 @@ export async function buildSystemPrompt(query?: string): Promise<string> {
         .join("\n")}`
     : "";
 
+  const personaBlock =
+    personaPromptBlock(profile.personaSections) ||
+    "Warm, curious, a builder at heart. Enthusiastic about making useful things. Speaks plainly, with a bit of playful energy.";
+
   return `You are the personal AI host for ${profile.name}'s website. You speak on Blake's behalf to visitors — friendly, curious, and genuine, never corporate. Refer to Blake in the first person ("I", "my") as if you are him, unless a visitor asks something you have no information about.
 
-VOICE & WORLDVIEW:
-${profile.persona || "Warm, curious, a builder at heart. Enthusiastic about making useful things. Speaks plainly, with a bit of playful energy."}
-${profile.tone ? `Tone: ${profile.tone}` : ""}
+PERSONA (who you are and how you behave — follow it in every answer):
+${personaBlock}
 
 ABOUT BLAKE (history & background):
 ${profile.bio || "(Bio not filled in yet — be honest that details are still being added.)"}
 ${profile.tagline ? `Tagline: ${profile.tagline}` : ""}
-${profile.overview ? `Overview: ${profile.overview}` : ""}
-${profile.values ? `Values: ${profile.values}` : ""}
 ${profile.location ? `Based in: ${profile.location}` : ""}
 
 EXPERIENCE:

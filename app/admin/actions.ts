@@ -14,7 +14,9 @@ import { prisma, getProfile } from "@/lib/db";
 import { checkPassword, createSession, destroySession, isAuthed } from "@/lib/auth";
 import { extractLink, extractDocument, extractText, fileToText, writeProfileFromResume } from "@/lib/scrape";
 import { indexSource } from "@/lib/retrieval/indexer";
+import { renameEntity, deleteEntity, addEdge, deleteEdge } from "@/lib/retrieval/graph";
 import { safeExperience, safeSocials } from "@/lib/knowledge";
+import { PERSONA_SECTIONS, writePersonaSections } from "@/lib/persona";
 import { COLOR_ROLES } from "@/lib/theme";
 import { saveUpload, saveBytes } from "@/lib/uploads";
 import { describeImage } from "@/lib/vision";
@@ -172,8 +174,27 @@ export async function uploadResume(formData: FormData) {
   revalidateAll();
 }
 
-// ── Persona & brand/theme ──
+// ── Persona (the section catalogue in lib/persona.ts) ──
 export async function savePersona(formData: FormData) {
+  await requireAuth();
+  await getProfile();
+
+  // Driven by the catalogue so adding a section can't silently fail to save.
+  const sections: Record<string, string> = {};
+  for (const s of PERSONA_SECTIONS) {
+    sections[s.key] = String(formData.get(`section_${s.key}`) ?? "");
+  }
+
+  await prisma.profile.update({
+    where: { id: 1 },
+    data: { tagline: String(formData.get("tagline") ?? "") },
+  });
+  await writePersonaSections(sections);
+  revalidateAll();
+}
+
+// ── Theme (aesthetic description + the design tokens the site renders from) ──
+export async function saveTheme(formData: FormData) {
   await requireAuth();
   await getProfile();
 
@@ -190,12 +211,7 @@ export async function savePersona(formData: FormData) {
   await prisma.profile.update({
     where: { id: 1 },
     data: {
-      tagline: String(formData.get("tagline") ?? ""),
-      persona: String(formData.get("persona") ?? ""),
-      overview: String(formData.get("overview") ?? ""),
-      values: String(formData.get("values") ?? ""),
       aesthetic: String(formData.get("aesthetic") ?? ""),
-      tone: String(formData.get("tone") ?? ""),
       themeFont: String(formData.get("themeFont") ?? "space-grotesk"),
       themeBodyFont: String(formData.get("themeBodyFont") ?? "inter"),
       themeRadius: String(formData.get("themeRadius") ?? "rounded"),
@@ -502,6 +518,43 @@ export async function saveChatFeedback(formData: FormData) {
       .update({ where: { id }, data: { rating, note } })
       .catch(() => {});
   }
+  revalidatePath("/admin/dashboard");
+}
+
+// ── Knowledge graph (Graph tab) ──
+// Thin auth + revalidate wrappers; the repair logic lives in lib/retrieval/graph.
+
+/** Rename/retype an entity. A name that collides merges the two entities. */
+export async function saveEntity(formData: FormData) {
+  await requireAuth();
+  const id = String(formData.get("id") ?? "");
+  const name = String(formData.get("name") ?? "");
+  const type = String(formData.get("type") ?? "other");
+  if (id && name.trim()) await renameEntity(id, name, type);
+  revalidatePath("/admin/dashboard");
+}
+
+export async function removeEntity(formData: FormData) {
+  await requireAuth();
+  const id = String(formData.get("id") ?? "");
+  if (id) await deleteEntity(id);
+  revalidatePath("/admin/dashboard");
+}
+
+export async function createEntityEdge(formData: FormData) {
+  await requireAuth();
+  await addEdge(
+    String(formData.get("fromId") ?? ""),
+    String(formData.get("toId") ?? ""),
+    String(formData.get("relation") ?? ""),
+  );
+  revalidatePath("/admin/dashboard");
+}
+
+export async function removeEntityEdge(formData: FormData) {
+  await requireAuth();
+  const id = String(formData.get("id") ?? "");
+  if (id) await deleteEdge(id);
   revalidatePath("/admin/dashboard");
 }
 

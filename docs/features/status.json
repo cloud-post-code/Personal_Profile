@@ -19,10 +19,24 @@
       "notes": "Sources are chunked+embedded+entity-extracted inline at ingest (lib/retrieval/*); chat builds persona-core prompt + retrieved context for the visitor's question (buildSystemPrompt(query)). Embeddings: VOYAGE_API_KEY/OPENAI_API_KEY if set, else local hashed n-grams; hybrid BM25+cosine with EntityEdge one-hop expansion. Backfill: npx tsx scripts/reindex.ts. Proof: docs/features/retrieval-engine-v1/proof.ts (green); gate PASS; verified live in browser."
     },
     {
+      "id": "knowledge-graph-admin",
+      "title": "Graph tab: see and fix the extracted entity/relation graph",
+      "status": "done",
+      "notes": "Admin dashboard 'Graph' tab (app/admin/GraphPanel.tsx) over lib/retrieval/graph.ts: index-health stats (sources/chunks/entities/relations/orphans, plus warnings for missing embeddings and a mixed-embedding-model index), every entity with mention count + source titles + edge count, orphans flagged, and every relation. Fixes: rename/retype an entity (renaming onto an existing name MERGES them — mentions move, edges rewire, duplicates collapse, self-loops drop), delete entity, delete relation, add relation. Server actions are thin auth wrappers so the logic stays testable. Proof: docs/features/knowledge-graph-admin/proof.ts (28 assertions green); gate PASS. Not yet visually clicked through (admin login required).",
+      "next": "Phase 2 continues: persona-aware entity ontology in lib/retrieval/entities.ts + persona-biased ranking."
+    },
+    {
       "id": "github-profile-import",
       "title": "Import all projects from a GitHub profile link",
       "status": "done",
       "notes": "Projects tab 'Import from GitHub': paste a profile URL, fetches public non-fork repos via GitHub API (lib/github.ts), creates a Project per repo (name, description->blurb, html_url->githubUrl, homepage->liveUrl), most-starred first, capped at 12, skips already-imported (deduped by githubUrl). Verified live against a real profile. Live."
+    },
+    {
+      "id": "persona-sections",
+      "title": "Persona sections: high-fidelity persona + agent behaviors, one text box per section; Persona and Theme split into two tabs",
+      "status": "done",
+      "notes": "lib/persona.ts is the catalogue (9 persona sections + 12 agent-behavior sections, each with label/hint/rows); the admin form, savePersona, and the chat prompt all iterate it. Stored as JSON in Profile.personaSections. Admin 'Persona & Theme' split into 'Persona' (tagline + 21 textareas, one form) and 'Theme' (aesthetic + ThemePicker, saveTheme). buildSystemPrompt renders only filled sections (grouped, labeled); retired VOICE & WORLDVIEW / Overview / Values lines. Legacy persona/overview/values/tone columns kept unused pending the ingestion pass. Proof: docs/features/persona-sections/proof.ts (green); verified live in browser (save + reload round-trip).",
+      "next": "Ingestion: fill sections from an uploaded document / existing knowledge, incl. mapping the legacy persona columns."
     }
   ]
 }
