@@ -25,7 +25,6 @@ export const brand = {
     border: "#2A335C",
 
     text: "#E8ECFF",
-    textMuted: "#9AA3C7",
 
     // Electric "signal violet" — primary accent / brand.
     primary: "#7C5CFF",
@@ -65,7 +64,7 @@ export function themeCssVars(): string {
   const c = brand.color;
   return `
     --bg:${c.bg}; --bg-soft:${c.bgSoft}; --surface:${c.surface}; --border:${c.border};
-    --text:${c.text}; --text-muted:${c.textMuted};
+    --text:${c.text};
     --primary:${c.primary}; --primary-soft:${c.primarySoft}; --accent:${c.accent};
     --success:${c.success}; --danger:${c.danger};
     --radius-sm:${brand.radius.sm}; --radius-md:${brand.radius.md};
@@ -107,8 +106,8 @@ export type ThemeColors = {
   accent?: string;
 
   // ── Per-fill text ── each pairs with the fill it sits on, so contrast is
-  // chosen where it's actually seen rather than as a floating global. Muted
-  // variants aren't editable; they're derived from these (see mutedFrom).
+  // chosen where it's actually seen rather than as a floating global. There is
+  // one text color per fill; secondary text is the same color in italics.
   text?: string;
   surfaceText?: string;
   accentText?: string;
@@ -143,33 +142,6 @@ export const COLOR_ROLES: { key: keyof ThemeColors; label: string; fallback: str
   ...COLOR_GROUPS.flatMap((g) => [g.fill, ...g.text]),
   { key: "border", label: "Border", fallback: "#2A335C" },
 ];
-
-/**
- * Muted text is always derived from its paired text color — faded toward the
- * fill behind it so the relationship holds for any palette. Editing the text
- * color moves its muted variant with it, which is why there's no picker.
- */
-export function mutedFrom(text: string, fill: string): string {
-  // Fade the text toward the fill in small steps: a light fill pulls it
-  // lighter, a dark fill darker. Muted text isn't user-adjustable, so it has
-  // to stay legible on its own — but holding it to the same 4.5:1 as body text
-  // leaves nothing to fade when the base pair is already near that line, and
-  // muted would come out identical to normal text. So it must both stay above
-  // a 3:1 floor (WCAG's large/secondary-text bar) and read as visibly softer
-  // than its source. If nothing satisfies both, one dimmed step still beats
-  // returning the text color unchanged.
-  const direction = isLight(fill) ? 1 : -1;
-  const baseRatio = contrastRatio(text, fill);
-  const floor = Math.max(3, Math.min(4.5, baseRatio * 0.7));
-
-  let best: string | null = null;
-  for (let amount = 0.08; amount <= 0.55; amount += 0.04) {
-    const candidate = shift(text, direction * amount);
-    if (contrastRatio(candidate, fill) < floor) break;
-    best = candidate;
-  }
-  return best ?? shift(text, direction * 0.12);
-}
 
 /** Heading weight options for the design panel. */
 export const HEADING_WEIGHTS = [
@@ -229,6 +201,10 @@ function contrastRatio(a: string, b: string): number {
 const INK = "#10131C";
 const PAPER = "#FFFFFF";
 
+/** Semantic hues. Not admin-editable, so they need per-fill readable copies. */
+const DANGER = brand.color.danger;
+const SUCCESS = brand.color.success;
+
 /**
  * The readable foreground for text/icons sitting ON a colored surface. Every
  * filled element (primary button, accent chip, card) pairs its background with
@@ -238,6 +214,52 @@ const PAPER = "#FFFFFF";
  */
 export function contrastOn(h: string): string {
   return contrastRatio(h, INK) >= contrastRatio(h, PAPER) ? INK : PAPER;
+}
+
+/**
+ * Keep a *hue* usable as text on a given fill. Accent-colored text (links,
+ * tags, the headline spark) has to stay recognisably the accent, so instead of
+ * flipping it to ink/paper this walks the hue toward white or black until it
+ * clears `min`. Only if neither direction gets there does it fall back to a
+ * plain readable foreground.
+ *
+ * Both directions are searched rather than picked from `isLight`. A mid-tone
+ * fill — sage green, dusty violet — sits near that threshold, and guessing
+ * wrong walks the hue toward the fill's own brightness, where no amount of
+ * shifting can reach the target. Of the directions that do work, the one
+ * needing the smaller shift wins, since it stays closest to the original hue.
+ */
+function readableOn(color: string, fill: string, min = 4.5): string {
+  if (!rgb(color) || !rgb(fill)) return color;
+  if (contrastRatio(color, fill) >= min) return color;
+
+  let best: string | null = null;
+  let bestAmount = Infinity;
+  for (const direction of [-1, 1]) {
+    for (let amount = 0.06; amount <= 1.0001; amount += 0.06) {
+      const candidate = shift(color, direction * amount);
+      if (contrastRatio(candidate, fill) < min) continue;
+      if (amount < bestAmount) {
+        bestAmount = amount;
+        best = candidate;
+      }
+      break;
+    }
+  }
+  return best ?? contrastOn(fill);
+}
+
+/**
+ * Danger and success have to stay recognisably red and green — an ink-black
+ * "Delete" reads as an ordinary action, which is worse than a slightly weaker
+ * ratio. So aim for 4.5:1, and rather than give the hue up, settle for WCAG's
+ * 3:1 non-text/large-text floor. Only if even that is unreachable on this fill
+ * does it fall through to a plain readable foreground.
+ */
+function semanticOn(hue: string, fill: string): string {
+  const strict = readableOn(hue, fill, 4.5);
+  // readableOn signals "this hue can't get there" by returning ink/paper.
+  return strict === contrastOn(fill) ? readableOn(hue, fill, 3) : strict;
 }
 
 /** Mix a hex toward white (amount>0) or black (amount<0) by `amount` (0..1). */
@@ -318,7 +340,6 @@ export function themeVarLines(opts: {
     lines.push(`--border:${d.border};`);
     // Default text to whatever reads on this background; overridden if set.
     lines.push(`--text:${contrastOn(bg)};`);
-    lines.push(`--text-muted:${mutedFrom(contrastOn(bg), bg)};`);
   }
 
   // Surface is the single fill behind BOTH cards and primary buttons, so the
@@ -329,28 +350,47 @@ export function themeVarLines(opts: {
   }
   const surfaceFill = surface ?? (bg ? derivedSurfaces(bg).surface : "#1A2140");
   lines.push(`--primary:${surfaceFill};`);
-  lines.push(`--primary-soft:${surfaceFill};`);
 
   if (border) lines.push(`--border:${border};`);
   if (accent) lines.push(`--accent:${accent};`);
 
-  // An explicit background text color also re-derives its muted variant, so
-  // the two always move together.
-  if (text) {
-    lines.push(`--text:${text};`);
-    lines.push(`--text-muted:${mutedFrom(text, bg ?? "#0B1020")};`);
-  }
+  if (text) lines.push(`--text:${text};`);
 
   // ── Contrast pairs ── each fill's text, taken from the paired picker when
-  // set and otherwise computed, so content on a fill is always legible. Muted
-  // variants are always derived — never separately chosen.
+  // set and otherwise computed, so content on a fill is always legible. There
+  // is exactly one text color per fill: secondary text reuses it in italics
+  // rather than introducing a lighter neutral of its own.
   const accentFill = accent ?? "#FFB84D";
   const onSurface = surfaceText ?? contrastOn(surfaceFill);
   lines.push(`--on-surface:${onSurface};`);
-  lines.push(`--on-surface-muted:${mutedFrom(onSurface, surfaceFill)};`);
   // Primary shares surface's fill, so it shares surface's foreground too.
   lines.push(`--on-primary:${onSurface};`);
   lines.push(`--on-accent:${accentText ?? contrastOn(accentFill)};`);
+
+  // ── bg-soft ── the tone behind chips, fields and cards. It is either a shade
+  // of the background or, when no background was chosen, the surface fill
+  // itself — so its text follows whichever fill it actually resolved to rather
+  // than always borrowing the background's.
+  const bgFill = bg ?? "#0B1020";
+  const onBg = text ?? (bg ? contrastOn(bg) : "#E8ECFF");
+  const bgSoftFill = bg ? derivedSurfaces(bg).soft : surface ?? "#12182E";
+  lines.push(`--on-bg-soft:${bg ? onBg : onSurface};`);
+
+  // ── Accent-colored text ── links, tags and the headline spark read as the
+  // accent hue, but each fill gets its own nudged copy. Without this an accent
+  // picked to look good on the background disappears on a card or a bubble.
+  lines.push(`--accent-on-bg:${readableOn(accentFill, bgFill)};`);
+  lines.push(`--accent-on-bg-soft:${readableOn(accentFill, bgSoftFill)};`);
+  lines.push(`--accent-on-surface:${readableOn(accentFill, surfaceFill)};`);
+
+  // ── Semantic colors ── danger and success are fixed hues rather than admin
+  // choices, so they collide with whatever fill the theme picks: the stock red
+  // lands near 2:1 on a mid-tone panel. Same per-fill treatment as the accent.
+  for (const [name, hue] of [["danger", DANGER], ["success", SUCCESS]] as const) {
+    lines.push(`--${name}-on-bg:${semanticOn(hue, bgFill)};`);
+    lines.push(`--${name}-on-bg-soft:${semanticOn(hue, bgSoftFill)};`);
+    lines.push(`--${name}-on-surface:${semanticOn(hue, surfaceFill)};`);
+  }
 
   return lines.join("");
 }

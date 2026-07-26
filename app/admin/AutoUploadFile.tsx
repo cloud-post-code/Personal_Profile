@@ -39,7 +39,11 @@ export function AutoUploadFile({
       <span
         style={{
           fontSize: 12,
-          color: pending ? "var(--primary-soft)" : "var(--text-muted)",
+          // Both states sit on a panel, so they take that fill's pair — the
+          // lit one as accent-on-surface rather than the surface fill itself.
+          // The idle hint is secondary, so it italicises instead of fading.
+          color: pending ? "var(--accent-on-surface)" : "var(--on-surface)",
+          fontStyle: pending ? "normal" : "italic",
           transition: "color 0.2s ease",
         }}
       >

@@ -110,7 +110,7 @@ export function GithubImport() {
       </form>
 
       {status.kind !== "idle" && (
-        <p style={{ color: "var(--text-muted)", fontSize: 13, marginTop: 10 }} aria-live="polite">
+        <p style={{ color: "var(--on-surface)", fontStyle: "italic", fontSize: 13, marginTop: 10 }} aria-live="polite">
           {status.kind === "running" &&
             (status.total === null
               ? "Fetching repos from GitHub…"
@@ -120,7 +120,7 @@ export function GithubImport() {
             (status.total === 0
               ? `Nothing to do${status.skipped ? ` — all ${status.skipped} imported repos are unchanged on GitHub` : ""}.`
               : summarize(imported, status.skipped))}
-          {status.kind === "error" && <span style={{ color: "var(--danger)" }}>{status.message}</span>}
+          {status.kind === "error" && <span style={{ color: "var(--danger-on-surface)" }}>{status.message}</span>}
         </p>
       )}
 
@@ -129,17 +129,19 @@ export function GithubImport() {
           {imported.map((p) => (
             <div
               key={p.id}
+              data-fill="bg-soft"
               style={{
                 border: "1px solid var(--border)",
                 borderRadius: "var(--radius-sm)",
                 padding: "10px 12px",
                 background: "var(--bg-soft)",
+                color: "var(--on-bg-soft)",
               }}
             >
               <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
                 <strong style={{ fontSize: 14 }}>{p.name}</strong>
                 {p.stars > 0 && (
-                  <span style={{ color: "var(--text-muted)", fontSize: 12 }}>★ {p.stars}</span>
+                  <span style={{ color: "var(--on-bg-soft)", fontStyle: "italic", fontSize: 12 }}>★ {p.stars}</span>
                 )}
                 <span
                   style={{
@@ -156,7 +158,7 @@ export function GithubImport() {
               </div>
               <p style={{ fontSize: 13, marginTop: 2 }}>{p.blurb}</p>
               {p.detail && (
-                <p style={{ color: "var(--text-muted)", fontSize: 13, marginTop: 4 }}>{p.detail}</p>
+                <p style={{ color: "var(--on-bg-soft)", fontStyle: "italic", fontSize: 13, marginTop: 4 }}>{p.detail}</p>
               )}
               {p.tags.length > 0 && (
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
@@ -168,7 +170,8 @@ export function GithubImport() {
                         padding: "2px 8px",
                         borderRadius: 999,
                         border: "1px solid var(--border)",
-                        color: "var(--text-muted)",
+                        color: "var(--on-bg-soft)",
+                        fontStyle: "italic",
                       }}
                     >
                       {t}

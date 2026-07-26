@@ -90,9 +90,9 @@ function ContactForm() {
 
   if (state === "done") {
     return (
-      <div style={{ ...card, borderColor: "var(--success)" }}>
+      <div data-fill="bg-soft" style={{ ...card, borderColor: "var(--success-on-bg-soft)" }}>
         <strong style={{ fontSize: 15 }}>Got it — thank you.</strong>
-        <p style={{ color: "var(--text-muted)", fontSize: 14, marginTop: 6 }}>
+        <p style={{ color: "var(--on-bg-soft)", fontStyle: "italic", fontSize: 14, marginTop: 6 }}>
           Your message reached Blake. He&apos;ll get back to you at {email}.
         </p>
       </div>
@@ -100,9 +100,9 @@ function ContactForm() {
   }
 
   return (
-    <div style={{ ...card, maxWidth: 440 }}>
+    <div data-fill="bg-soft" style={{ ...card, maxWidth: 440 }}>
       <strong style={{ fontSize: 15, fontFamily: "var(--font-heading)" }}>Leave your details</strong>
-      <p style={{ color: "var(--text-muted)", fontSize: 13, margin: "6px 0 12px" }}>
+      <p style={{ color: "var(--on-bg-soft)", fontStyle: "italic", fontSize: 13, margin: "6px 0 12px" }}>
         Drop your info and a note — it goes straight to Blake.
       </p>
       <input
@@ -126,7 +126,7 @@ function ContactForm() {
         style={{ ...cf, resize: "vertical" }}
       />
       {state === "error" && (
-        <p style={{ color: "var(--danger)", fontSize: 13, marginBottom: 8 }}>{error}</p>
+        <p style={{ color: "var(--danger-on-bg-soft)", fontSize: 13, marginBottom: 8 }}>{error}</p>
       )}
       <button
         onClick={submit}
@@ -148,22 +148,22 @@ function ProjectCardView({ p, big }: { p: ProjectCard; big?: boolean }) {
   const [open, setOpen] = useState(false);
   const hasDetail = !!p.detail && p.detail.trim().length > 0;
   return (
-    <div style={{ ...card, ...(big ? { maxWidth: 480 } : {}) }}>
+    <div data-fill="bg-soft" style={{ ...card, ...(big ? { maxWidth: 480 } : {}) }}>
       {p.imageUrl && (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={p.imageUrl} alt={p.name} style={{ width: "100%", borderRadius: 10, marginBottom: 10 }} />
       )}
       <h3 style={{ fontSize: 17, marginBottom: 6, fontFamily: "var(--font-heading)" }}>{p.name}</h3>
-      <p style={{ color: "var(--text-muted)", fontSize: 14, marginBottom: 10 }}>{p.blurb}</p>
+      <p style={{ color: "var(--on-bg-soft)", fontStyle: "italic", fontSize: 14, marginBottom: 10 }}>{p.blurb}</p>
       {open && hasDetail && (
-        <p style={{ color: "var(--text)", fontSize: 14, lineHeight: 1.55, marginBottom: 10 }}>
+        <p style={{ color: "var(--on-bg-soft)", fontSize: 14, lineHeight: 1.55, marginBottom: 10 }}>
           {p.detail}
         </p>
       )}
       {p.tags.length > 0 && (
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
           {p.tags.map((t) => (
-            <span key={t} style={{ fontSize: 11, color: "var(--primary-soft)" }}>
+            <span key={t} style={{ fontSize: 11, color: "var(--accent-on-bg-soft)" }}>
               #{t}
             </span>
           ))}
@@ -199,7 +199,7 @@ function Carousel({ items }: { items: PhotoCard[] }) {
   const ph = items[i];
   const go = (d: number) => setI((v) => (v + d + items.length) % items.length);
   return (
-    <div style={card}>
+    <div data-fill="bg-soft" style={card}>
       <div style={{ position: "relative" }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={ph.src} alt={ph.description} style={{ width: "100%", borderRadius: 10, display: "block" }} />
@@ -215,7 +215,7 @@ function Carousel({ items }: { items: PhotoCard[] }) {
         )}
       </div>
       {ph.description && (
-        <p style={{ color: "var(--text-muted)", fontSize: 14, marginTop: 10 }}>{ph.description}</p>
+        <p style={{ color: "var(--on-bg-soft)", fontStyle: "italic", fontSize: 14, marginTop: 10 }}>{ph.description}</p>
       )}
       <div style={{ display: "flex", gap: 6, justifyContent: "center", marginTop: 10 }}>
         {items.map((_, idx) => (
@@ -240,7 +240,7 @@ function Carousel({ items }: { items: PhotoCard[] }) {
 function Filmstrip({ items }: { items: PhotoCard[] }) {
   const [open, setOpen] = useState<number | null>(null);
   return (
-    <div style={card}>
+    <div data-fill="bg-soft" style={card}>
       <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6 }}>
         {items.map((ph, idx) => (
           <button
@@ -259,11 +259,11 @@ function Filmstrip({ items }: { items: PhotoCard[] }) {
       </div>
       {open !== null && (
         <div style={lightbox} onClick={() => setOpen(null)}>
-          <div style={lightboxInner} onClick={(e) => e.stopPropagation()}>
+          <div data-fill="surface" style={lightboxInner} onClick={(e) => e.stopPropagation()}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={items[open].src} alt={items[open].description} style={{ maxWidth: "100%", maxHeight: "70vh", borderRadius: 10 }} />
             {items[open].description && (
-              <p style={{ color: "var(--text)", fontSize: 15, marginTop: 12 }}>{items[open].description}</p>
+              <p style={{ color: "var(--on-surface)", fontSize: 15, marginTop: 12 }}>{items[open].description}</p>
             )}
             <button style={{ ...linkBtn, marginTop: 14 }} onClick={() => setOpen(null)}>
               Close ✕
@@ -277,7 +277,7 @@ function Filmstrip({ items }: { items: PhotoCard[] }) {
 
 function Empty({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ ...card, color: "var(--text-muted)", fontSize: 14 }}>{children}</div>
+    <div data-fill="bg-soft" style={{ ...card, color: "var(--on-bg-soft)", fontStyle: "italic", fontSize: 14 }}>{children}</div>
   );
 }
 
@@ -290,6 +290,7 @@ const card: React.CSSProperties = {
   background: "var(--bg-soft)",
   border: "1px solid var(--border)",
   borderRadius: "var(--radius-md)",
+  color: "var(--on-bg-soft)",
   padding: 16,
 };
 const linkBtn: React.CSSProperties = {
@@ -297,7 +298,7 @@ const linkBtn: React.CSSProperties = {
   padding: "7px 12px",
   borderRadius: "var(--radius-sm)",
   border: "1px solid var(--border)",
-  color: "var(--text)",
+  color: "var(--on-surface)",
   background: "var(--surface)",
   textDecoration: "none",
 };
@@ -310,7 +311,7 @@ const cf: React.CSSProperties = {
   marginBottom: 10,
   outline: "none",
   fontSize: 14,
-  color: "var(--text)",
+  color: "var(--on-surface)",
 };
 const liveBtn: React.CSSProperties = {
   background: "var(--primary)",
@@ -325,8 +326,8 @@ const navArrow: React.CSSProperties = {
   height: 34,
   borderRadius: 999,
   border: "1px solid var(--border)",
-  background: "rgba(11,16,32,0.7)",
-  color: "var(--text)",
+  background: "var(--surface)",
+  color: "var(--on-surface)",
   fontSize: 20,
   lineHeight: 1,
 };
@@ -345,6 +346,7 @@ const lightboxInner: React.CSSProperties = {
   width: "100%",
   textAlign: "center",
   background: "var(--surface)",
+  color: "var(--on-surface)",
   border: "1px solid var(--border)",
   borderRadius: "var(--radius-lg)",
   padding: 20,

@@ -4,6 +4,7 @@ import type React from "react";
 
 export const panel: React.CSSProperties = {
   background: "var(--surface)",
+  color: "var(--on-surface)",
   border: "1px solid var(--border)",
   borderRadius: "var(--radius-md)",
   padding: 20,
@@ -14,6 +15,7 @@ export const field: React.CSSProperties = {
   width: "100%",
   padding: "10px 12px",
   background: "var(--bg-soft)",
+  color: "var(--on-bg-soft)",
   border: "1px solid var(--border)",
   borderRadius: "var(--radius-sm)",
   marginBottom: 10,
@@ -34,7 +36,11 @@ export const btn: React.CSSProperties = {
 export const btnGhost: React.CSSProperties = {
   padding: "7px 12px",
   background: "transparent",
-  color: "var(--text-muted)",
+  // Ghost buttons appear both on panels and on the bare page background, so
+  // they inherit whichever foreground their container established instead of
+  // pinning one fill's text color, and read as secondary through italics.
+  color: "inherit",
+  fontStyle: "italic",
   border: "1px solid var(--border)",
   borderRadius: "var(--radius-sm)",
   fontSize: 13,
@@ -42,8 +48,9 @@ export const btnGhost: React.CSSProperties = {
 
 export const btnDanger: React.CSSProperties = {
   ...btnGhost,
-  color: "var(--danger)",
-  borderColor: "rgba(255,107,107,0.35)",
+  color: "var(--danger-on-surface)",
+  fontStyle: "normal",
+  borderColor: "color-mix(in srgb, var(--danger-on-surface) 45%, transparent)",
 };
 
 export function SectionTitle({ children }: { children: React.ReactNode }) {
@@ -56,7 +63,7 @@ export function SectionTitle({ children }: { children: React.ReactNode }) {
 
 export function Label({ children }: { children: React.ReactNode }) {
   return (
-    <label style={{ display: "block", fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>
+    <label style={{ display: "block", fontSize: 12, color: "var(--on-surface)", fontStyle: "italic", marginBottom: 4 }}>
       {children}
     </label>
   );

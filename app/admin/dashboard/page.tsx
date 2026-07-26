@@ -18,7 +18,6 @@ import {
   updateSourceSummary,
   deleteSource,
   addProject,
-  deleteProject,
   uploadPhoto,
   updatePhoto,
   deletePhoto,
@@ -29,6 +28,7 @@ import {
 } from "../actions";
 import { Extractor } from "../Extractor";
 import { GithubImport } from "../GithubImport";
+import { ProjectRow } from "../ProjectRow";
 import { Tabs } from "../Tabs";
 import { SaveButton } from "../SaveButton";
 import { AutoUploadFile } from "../AutoUploadFile";
@@ -68,7 +68,7 @@ export default async function Dashboard() {
 
   // ── PROFILE TAB (Details + Bio merged) ──
   const profileTab = (
-    <section style={panel}>
+    <section data-fill="surface" style={panel}>
       <SectionTitle>Profile</SectionTitle>
 
       {/* Headshot — auto-uploads the moment a file is chosen. */}
@@ -157,7 +157,7 @@ export default async function Dashboard() {
 
   // ── PERSONA & THEME TAB ──
   const personaTab = (
-    <section style={panel}>
+    <section data-fill="surface" style={panel}>
       <SectionTitle>Persona & brand</SectionTitle>
 
       <form action={savePersona}>
@@ -210,7 +210,7 @@ export default async function Dashboard() {
 
   // ── PROJECTS TAB ──
   const projectsTab = (
-    <section style={panel}>
+    <section data-fill="surface" style={panel}>
       <SectionTitle>Projects (GitHub + Live links)</SectionTitle>
 
       {/* ── Import all repos from a GitHub profile link. ── */}
@@ -218,7 +218,7 @@ export default async function Dashboard() {
         <strong style={{ fontSize: 14, color: "var(--on-surface)", display: "block", marginBottom: 6 }}>
           Import from GitHub
         </strong>
-        <p style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 10 }}>
+        <p style={{ color: "var(--on-surface)", fontStyle: "italic", fontSize: 13, marginBottom: 10 }}>
           Paste your GitHub profile link — your top public repos become project cards, each
           enriched by Claude with a blurb, a &ldquo;Learn more&rdquo; write-up, and tags. Cards
           stream in one by one as they finish. Re-running refreshes projects whose repos have
@@ -245,7 +245,7 @@ export default async function Dashboard() {
         <Label>Cover image (optional)</Label>
         <input type="file" name="image" accept="image/*" style={field} />
         <button style={btn}>Add project</button>
-        <p style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 8 }}>
+        <p style={{ color: "var(--on-surface)", fontStyle: "italic", fontSize: 12, marginTop: 8 }}>
           Leave the description blank and add a GitHub or Live link — Claude writes the short
           description automatically from that page.
         </p>
@@ -253,50 +253,19 @@ export default async function Dashboard() {
       <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
         {projects.length === 0 && <Empty>No projects yet.</Empty>}
         {projects.map((p) => (
-          <div key={p.id} style={rowCard}>
-            <div style={{ minWidth: 0 }}>
-              <strong style={{ fontSize: 14 }}>{p.name}</strong>
-              <p style={{ color: "var(--text-muted)", fontSize: 13 }}>{p.blurb}</p>
-              {p.detail && (
-                <details style={{ marginTop: 4 }}>
-                  <summary style={{ fontSize: 12, color: "var(--text-muted)", cursor: "pointer" }}>
-                    Learn more
-                  </summary>
-                  <p style={{ color: "var(--text-muted)", fontSize: 13, marginTop: 4 }}>{p.detail}</p>
-                </details>
-              )}
-              {safeTags(p.tags).length > 0 && (
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
-                  {safeTags(p.tags).map((t) => (
-                    <span
-                      key={t}
-                      style={{
-                        fontSize: 11,
-                        padding: "2px 8px",
-                        borderRadius: 999,
-                        border: "1px solid var(--border)",
-                        color: "var(--text-muted)",
-                      }}
-                    >
-                      {t}
-                    </span>
-                  ))}
-                </div>
-              )}
-              <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
-                {p.githubUrl && (
-                  <a href={p.githubUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>GitHub</a>
-                )}
-                {p.liveUrl && (
-                  <a href={p.liveUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>Live</a>
-                )}
-              </div>
-            </div>
-            <form action={deleteProject}>
-              <input type="hidden" name="id" value={p.id} />
-              <button style={btnDanger as React.CSSProperties}>Delete</button>
-            </form>
-          </div>
+          <ProjectRow
+            key={p.id}
+            project={{
+              id: p.id,
+              name: p.name,
+              blurb: p.blurb,
+              detail: p.detail,
+              tags: safeTags(p.tags),
+              githubUrl: p.githubUrl,
+              liveUrl: p.liveUrl,
+              order: p.order,
+            }}
+          />
         ))}
       </div>
     </section>
@@ -304,7 +273,7 @@ export default async function Dashboard() {
 
   // ── KNOWLEDGE TAB ──
   const knowledgeTab = (
-    <section style={panel}>
+    <section data-fill="surface" style={panel}>
       <SectionTitle>Add knowledge — link, PDF, or text</SectionTitle>
       <Extractor />
       {sources.length > 0 && (
@@ -335,14 +304,14 @@ export default async function Dashboard() {
                   </form>
                 </div>
               </div>
-              {s.error && <p style={{ color: "var(--danger)", fontSize: 12, marginTop: 6 }}>{s.error}</p>}
+              {s.error && <p style={{ color: "var(--danger-on-surface)", fontSize: 12, marginTop: 6 }}>{s.error}</p>}
               <form action={updateSourceSummary} style={{ marginTop: 10 }}>
                 <input type="hidden" name="id" value={s.id} />
                 <textarea name="summary" defaultValue={s.summary ?? ""} rows={2} placeholder="Summary the chatbot will use…" style={{ ...field, marginBottom: 8, resize: "vertical" }} />
                 {safeTags(s.tags).length > 0 && (
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
                     {safeTags(s.tags).map((t) => (
-                      <span key={t} style={{ fontSize: 11, color: "var(--primary-soft)" }}>#{t}</span>
+                      <span key={t} style={{ fontSize: 11, color: "var(--accent-on-surface)" }}>#{t}</span>
                     ))}
                   </div>
                 )}
@@ -357,7 +326,7 @@ export default async function Dashboard() {
 
   // ── PHOTOS TAB ──
   const photosTab = (
-    <section style={panel}>
+    <section data-fill="surface" style={panel}>
       <SectionTitle>Photos (auto-described by Claude vision)</SectionTitle>
       <form action={uploadPhoto} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
         <input type="file" name="file" accept="image/*" required style={{ ...field, marginBottom: 0, maxWidth: 260 }} />
@@ -392,7 +361,7 @@ export default async function Dashboard() {
 
   // ── CONTACTS TAB ──
   const contactsTab = (
-    <section style={panel}>
+    <section data-fill="surface" style={panel}>
       <SectionTitle>Contact submissions{unhandled > 0 ? ` · ${unhandled} new` : ""}</SectionTitle>
       {contacts.length === 0 && <Empty>No submissions yet. They arrive via the in-chat contact form.</Empty>}
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -402,8 +371,8 @@ export default async function Dashboard() {
               <div style={{ minWidth: 0 }}>
                 <strong style={{ fontSize: 14 }}>{c.name}</strong>{" "}
                 <a href={`mailto:${c.email}`} style={{ fontSize: 13 }}>{c.email}</a>
-                <p style={{ color: "var(--text)", fontSize: 14, marginTop: 6, whiteSpace: "pre-wrap" }}>{c.message}</p>
-                <span style={{ color: "var(--text-muted)", fontSize: 11 }}>{c.createdAt.toISOString().slice(0, 16).replace("T", " ")} UTC</span>
+                <p style={{ color: "var(--on-surface)", fontSize: 14, marginTop: 6, whiteSpace: "pre-wrap" }}>{c.message}</p>
+                <span style={{ color: "var(--on-surface)", fontStyle: "italic", fontSize: 11 }}>{c.createdAt.toISOString().slice(0, 16).replace("T", " ")} UTC</span>
               </div>
               <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                 <form action={toggleContactHandled}>
@@ -425,9 +394,9 @@ export default async function Dashboard() {
 
   // ── ACTIVITY TAB — what visitors are asking the chatbot ──
   const activityTab = (
-    <section style={panel}>
+    <section data-fill="surface" style={panel}>
       <SectionTitle>Activity — visitor conversations</SectionTitle>
-      <p style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 14 }}>
+      <p style={{ color: "var(--on-surface)", fontStyle: "italic", fontSize: 13, marginBottom: 14 }}>
         Every conversation people have with your chatbot is recorded here — their
         questions and the answers they got. Click any chat to read the full transcript.
       </p>
@@ -487,7 +456,7 @@ export default async function Dashboard() {
                         flexShrink: 0,
                         fontSize: 12,
                         fontWeight: 700,
-                        color: "var(--primary-soft)",
+                        color: "var(--accent-on-bg-soft)",
                         background: "var(--bg-soft)",
                         borderRadius: 999,
                         padding: "1px 9px",
@@ -510,7 +479,7 @@ export default async function Dashboard() {
                 <strong style={{ fontSize: 14, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {s.firstQuery || "(no question)"}
                 </strong>
-                <span style={{ color: "var(--text-muted)", fontSize: 11 }}>
+                <span style={{ color: "var(--on-surface)", fontStyle: "italic", fontSize: 11 }}>
                   {s.messages.length} messages · {s.updatedAt.toISOString().slice(0, 16).replace("T", " ")} UTC
                 </span>
               </span>
@@ -537,7 +506,7 @@ export default async function Dashboard() {
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
         <div>
           <h1 style={{ fontSize: 26 }}>Control room</h1>
-          <p style={{ color: "var(--text-muted)", fontSize: 14 }}>Everything here feeds the chatbot & site.</p>
+          <p style={{ color: "var(--text)", fontStyle: "italic", fontSize: 14 }}>Everything here feeds the chatbot & site.</p>
         </div>
         <div style={{ display: "flex", gap: 10 }}>
           <Link href="/" style={btnGhost as React.CSSProperties}>View site</Link>
@@ -585,7 +554,7 @@ function UploadToGenerate({
 }) {
   return (
     <div>
-      <p style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 10 }}>{hint}</p>
+      <p style={{ color: "var(--on-surface)", fontStyle: "italic", fontSize: 13, marginBottom: 10 }}>{hint}</p>
       <form action={action} style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <input
           type="file"
@@ -597,14 +566,14 @@ function UploadToGenerate({
         <button style={btn}>{buttonLabel}</button>
       </form>
       {footnote && (
-        <p style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 8 }}>{footnote}</p>
+        <p style={{ color: "var(--on-surface)", fontStyle: "italic", fontSize: 12, marginTop: 8 }}>{footnote}</p>
       )}
     </div>
   );
 }
 
 function Empty({ children }: { children: React.ReactNode }) {
-  return <p style={{ color: "var(--text-muted)", fontSize: 14 }}>{children}</p>;
+  return <p style={{ color: "var(--on-surface)", fontStyle: "italic", fontSize: 14 }}>{children}</p>;
 }
 
 /** One message in a transcript: the bubble, plus feedback controls on bot answers. */
@@ -620,7 +589,7 @@ function MessageRow({
         style={{
           maxWidth: "85%",
           background: isUser ? "var(--primary)" : "var(--bg-soft)",
-          color: isUser ? "var(--on-primary)" : "var(--text)",
+          color: isUser ? "var(--on-primary)" : "var(--on-bg-soft)",
           border: isUser ? "1px solid transparent" : "1px solid var(--border)",
           borderRadius: 12,
           padding: "8px 12px",
@@ -653,7 +622,7 @@ function FeedbackControls({
     ...(btnGhost as React.CSSProperties),
     padding: "4px 10px",
     fontSize: 13,
-    ...(active ? { borderColor: "var(--primary)", color: "var(--primary-soft)", background: "var(--bg-soft)" } : {}),
+    ...(active ? { borderColor: "var(--primary)", color: "var(--accent-on-bg-soft)", background: "var(--bg-soft)" } : {}),
   });
   return (
     <div style={{ maxWidth: "85%", width: "100%" }}>
@@ -674,7 +643,7 @@ function FeedbackControls({
             </button>
           </form>
         )}
-        {rating === "up" && <span style={{ fontSize: 11, color: "var(--success)" }}>Marked good</span>}
+        {rating === "up" && <span style={{ fontSize: 11, color: "var(--success-on-surface)" }}>Marked good</span>}
       </div>
 
       {/* Correction note — steers future answers when the rating is 👎. */}
@@ -700,17 +669,19 @@ function FeedbackControls({
 function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div
+      data-fill="bg-soft"
       style={{
         border: "1px solid var(--border)",
         borderRadius: 10,
         padding: "12px 14px",
         background: "var(--bg-soft)",
+        color: "var(--on-bg-soft)",
       }}
     >
       <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "var(--font-heading)", lineHeight: 1.1 }}>
         {value}
       </div>
-      <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 2 }}>
+      <div style={{ fontSize: 11, color: "var(--on-bg-soft)", fontStyle: "italic", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 2 }}>
         {label}
       </div>
     </div>
@@ -720,15 +691,15 @@ function Stat({ label, value }: { label: string; value: number }) {
 function TypePill({ t }: { t: string }) {
   const icon = t === "pdf" ? "PDF" : t === "text" ? "TXT" : "LINK";
   return (
-    <span style={{ fontSize: 11, color: "var(--text-muted)", border: "1px solid var(--border)", borderRadius: 999, padding: "1px 7px" }}>{icon}</span>
+    <span style={{ fontSize: 11, color: "var(--on-surface)", fontStyle: "italic", border: "1px solid var(--border)", borderRadius: 999, padding: "1px 7px" }}>{icon}</span>
   );
 }
 
 function StatusPill({ status }: { status: string }) {
   const map: Record<string, { c: string; t: string }> = {
-    scanned: { c: "var(--success)", t: "scanned" },
-    pending: { c: "var(--accent)", t: "pending" },
-    failed: { c: "var(--danger)", t: "failed" },
+    scanned: { c: "var(--success-on-surface)", t: "scanned" },
+    pending: { c: "var(--accent-on-surface)", t: "pending" },
+    failed: { c: "var(--danger-on-surface)", t: "failed" },
   };
   const s = map[status] ?? map.pending;
   return (
@@ -737,12 +708,3 @@ function StatusPill({ status }: { status: string }) {
 }
 
 const grid2: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 };
-const rowCard: React.CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  border: "1px solid var(--border)",
-  borderRadius: 10,
-  padding: "10px 14px",
-  gap: 10,
-};

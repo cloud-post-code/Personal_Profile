@@ -6,10 +6,8 @@
   --border: #2a335c;
 
   --text: #e8ecff;
-  --text-muted: #9aa3c7;
 
   --primary: #7c5cff;
-  --primary-soft: #a48bff;
   --accent: #ffb84d;
 
   --success: #4ade80;
@@ -17,11 +15,28 @@
 
   /* ── Contrast pairs ── the readable foreground for content sitting ON each
      fill. Recomputed from the admin palette in lib/theme.ts, so anything
-     inside a primary button / accent chip / card stays legible. */
+     inside a primary button / accent chip / card stays legible. Never use a
+     foreground from one fill's group on top of another fill. */
   --on-primary: #ffffff;
   --on-accent: #10131c;
   --on-surface: #e8ecff;
-  --on-surface-muted: #9aa3c7;
+  --on-bg-soft: #e8ecff;
+
+  /* The accent hue as *text*, one copy per fill it can land on — each already
+     nudged to clear 4.5:1 there. Links, tags, and highlighted words use these
+     instead of --accent, which is a fill and can vanish on another fill. */
+  --accent-on-bg: #ffb84d;
+  --accent-on-bg-soft: #ffb84d;
+  --accent-on-surface: #ffb84d;
+
+  /* Same treatment for the semantic hues — a fixed red or green will collide
+     with some fill the admin picks, so each fill gets a readable copy. */
+  --danger-on-bg: #ff6b6b;
+  --danger-on-bg-soft: #ff6b6b;
+  --danger-on-surface: #ff6b6b;
+  --success-on-bg: #4ade80;
+  --success-on-bg-soft: #4ade80;
+  --success-on-surface: #4ade80;
 
   --radius-sm: 8px;
   --radius-md: 14px;
@@ -72,7 +87,7 @@ code,
 }
 
 a {
-  color: var(--primary-soft);
+  color: var(--accent-on-bg);
   text-decoration: none;
 }
 a:hover {
@@ -84,11 +99,58 @@ button {
   cursor: pointer;
 }
 
+/* Placeholders are secondary text like any other: the field's own color in
+   italics. The browser's default is a grey of its own choosing, which would
+   put a neutral back on the page outside the fill/text pairs. */
+::placeholder {
+  color: currentColor;
+  font-style: italic;
+  opacity: 1;
+}
+
 input,
 textarea,
 select {
   font-family: inherit;
   color: var(--text);
+}
+
+/* ── Fill scopes ──────────────────────────────────────────────────────────
+   Mark a filled container with data-fill and everything nested inside it
+   switches to that fill's foreground group. Without this, descendants that
+   don't set a color of their own (markdown links, bare inputs) fall back to
+   the *background's* text color while sitting on a surface, which is exactly
+   the mismatch these tokens exist to prevent. Inline styles still win, so a
+   component can be explicit where it wants to be. */
+[data-fill="surface"] {
+  color: var(--on-surface);
+}
+[data-fill="surface"] a {
+  color: var(--accent-on-surface);
+}
+[data-fill="surface"] input,
+[data-fill="surface"] textarea,
+[data-fill="surface"] select {
+  color: var(--on-surface);
+}
+
+[data-fill="bg-soft"] {
+  color: var(--on-bg-soft);
+}
+[data-fill="bg-soft"] a {
+  color: var(--accent-on-bg-soft);
+}
+[data-fill="bg-soft"] input,
+[data-fill="bg-soft"] textarea,
+[data-fill="bg-soft"] select {
+  color: var(--on-bg-soft);
+}
+
+[data-fill="accent"] {
+  color: var(--on-accent);
+}
+[data-fill="accent"] a {
+  color: var(--on-accent);
 }
 
 ::selection {

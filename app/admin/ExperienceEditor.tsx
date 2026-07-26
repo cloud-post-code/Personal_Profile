@@ -36,7 +36,7 @@ export function ExperienceEditor({ initial }: { initial: Experience[] }) {
       <input type="hidden" name="experience" value={JSON.stringify(rows)} />
 
       {rows.length === 0 && (
-        <p style={{ color: "var(--text-muted)", fontSize: 13 }}>
+        <p style={{ color: "var(--on-surface)", fontStyle: "italic", fontSize: 13 }}>
           No experience added yet. Add your roles below — each becomes a box here.
         </p>
       )}
@@ -45,6 +45,7 @@ export function ExperienceEditor({ initial }: { initial: Experience[] }) {
         <div
           key={i}
           className="exp-card"
+          data-fill="surface"
           style={{
             border: "1px solid var(--border)",
             background: "var(--surface)",

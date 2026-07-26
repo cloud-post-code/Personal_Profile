@@ -25,6 +25,7 @@ export default async function AdminLogin({
     >
       <form
         action={login}
+        data-fill="surface"
         style={{
           background: "var(--surface)",
           border: "1px solid var(--border)",
@@ -36,11 +37,11 @@ export default async function AdminLogin({
         }}
       >
         <h1 style={{ fontSize: 24, marginBottom: 6 }}>Admin</h1>
-        <p style={{ color: "var(--text-muted)", fontSize: 14, marginBottom: 20 }}>
+        <p style={{ color: "var(--on-surface)", fontStyle: "italic", fontSize: 14, marginBottom: 20 }}>
           Blake&apos;s control room. Add projects, scan links, upload photos.
         </p>
         {error && (
-          <p style={{ color: "var(--danger)", fontSize: 14, marginBottom: 12 }}>
+          <p style={{ color: "var(--danger-on-surface)", fontSize: 14, marginBottom: 12 }}>
             Wrong password. Try again.
           </p>
         )}
@@ -57,6 +58,7 @@ export default async function AdminLogin({
             borderRadius: "var(--radius-md)",
             marginBottom: 14,
             outline: "none",
+            color: "var(--on-bg-soft)",
           }}
         />
         <button

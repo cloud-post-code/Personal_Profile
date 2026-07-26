@@ -59,7 +59,8 @@ const tab: React.CSSProperties = {
   borderRadius: "var(--radius-pill)",
   border: "1px solid var(--border)",
   background: "transparent",
-  color: "var(--text-muted)",
+  color: "var(--text)",
+  fontStyle: "italic",
   fontSize: 14,
   fontWeight: 600,
   display: "inline-flex",
@@ -69,6 +70,7 @@ const tab: React.CSSProperties = {
 const tabOn: React.CSSProperties = {
   background: "var(--primary)",
   color: "var(--on-primary)",
+  fontStyle: "normal",
   border: "1px solid transparent",
   boxShadow: "var(--glow-primary)",
 };

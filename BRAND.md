@@ -18,15 +18,19 @@ Blake would rather talk than list bullet points.
 | Ink navy (bg) | `#0B1020` | Base "night terminal" background |
 | Surface | `#1A2140` | Cards, bubbles, panels |
 | Signal violet (primary) | `#7C5CFF` | Brand accent, buttons, links |
-| Violet soft | `#A48BFF` | Gradients, hovers |
 | Amber (accent) | `#FFB84D` | The spark — live dots, highlights, CTAs |
 | Text | `#E8ECFF` | Body |
-| Muted | `#9AA3C7` | Secondary text |
 
 High contrast, flat solid colors. No gradients or glows — the background is a
 single solid, and every accent is a flat fill. The three admin theme colors
 (Background / Primary / Accent) are the single source of truth and everything
 across the site derives from them.
+
+**One text color per fill.** There is no muted grey. Every fill — background,
+bg-soft, surface, accent — owns exactly one foreground, and secondary text
+(captions, hints, blurbs, timestamps) is that same color set in *italics*. A
+lighter neutral would be a fourth color outside the contrast pairs, which is
+how text ended up unreadable on themed fills in the first place.
 
 ## Type
 

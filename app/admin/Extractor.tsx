@@ -17,7 +17,8 @@ export function Extractor() {
         borderRadius: "var(--radius-sm)",
         border: "1px solid var(--border)",
         background: mode === m ? "var(--primary)" : "transparent",
-        color: mode === m ? "var(--on-primary)" : "var(--text-muted)",
+        color: mode === m ? "var(--on-primary)" : "var(--on-surface)",
+        fontStyle: mode === m ? "normal" : "italic",
         fontSize: 13,
         fontWeight: 600,
       }}
@@ -75,7 +76,7 @@ export function Extractor() {
         </form>
       )}
 
-      <p style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 12 }}>
+      <p style={{ color: "var(--on-surface)", fontStyle: "italic", fontSize: 12, marginTop: 12 }}>
         Whatever you add is fetched/parsed, then Claude writes a summary + tags. That becomes
         knowledge the chatbot can cite. LinkedIn often blocks bots — if a scan is thin, edit the
         summary below.

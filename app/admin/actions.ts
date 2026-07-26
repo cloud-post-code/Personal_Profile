@@ -376,6 +376,38 @@ export async function addProject(formData: FormData) {
   revalidateAll();
 }
 
+/**
+ * Save hand-edits to a project card. Tags arrive as a comma-separated string.
+ * Editing bumps updatedAt, so a GitHub re-import only overwrites this card if
+ * the repo is pushed to again after the edit.
+ */
+export async function updateProject(formData: FormData) {
+  await requireAuth();
+  const id = String(formData.get("id") ?? "");
+  const name = String(formData.get("name") ?? "").trim();
+  if (!id || !name) return;
+
+  const tags = String(formData.get("tags") ?? "")
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean)
+    .slice(0, 8);
+
+  await prisma.project.update({
+    where: { id },
+    data: {
+      name,
+      blurb: String(formData.get("blurb") ?? "").trim(),
+      detail: String(formData.get("detail") ?? "").trim() || null,
+      tags: JSON.stringify(tags),
+      githubUrl: String(formData.get("githubUrl") ?? "").trim() || null,
+      liveUrl: String(formData.get("liveUrl") ?? "").trim() || null,
+      order: Number(formData.get("order") ?? 0) || 0,
+    },
+  });
+  revalidateAll();
+}
+
 export async function deleteProject(formData: FormData) {
   await requireAuth();
   const id = String(formData.get("id") ?? "");

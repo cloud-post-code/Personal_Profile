@@ -225,7 +225,7 @@ function Composer({
   big?: boolean;
 }) {
   return (
-    <div style={{ ...styles.composer, ...(big ? styles.composerBig : {}) }}>
+    <div data-fill="surface" style={{ ...styles.composer, ...(big ? styles.composerBig : {}) }}>
       <input
         value={input}
         onChange={(e) => setInput(e.target.value)}
@@ -261,7 +261,7 @@ function Bubble({
   return (
     <div style={{ ...styles.row, flexDirection: "column", alignItems: isUser ? "flex-end" : "flex-start" }}>
       {(content || !hasCards) && (
-        <div style={isUser ? styles.userBubble : styles.botBubble}>
+        <div data-fill="surface" style={isUser ? styles.userBubble : styles.botBubble}>
           {content ? (
             isUser ? (
               <span style={{ whiteSpace: "pre-wrap" }}>{content}</span>
@@ -304,9 +304,11 @@ const styles: Record<string, React.CSSProperties> = {
   },
   h1: { fontSize: "clamp(40px, 8vw, 68px)", lineHeight: 1.02, marginBottom: 16 },
   h1accent: {
-    color: "var(--accent)",
+    // The accent as text on the page background — not --accent, which is a
+    // fill and can sit too close to the background to read.
+    color: "var(--accent-on-bg)",
   },
-  sub: { color: "var(--text-muted)", fontSize: 18, marginBottom: 36, maxWidth: 520 },
+  sub: { color: "var(--text)", fontStyle: "italic", fontSize: 18, marginBottom: 36, maxWidth: 520 },
 
   composer: {
     display: "flex",
@@ -324,6 +326,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: "transparent",
     border: "none",
     outline: "none",
+    color: "var(--on-surface)",
     fontSize: 16,
     padding: "12px 14px",
   },
@@ -341,7 +344,7 @@ const styles: Record<string, React.CSSProperties> = {
   chip: {
     background: "var(--bg-soft)",
     border: "1px solid var(--border)",
-    color: "var(--text)",
+    color: "var(--on-bg-soft)",
     borderRadius: 999,
     padding: "10px 16px",
     fontSize: 14,
@@ -349,7 +352,7 @@ const styles: Record<string, React.CSSProperties> = {
     maxWidth: "100%",
     textAlign: "center",
   },
-  footnote: { color: "var(--text-muted)", fontSize: 13, marginTop: 32, maxWidth: 460 },
+  footnote: { color: "var(--text)", fontStyle: "italic", fontSize: 13, marginTop: 32, maxWidth: 460 },
 
   chatWrap: {
     flex: 1,
@@ -379,7 +382,8 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: "pointer",
   },
   homeLabel: {
-    color: "var(--text-muted)",
+    color: "var(--text)",
+    fontStyle: "italic",
     fontSize: 13,
     fontWeight: 500,
   },
@@ -411,7 +415,7 @@ const styles: Record<string, React.CSSProperties> = {
   userBubble: {
     background: "var(--surface)",
     border: "1px solid var(--border)",
-    color: "var(--text)",
+    color: "var(--on-surface)",
     padding: "12px 16px",
     borderRadius: "18px 18px 4px 18px",
     maxWidth: "80%",
@@ -421,7 +425,7 @@ const styles: Record<string, React.CSSProperties> = {
   botBubble: {
     background: "var(--surface)",
     border: "1px solid var(--border)",
-    color: "var(--text)",
+    color: "var(--on-surface)",
     padding: "12px 16px",
     borderRadius: "18px 18px 18px 4px",
     maxWidth: "80%",
@@ -433,7 +437,9 @@ const styles: Record<string, React.CSSProperties> = {
     width: 7,
     height: 7,
     borderRadius: 999,
-    background: "var(--primary-soft)",
+    // The dots sit inside a surface bubble, so they take that fill's
+    // foreground — --primary-soft was the surface fill itself and vanished.
+    background: "var(--on-surface)",
     display: "inline-block",
     animation: "blink 1s infinite",
   },
@@ -450,7 +456,7 @@ const styles: Record<string, React.CSSProperties> = {
   chipSmall: {
     background: "var(--bg-soft)",
     border: "1px solid var(--border)",
-    color: "var(--text)",
+    color: "var(--on-bg-soft)",
     borderRadius: 999,
     padding: "8px 16px",
     fontSize: 14,

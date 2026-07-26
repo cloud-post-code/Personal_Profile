@@ -123,7 +123,10 @@ export function ThemePicker({
                       fontWeight: Number(w.key),
                       cursor: "pointer",
                       border: on ? "1px solid var(--primary)" : "1px solid var(--border)",
-                      background: on ? "var(--bg-soft)" : "transparent",
+                      // Mark the selection with a tint of the panel's own text
+                      // rather than a different fill, so all four keep the
+                      // surface pair instead of one switching underneath it.
+                      background: on ? "color-mix(in srgb, var(--on-surface) 12%, transparent)" : "transparent",
                     }}
                   >
                     {w.label}
@@ -201,7 +204,7 @@ export function ThemePicker({
             );
           })}
         </div>
-        <p style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 10 }}>
+        <p style={{ color: "var(--on-surface)", fontStyle: "italic", fontSize: 12, marginTop: 10 }}>
           Each fill owns the text that sits on it, with its live contrast ratio — aim for 4.5 or
           higher. Muted text is derived from each text color automatically. Cards and primary
           buttons share the Surface color. Clear a hex field to fall back to its default.
@@ -231,12 +234,12 @@ export function ThemePicker({
                     height: 64,
                     background: tint,
                     borderRadius: r.preview,
-                    border: on ? "3px solid var(--text)" : "3px solid transparent",
+                    border: on ? "3px solid var(--on-surface)" : "3px solid transparent",
                     boxShadow: on ? "none" : "inset 0 0 0 1px var(--border)",
                     transition: "border-color 0.15s ease",
                   }}
                 />
-                <span style={{ fontSize: 12, color: on ? "var(--text)" : "var(--text-muted)" }}>
+                <span style={{ fontSize: 12, color: "var(--on-surface)", fontStyle: on ? "normal" : "italic" }}>
                   {r.label.replace(/\s*\(.*\)$/, "")}
                 </span>
               </button>
@@ -279,21 +282,21 @@ function PreviewCard() {
   return (
     <div style={{ background: "var(--bg)", color: "var(--text)", padding: 18, fontFamily: "var(--font-body)" }}>
       <div style={{ fontFamily: "var(--font-heading)", fontWeight: "var(--heading-weight)" as unknown as number, fontSize: 26, letterSpacing: "-0.02em" }}>
-        Hey, I&apos;m Blake. <span style={{ color: "var(--accent)" }}>Talk to me.</span>
+        Hey, I&apos;m Blake. <span style={{ color: "var(--accent-on-bg)" }}>Talk to me.</span>
       </div>
-      <p style={{ color: "var(--text-muted)", fontSize: "var(--font-size-base)", margin: "6px 0 14px" }}>
+      <p style={{ color: "var(--text)", fontStyle: "italic", fontSize: "var(--font-size-base)", margin: "6px 0 14px" }}>
         Curious builder. I make things and talk about them.
       </p>
       <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-        <span style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)", borderRadius: "var(--radius-md)", padding: "8px 12px", fontSize: 13 }}>
+        <span style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--on-surface)", borderRadius: "var(--radius-md)", padding: "8px 12px", fontSize: 13 }}>
           A card / bubble
         </span>
         <span style={{ background: "var(--primary)", color: "var(--on-primary)", borderRadius: "var(--radius-md)", padding: "8px 14px", fontSize: 13, fontWeight: 600 }}>
           Primary button
         </span>
       </div>
-      <a href="#" onClick={(e) => e.preventDefault()} style={{ color: "var(--primary)", fontSize: 13 }}>
-        A link in primary
+      <a href="#" onClick={(e) => e.preventDefault()} style={{ color: "var(--accent-on-bg)", fontSize: 13 }}>
+        A link on the background
       </a>
     </div>
   );
@@ -317,10 +320,10 @@ function FontDropdown({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        style={{ ...field, marginBottom: 0, display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", textAlign: "left", color: "var(--on-surface)" }}
+        style={{ ...field, marginBottom: 0, display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", textAlign: "left", color: "var(--on-bg-soft)" }}
       >
-        <span style={{ fontFamily: current?.family, fontSize: 16, color: "var(--on-surface)" }}>{current?.label}</span>
-        <span style={{ color: "var(--text-muted)", fontSize: 12 }}>{open ? "▲" : "▼"}</span>
+        <span style={{ fontFamily: current?.family, fontSize: 16, color: "var(--on-bg-soft)" }}>{current?.label}</span>
+        <span style={{ color: "var(--on-bg-soft)", fontStyle: "italic", fontSize: 12 }}>{open ? "▲" : "▼"}</span>
       </button>
       {open && (
         <div style={{ position: "absolute", zIndex: 20, top: "calc(100% + 4px)", left: 0, right: 0, maxHeight: 280, overflowY: "auto", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", boxShadow: "0 12px 32px rgba(0,0,0,0.4)" }}>
@@ -332,7 +335,7 @@ function FontDropdown({
                 onChange(o.key);
                 setOpen(false);
               }}
-              style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 12px", background: o.key === value ? "var(--bg-soft)" : "transparent", border: "none", color: "var(--on-surface)", cursor: "pointer", fontFamily: o.family, fontSize: 17 }}
+              style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 12px", background: o.key === value ? "color-mix(in srgb, var(--on-surface) 12%, transparent)" : "transparent", border: "none", color: "var(--on-surface)", cursor: "pointer", fontFamily: o.family, fontSize: 17 }}
             >
               {o.label}
             </button>
@@ -404,7 +407,7 @@ function ColorField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={fallback}
-        style={{ ...field, marginBottom: 0, color: "var(--on-surface)", fontFamily: "var(--font-mono)", fontSize: 12, padding: "6px 8px" }}
+        style={{ ...field, marginBottom: 0, color: "var(--on-bg-soft)", fontFamily: "var(--font-mono)", fontSize: 12, padding: "6px 8px" }}
       />
     </div>
   );
@@ -415,4 +418,4 @@ const grid2: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr 
 // they must stay visible against the editor panel no matter what the live theme
 // colors are — a theme whose --primary matches the panel would otherwise make
 // the swatch blend in and read as an empty bordered box.
-const CORNER_TINTS = ["var(--accent)", "var(--primary)", "var(--primary-soft)"];
+const CORNER_TINTS = ["var(--accent)", "var(--primary)", "var(--border)"];
