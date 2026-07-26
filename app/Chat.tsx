@@ -406,21 +406,27 @@ const styles: Record<string, React.CSSProperties> = {
   },
   thread: { flex: 1, overflowY: "auto", padding: "12px 4px", display: "flex", flexDirection: "column", gap: 14 },
   row: { display: "flex", width: "100%" },
+  // User and bot bubbles share one look; only alignment and the tucked corner
+  // differ, so both sides of the conversation read identically.
   userBubble: {
-    background: "var(--primary)",
-    color: "var(--on-primary)",
+    background: "var(--surface)",
+    border: "1px solid var(--border)",
+    color: "var(--text)",
     padding: "12px 16px",
     borderRadius: "18px 18px 4px 18px",
     maxWidth: "80%",
     fontSize: 15,
+    lineHeight: 1.5,
   },
   botBubble: {
     background: "var(--surface)",
     border: "1px solid var(--border)",
+    color: "var(--text)",
     padding: "12px 16px",
     borderRadius: "18px 18px 18px 4px",
     maxWidth: "80%",
     fontSize: 15,
+    lineHeight: 1.5,
   },
   typing: { display: "inline-flex", gap: 5, alignItems: "center", height: 20 },
   tdot: {
