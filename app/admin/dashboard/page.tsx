@@ -221,7 +221,8 @@ export default async function Dashboard() {
         <p style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 10 }}>
           Paste your GitHub profile link — your top public repos become project cards, each
           enriched by Claude with a blurb, a &ldquo;Learn more&rdquo; write-up, and tags. Cards
-          stream in one by one as they finish. Re-running skips ones already imported.
+          stream in one by one as they finish. Re-running refreshes projects whose repos have
+          changed on GitHub since the last import and skips the rest.
         </p>
         <GithubImport />
       </div>

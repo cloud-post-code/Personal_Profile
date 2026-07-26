@@ -13,6 +13,7 @@ type ImportedProject = {
   githubUrl: string | null;
   liveUrl: string | null;
   stars: number;
+  status: "new" | "updated";
 };
 
 type Status =
@@ -20,6 +21,17 @@ type Status =
   | { kind: "running"; total: number | null; skipped: number }
   | { kind: "done"; total: number; skipped: number }
   | { kind: "error"; message: string };
+
+function summarize(imported: ImportedProject[], skipped: number): string {
+  const added = imported.filter((p) => p.status === "new").length;
+  const updated = imported.filter((p) => p.status === "updated").length;
+  const parts = [];
+  if (added) parts.push(`imported ${added} new`);
+  if (updated) parts.push(`updated ${updated} changed`);
+  if (skipped) parts.push(`${skipped} unchanged`);
+  const s = parts.join(", ") || "nothing to do";
+  return s.charAt(0).toUpperCase() + s.slice(1) + ".";
+}
 
 /**
  * GitHub import with live streaming: posts to /api/admin/import-github and
@@ -103,13 +115,11 @@ export function GithubImport() {
             (status.total === null
               ? "Fetching repos from GitHub…"
               : `Enriching ${imported.length}/${status.total} projects with Claude…` +
-                (status.skipped ? ` (${status.skipped} already imported, skipped)` : ""))}
+                (status.skipped ? ` (${status.skipped} unchanged, skipped)` : ""))}
           {status.kind === "done" &&
             (status.total === 0
-              ? `Nothing new to import${status.skipped ? ` — all ${status.skipped} repos already imported` : ""}.`
-              : `Imported ${imported.length} project${imported.length === 1 ? "" : "s"}` +
-                (status.skipped ? ` (${status.skipped} already imported, skipped)` : "") +
-                ".")}
+              ? `Nothing to do${status.skipped ? ` — all ${status.skipped} imported repos are unchanged on GitHub` : ""}.`
+              : summarize(imported, status.skipped))}
           {status.kind === "error" && <span style={{ color: "var(--danger)" }}>{status.message}</span>}
         </p>
       )}
@@ -131,6 +141,18 @@ export function GithubImport() {
                 {p.stars > 0 && (
                   <span style={{ color: "var(--text-muted)", fontSize: 12 }}>★ {p.stars}</span>
                 )}
+                <span
+                  style={{
+                    fontSize: 11,
+                    padding: "1px 8px",
+                    borderRadius: 999,
+                    background: "var(--primary)",
+                    color: "var(--on-primary)",
+                    fontWeight: 600,
+                  }}
+                >
+                  {p.status === "updated" ? "updated" : "new"}
+                </span>
               </div>
               <p style={{ fontSize: 13, marginTop: 2 }}>{p.blurb}</p>
               {p.detail && (

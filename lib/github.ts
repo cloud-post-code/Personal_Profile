@@ -16,6 +16,8 @@ export type RepoProject = {
   /** Raw repo language/topics, used as extra context when enriching. */
   language: string | null;
   topics: string[];
+  /** When the repo last received a push, ISO string — drives re-sync of stale imports. */
+  pushedAt: string | null;
 };
 
 /** The AI-enriched fields Haiku produces for a single project. */
@@ -47,6 +49,7 @@ type GhRepo = {
   stargazers_count: number;
   language: string | null;
   topics?: string[];
+  pushed_at: string | null;
 };
 
 /**
@@ -90,6 +93,7 @@ export async function fetchGithubProjects(
       stars: r.stargazers_count,
       language: r.language ?? null,
       topics: Array.isArray(r.topics) ? r.topics.slice(0, 8) : [],
+      pushedAt: r.pushed_at ?? null,
     }));
 }
 
