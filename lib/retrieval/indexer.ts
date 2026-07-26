@@ -40,15 +40,28 @@ export async function dropOrigin(kind: string, id: string): Promise<void> {
   await prisma.chunk.deleteMany({ where: { originKind: kind, originId: id } });
 }
 
+/**
+ * Clear an origin's chunks, including rows written before the origin columns
+ * existed. Those legacy rows carry an empty `originId`, so matching on
+ * kind+id alone would leave them behind as duplicates of the content we are
+ * about to rewrite.
+ */
+async function clearOrigin(origin: OriginInput): Promise<void> {
+  await dropOrigin(origin.kind, origin.id);
+  if (origin.sourceId) {
+    await prisma.chunk.deleteMany({ where: { sourceId: origin.sourceId, originId: "" } });
+  }
+}
+
 export async function indexOrigin(origin: OriginInput, opts: IndexOpts = {}): Promise<void> {
   const text = origin.text.trim();
-  if (!text) return dropOrigin(origin.kind, origin.id);
+  if (!text) return clearOrigin(origin);
 
   const pieces = chunkText(text);
   const { vectors, model } = await embedTexts(pieces);
 
   // Replace this origin's chunks (mentions cascade away with them).
-  await dropOrigin(origin.kind, origin.id);
+  await clearOrigin(origin);
   const written: { id: string; text: string }[] = [];
   for (let i = 0; i < pieces.length; i++) {
     const v = vectors[i];

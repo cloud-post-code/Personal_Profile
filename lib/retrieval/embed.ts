@@ -14,6 +14,7 @@ import { tokenize } from "./chunking";
 
 export const LOCAL_EMBED_MODEL = "local-hash-256-v1";
 const LOCAL_DIM = 256;
+const MAX_EMBED_RETRIES = 4;
 
 export function embedModelName(): string {
   if (process.env.VOYAGE_API_KEY) return "voyage-3.5-lite";
@@ -28,14 +29,26 @@ export async function embedTexts(texts: string[]): Promise<Embedded> {
   if (model !== LOCAL_EMBED_MODEL) {
     try {
       return { vectors: await apiEmbed(texts, model), model };
-    } catch {
-      // Provider hiccup: fall back to local so ingestion never blocks.
+    } catch (e) {
+      // Deliberately NOT falling back to local vectors here. Cosine is only
+      // computed between same-model vectors, so a provider hiccup mid-reindex
+      // would silently split the index in two and leave part of the knowledge
+      // base keyword-only — with nothing to show for it. Leaving these chunks
+      // unembedded is the honest failure: they stay lexically searchable and
+      // the Graph tab reports them as missing an embedding.
+      console.error(`embedTexts: ${model} failed after retries —`, e);
+      return { vectors: texts.map(() => null), model };
     }
   }
   return { vectors: texts.map(localEmbed), model: LOCAL_EMBED_MODEL };
 }
 
-async function apiEmbed(texts: string[], model: string): Promise<Float32Array[]> {
+/**
+ * Embed via the provider, retrying rate limits and transient server errors.
+ * A bulk reindex fires one request per origin back to back, which trips the
+ * per-minute limits on entry-level plans; without this the whole run degrades.
+ */
+async function apiEmbed(texts: string[], model: string, attempt = 0): Promise<Float32Array[]> {
   const voyage = model.startsWith("voyage");
   const res = await fetch(
     voyage ? "https://api.voyageai.com/v1/embeddings" : "https://api.openai.com/v1/embeddings",
@@ -49,6 +62,12 @@ async function apiEmbed(texts: string[], model: string): Promise<Float32Array[]>
       signal: AbortSignal.timeout(20_000),
     },
   );
+
+  if ((res.status === 429 || res.status >= 500) && attempt < MAX_EMBED_RETRIES) {
+    // 2s, 4s, 8s, 16s — comfortably clears a per-minute window.
+    await new Promise((r) => setTimeout(r, 2000 * 2 ** attempt));
+    return apiEmbed(texts, model, attempt + 1);
+  }
   if (!res.ok) throw new Error(`Embeddings API ${res.status}`);
   const json = (await res.json()) as { data: { index: number; embedding: number[] }[] };
   const out: Float32Array[] = new Array(texts.length);
