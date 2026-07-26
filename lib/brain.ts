@@ -22,7 +22,14 @@ export type Msg = { role: "user" | "assistant"; content: string };
 export type BrainEvent = { t: "text"; v: string } | { t: "card"; v: UiBlock };
 
 /** Web renders cards; other channels are text-only until taught otherwise. */
-export type Channel = "web" | (string & {});
+export type Channel = "web" | "a2a" | (string & {});
+
+/**
+ * Channels that can do something with a UI block. Web paints it; A2A hands it
+ * to the calling agent as a structured data part, which is more useful to a
+ * machine than the prose equivalent. Anything else gets text only.
+ */
+const CARD_CHANNELS: ReadonlySet<string> = new Set(["web", "a2a"]);
 
 export type BrainInput = {
   message: string;
@@ -175,7 +182,7 @@ export async function* answer(
   deps: BrainDeps = {},
 ): AsyncGenerator<BrainEvent> {
   const { message, history = [], sessionId, channel = "web" } = input;
-  const cards = channel === "web";
+  const cards = CARD_CHANNELS.has(channel);
   let spoken = "";
 
   try {

@@ -274,3 +274,34 @@ model Profile {
 
   updatedAt DateTime @updatedAt
 }
+
+/// One A2A task: work another agent asked this agent to do over the A2A
+/// endpoint (lib/a2a). Persisted rather than held in memory because the
+/// protocol lets a caller send a message now and fetch the result later —
+/// GetTask/ListTasks/CancelTask have to survive the request that created the
+/// task, and on Railway they also have to survive a redeploy.
+model A2ATask {
+  id        String   @id
+  /// Groups tasks into one conversation. Reused as the chat sessionId, so an
+  /// agent-to-agent conversation shows up in Activity like any visitor's.
+  contextId String
+  /// TaskState in short form: submitted | working | completed | failed |
+  /// canceled | rejected. Rendered to the wire spelling per protocol version.
+  state     String   @default("submitted")
+  /// JSON array of A2A Message objects (v1.0 shape) — the turn history.
+  history   String   @default("[]") @db.Text
+  /// JSON array of A2A Artifact objects (v1.0 shape) — the answer and any
+  /// UI cards the brain emitted, as structured data parts.
+  artifacts String   @default("[]") @db.Text
+  /// Human-readable reason the task ended in `failed`.
+  error     String?  @db.Text
+  /// Set by CancelTask. The runner checks it between brain events, which is
+  /// the only safe place to stop — mid-stream there is nothing to roll back.
+  cancelRequested Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([contextId])
+  @@index([state])
+  @@index([createdAt])
+}

@@ -166,6 +166,10 @@ export default function Chat({
             This whole site is a conversation. An AI host answers as {name}, using only what
             he&apos;s shared — and can show you cards, projects, and galleries right here.
           </p>
+          {/* Other agents get the same host over A2A, not just people. */}
+          <a href="/agent" style={styles.agentLink}>
+            🪪 Agent card &amp; facts — this site is callable by other AI agents
+          </a>
         </section>
       ) : (
         <section style={styles.chatWrap}>
@@ -183,6 +187,9 @@ export default function Chat({
               )}
               <span style={styles.homeLabel}>Home</span>
             </button>
+            <a href="/agent" style={styles.headerAgentLink} title="Agent card & facts">
+              🪪 Agent card
+            </a>
           </div>
           <div ref={scrollRef} style={styles.thread}>
             {messages.map((m, i) => (
@@ -353,6 +360,20 @@ const styles: Record<string, React.CSSProperties> = {
     textAlign: "center",
   },
   footnote: { color: "var(--text)", fontStyle: "italic", fontSize: 13, marginTop: 32, maxWidth: 460 },
+  // Quiet by design: a visitor is here to talk, not to read a protocol spec.
+  agentLink: {
+    color: "var(--accent-on-bg)",
+    fontSize: 12.5,
+    marginTop: 12,
+    textDecoration: "none",
+    opacity: 0.75,
+  },
+  headerAgentLink: {
+    color: "var(--accent-on-bg)",
+    fontSize: 12,
+    textDecoration: "none",
+    opacity: 0.7,
+  },
 
   chatWrap: {
     flex: 1,

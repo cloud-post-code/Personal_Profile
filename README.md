@@ -23,6 +23,40 @@ portal. There's a public site and a password-gated admin control room.
   - **Photos** — on upload, **Claude vision writes a one-paragraph description**
     (editable); exposed individually and in galleries.
 
+### A2A (agent-to-agent) — this site is callable by other agents
+
+The site publishes an **A2A Agent Card** and answers the protocol, so another AI
+agent can discover this one and ask it questions. Nothing about the chatbot is
+duplicated: `lib/a2a/*` is a transport over the same `lib/brain.ts`.
+
+| URL | What it is |
+| --- | --- |
+| `/.well-known/agent-card.json` | Agent Card, A2A **v1.0** (the current spec) |
+| `/.well-known/agent.json` | The same agent in **v0.3** vocabulary, for older clients |
+| `/.well-known/agent-facts.json` | NANDA **AgentFacts** document (self-hosted, self-declared) |
+| `/api/a2a` | JSON-RPC 2.0 endpoint (+ SSE streaming) |
+| `/api/a2a/rest` | The same methods over HTTP+JSON |
+| `/agent` | The human-readable page, linked from the homepage |
+
+Both live protocol generations are spoken, negotiated by the `A2A-Version`
+header — absent means 0.3, per spec §3.6.2. Implemented: `SendMessage`,
+`SendStreamingMessage`, `GetTask`, `ListTasks`, `CancelTask`,
+`SubscribeToTask`. Push notifications are not, and the card says so.
+
+```bash
+curl -X POST http://localhost:3000/api/a2a \
+  -H 'Content-Type: application/json' -H 'A2A-Version: 1.0' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"SendMessage","params":{
+        "message":{"messageId":"1","role":"ROLE_USER",
+                   "parts":[{"text":"What are your recent projects?"}]}}}'
+```
+
+The card is generated from the `Profile` row, so a site built from this template
+describes its own owner with its own skills — there is no JSON to hand-edit.
+Everything the chatbot would draw as a UI card (projects, galleries) is returned
+to a calling agent as a structured **data part**, so it gets JSON rather than
+prose it has to parse.
+
 ### A2UI (agent-to-UI)
 
 The chat API (`app/api/chat/route.ts`) gives Claude three tools —
