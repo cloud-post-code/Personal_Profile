@@ -6,6 +6,7 @@ import {
   COLOR_GROUPS,
   COLOR_ROLES,
   HEADING_WEIGHTS,
+  THEME_PRESETS,
   contrastRatioOf,
   themeVarLines,
   type ThemeColors,
@@ -50,9 +51,29 @@ export function ThemePicker({
   const [fontSize, setFontSize] = useState(initial.themeFontSize || "16");
   const [headingWeight, setHeadingWeight] = useState(initial.themeHeadingWeight || "700");
   const [colors, setColors] = useState<ThemeColors>(initial.colors ?? {});
+  // Which preset the shuffle button last applied, so its name can be shown and
+  // so the next shuffle can skip it. Null until shuffled — hand-picked colors
+  // don't belong to a preset even when they happen to match one.
+  const [presetIndex, setPresetIndex] = useState<number | null>(null);
 
-  const setColor = (key: keyof ThemeColors, v: string) =>
+  const setColor = (key: keyof ThemeColors, v: string) => {
     setColors((c) => ({ ...c, [key]: v }));
+    // Editing any swatch means these are no longer the preset's colors.
+    setPresetIndex(null);
+  };
+
+  /**
+   * Jump to a random preset, never the one already showing — a shuffle that
+   * lands on the current theme reads as a broken button. Presets carry all
+   * seven roles, so this replaces the palette wholesale rather than merging
+   * into it and leaving an old border or accent behind.
+   */
+  const shuffle = () => {
+    const others = THEME_PRESETS.map((_, i) => i).filter((i) => i !== presetIndex);
+    const next = others[Math.floor(Math.random() * others.length)];
+    setColors({ ...THEME_PRESETS[next].colors });
+    setPresetIndex(next);
+  };
 
   const headingFamily = fontOptions.find((f) => f.key === themeFont)?.family;
   const bodyFamily = bodyFontOptions.find((f) => f.key === themeBodyFont)?.family;
@@ -140,7 +161,45 @@ export function ThemePicker({
 
       {/* ── Colors ── grouped by fill, each owning the text that sits on it. ── */}
       <div>
-        <strong style={{ fontSize: 13, color: "var(--on-surface)", display: "block", marginBottom: 10 }}>Colors</strong>
+        {/* Heading and shuffle sit on one row: the button rewrites every swatch
+            below it, so it belongs with the section it replaces, not floating. */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
+          <strong style={{ fontSize: 13, color: "var(--on-surface)" }}>Colors</strong>
+          <button
+            type="button"
+            onClick={shuffle}
+            title={`Apply a random one of the ${THEME_PRESETS.length} preset palettes`}
+            style={{
+              ...field,
+              marginBottom: 0,
+              width: "auto",
+              padding: "6px 12px",
+              fontSize: 12,
+              fontWeight: 600,
+              color: "var(--on-surface)",
+              border: "1px solid var(--border)",
+              background: "color-mix(in srgb, var(--on-surface) 12%, transparent)",
+              cursor: "pointer",
+            }}
+          >
+            Shuffle palette
+          </button>
+          {presetIndex !== null && (
+            <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--on-surface)" }}>
+              {/* A strip of the applied palette, so the name has something to
+                  read against while the eye is still on this row. */}
+              <span style={{ display: "flex", borderRadius: 4, overflow: "hidden", border: "1px solid var(--border)" }}>
+                {PRESET_SWATCH_ROLES.map((role) => (
+                  <span
+                    key={role}
+                    style={{ width: 14, height: 14, background: THEME_PRESETS[presetIndex].colors[role] }}
+                  />
+                ))}
+              </span>
+              <em>{THEME_PRESETS[presetIndex].name}</em>
+            </span>
+          )}
+        </div>
         {/* Three across on desktop, stacked on mobile — auto-fit handles both
             without a media query, since each card has a 240px floor. */}
         <div
@@ -414,6 +473,9 @@ function ColorField({
 }
 
 const grid2: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 };
+// The roles shown in the shuffled-preset swatch strip — the three fills that
+// carry the palette's character, in the order the picker cards below use.
+const PRESET_SWATCH_ROLES = ["bg", "surface", "accent"] as const;
 // Fills for the corner-shape previews. These are decorative shape samples, so
 // they must stay visible against the editor panel no matter what the live theme
 // colors are — a theme whose --primary matches the panel would otherwise make

@@ -143,6 +143,95 @@ export const COLOR_ROLES: { key: keyof ThemeColors; label: string; fallback: str
   { key: "border", label: "Border", fallback: "#2A335C" },
 ];
 
+/**
+ * Ready-made color themes for the admin "Shuffle" button. Each one is a full
+ * set of the seven roles — no partial presets, so shuffling can never leave a
+ * previous theme's background under a new theme's cards. Every fill/text pair
+ * here clears 4.5:1, which is the same bar the picker's live readout asks for.
+ */
+export const THEME_PRESETS: { name: string; colors: ThemeColors }[] = [
+  {
+    name: "Night Terminal",
+    colors: { bg: "#0B1020", text: "#E8ECFF", surface: "#1A2140", surfaceText: "#E8ECFF", accent: "#FFB84D", accentText: "#10131C", border: "#2A335C" },
+  },
+  {
+    name: "Sage Paper",
+    colors: { bg: "#F1E9D8", text: "#1F2A21", surface: "#3F5D46", surfaceText: "#F1E9D8", accent: "#9C4F2B", accentText: "#FFFFFF", border: "#D8CDB6" },
+  },
+  {
+    name: "Blueprint",
+    colors: { bg: "#0D1B2A", text: "#E0E6ED", surface: "#1B2C3F", surfaceText: "#E0E6ED", accent: "#4CC9F0", accentText: "#06121C", border: "#2C4159" },
+  },
+  {
+    name: "Mono Slate",
+    colors: { bg: "#18181B", text: "#FAFAFA", surface: "#27272A", surfaceText: "#FAFAFA", accent: "#A1A1AA", accentText: "#18181B", border: "#3F3F46" },
+  },
+  {
+    name: "Rose Ink",
+    colors: { bg: "#FFF5F7", text: "#2B1A20", surface: "#8C2F49", surfaceText: "#FFF5F7", accent: "#A32B4B", accentText: "#FFFFFF", border: "#EBD3DA" },
+  },
+  {
+    name: "Forest Cream",
+    colors: { bg: "#FAF7F0", text: "#1C2B21", surface: "#14432A", surfaceText: "#F3FBF6", accent: "#9A4A08", accentText: "#FFFFFF", border: "#DDD8C8" },
+  },
+  {
+    name: "Cyber Lime",
+    colors: { bg: "#0A0F0A", text: "#E6FFE6", surface: "#14251A", surfaceText: "#DFF7E3", accent: "#A3E635", accentText: "#0A0F0A", border: "#244430" },
+  },
+  {
+    name: "Copper Dusk",
+    colors: { bg: "#1C1614", text: "#F5EBE4", surface: "#2E241F", surfaceText: "#F5EBE4", accent: "#E08D50", accentText: "#1C1614", border: "#4A3A31" },
+  },
+  {
+    name: "Arctic",
+    colors: { bg: "#F7FAFC", text: "#0F1E2B", surface: "#1E3A5F", surfaceText: "#EAF2FA", accent: "#0B6076", accentText: "#FFFFFF", border: "#D3DEE8" },
+  },
+  {
+    name: "Plum Noir",
+    colors: { bg: "#17111F", text: "#EFE6F7", surface: "#291B36", surfaceText: "#EFE6F7", accent: "#C084FC", accentText: "#17111F", border: "#43305A" },
+  },
+  {
+    name: "Sand & Ink",
+    colors: { bg: "#EDE6DA", text: "#14110D", surface: "#2B2620", surfaceText: "#EDE6DA", accent: "#6F5423", accentText: "#FFFFFF", border: "#CFC5B4" },
+  },
+  {
+    name: "Ocean Deep",
+    colors: { bg: "#06232E", text: "#DDF2F7", surface: "#0C3543", surfaceText: "#DDF2F7", accent: "#22D3EE", accentText: "#052029", border: "#17505F" },
+  },
+  {
+    name: "Crimson Terminal",
+    colors: { bg: "#120708", text: "#FFE9EA", surface: "#24100F", surfaceText: "#FFE9EA", accent: "#F87171", accentText: "#1A0708", border: "#451F1E" },
+  },
+  {
+    name: "Mint Chalk",
+    colors: { bg: "#F2FBF6", text: "#0F241A", surface: "#0F5132", surfaceText: "#EAF7F0", accent: "#0B6058", accentText: "#FFFFFF", border: "#CFE6DA" },
+  },
+  {
+    name: "Mustard Press",
+    colors: { bg: "#FBF6E9", text: "#1F1B10", surface: "#3A3423", surfaceText: "#FBF6E9", accent: "#7A5108", accentText: "#FFFFFF", border: "#E0D7BE" },
+  },
+  {
+    name: "Cobalt Snow",
+    colors: { bg: "#FFFFFF", text: "#111827", surface: "#1D4ED8", surfaceText: "#FFFFFF", accent: "#B81F63", accentText: "#FFFFFF", border: "#E2E5EB" },
+  },
+  {
+    name: "Charcoal Amber",
+    colors: { bg: "#1F1D1B", text: "#F5F1EA", surface: "#2C2926", surfaceText: "#F5F1EA", accent: "#F59E0B", accentText: "#1F1D1B", border: "#46413B" },
+  },
+  {
+    name: "Lavender Fog",
+    colors: { bg: "#F5F3FF", text: "#1E1B2E", surface: "#4C1D95", surfaceText: "#EDE9FE", accent: "#5B21B6", accentText: "#FFFFFF", border: "#DDD8F0" },
+  },
+  {
+    name: "Teal Slate",
+    colors: { bg: "#102A2E", text: "#E2F4F2", surface: "#1B3F44", surfaceText: "#E2F4F2", accent: "#5EEAD4", accentText: "#0B1F22", border: "#2E5C62" },
+  },
+  {
+    name: "Peach Clay",
+    colors: { bg: "#FFF1E8", text: "#2A1810", surface: "#7C2D12", surfaceText: "#FFF1E8", accent: "#A93409", accentText: "#FFFFFF", border: "#F0DACB" },
+  },
+];
+
 /** Heading weight options for the design panel. */
 export const HEADING_WEIGHTS = [
   { key: "500", label: "Medium" },
