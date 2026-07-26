@@ -16,7 +16,6 @@ import { PostHogProvider as PHProvider } from "posthog-js/react";
 export function PostHogProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const key = process.env.NEXT_PUBLIC_POSTHOG_KEY;
-    console.log("[posthog] effect", { hasKey: !!key, loaded: posthog.__loaded });
     if (!key || posthog.__loaded) return;
 
     posthog.init(key, {
