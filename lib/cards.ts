@@ -11,6 +11,7 @@ export type ProjectCard = {
   id: string;
   name: string;
   blurb: string;
+  detail: string | null;
   githubUrl: string | null;
   liveUrl: string | null;
   imageUrl: string | null;
@@ -34,6 +35,7 @@ function toProjectCard(p: {
   id: string;
   name: string;
   blurb: string;
+  detail: string | null;
   githubUrl: string | null;
   liveUrl: string | null;
   imageUrl: string | null;
@@ -43,6 +45,7 @@ function toProjectCard(p: {
     id: p.id,
     name: p.name,
     blurb: p.blurb,
+    detail: p.detail,
     githubUrl: p.githubUrl,
     liveUrl: p.liveUrl,
     imageUrl: p.imageUrl,

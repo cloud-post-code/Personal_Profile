@@ -59,6 +59,8 @@ model Project {
   id          String   @id @default(cuid())
   name        String
   blurb       String @db.Text
+  /// Longer AI-enriched write-up, shown when a card's "Learn more" expands.
+  detail      String? @db.Text
   githubUrl   String?
   liveUrl     String?
   imageUrl    String?

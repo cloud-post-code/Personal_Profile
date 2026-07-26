@@ -7,6 +7,7 @@ export type ProjectCard = {
   id: string;
   name: string;
   blurb: string;
+  detail: string | null;
   githubUrl: string | null;
   liveUrl: string | null;
   imageUrl: string | null;
@@ -144,6 +145,8 @@ function ContactForm() {
 }
 
 function ProjectCardView({ p, big }: { p: ProjectCard; big?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const hasDetail = !!p.detail && p.detail.trim().length > 0;
   return (
     <div style={{ ...card, ...(big ? { maxWidth: 480 } : {}) }}>
       {p.imageUrl && (
@@ -152,6 +155,11 @@ function ProjectCardView({ p, big }: { p: ProjectCard; big?: boolean }) {
       )}
       <h3 style={{ fontSize: 17, marginBottom: 6, fontFamily: "var(--font-heading)" }}>{p.name}</h3>
       <p style={{ color: "var(--text-muted)", fontSize: 14, marginBottom: 10 }}>{p.blurb}</p>
+      {open && hasDetail && (
+        <p style={{ color: "var(--text)", fontSize: 14, lineHeight: 1.55, marginBottom: 10 }}>
+          {p.detail}
+        </p>
+      )}
       {p.tags.length > 0 && (
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
           {p.tags.map((t) => (
@@ -161,7 +169,16 @@ function ProjectCardView({ p, big }: { p: ProjectCard; big?: boolean }) {
           ))}
         </div>
       )}
-      <div style={{ display: "flex", gap: 8 }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {hasDetail && (
+          <button
+            onClick={() => setOpen((v) => !v)}
+            aria-expanded={open}
+            style={{ ...linkBtn, cursor: "pointer" }}
+          >
+            {open ? "Show less ▴" : "Learn more ▾"}
+          </button>
+        )}
         {p.githubUrl && (
           <a href={p.githubUrl} target="_blank" rel="noreferrer" style={linkBtn}>
             ⌥ GitHub

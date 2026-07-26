@@ -4,6 +4,8 @@
  * each into the fields the Project model needs. No auth token required for
  * public repos (rate-limited to 60 req/hr/IP, which is plenty for one import).
  */
+import type Anthropic from "@anthropic-ai/sdk";
+import { claude, claudeModel } from "./claude";
 
 export type RepoProject = {
   name: string;
@@ -11,6 +13,16 @@ export type RepoProject = {
   githubUrl: string;
   liveUrl: string | null;
   stars: number;
+  /** Raw repo language/topics, used as extra context when enriching. */
+  language: string | null;
+  topics: string[];
+};
+
+/** The AI-enriched fields Haiku produces for a single project. */
+export type ProjectEnrichment = {
+  blurb: string;
+  detail: string;
+  tags: string[];
 };
 
 /** Pull the username out of a github.com profile URL, or accept a bare handle. */
@@ -33,6 +45,8 @@ type GhRepo = {
   fork: boolean;
   archived: boolean;
   stargazers_count: number;
+  language: string | null;
+  topics?: string[];
 };
 
 /**
@@ -74,5 +88,59 @@ export async function fetchGithubProjects(
       githubUrl: r.html_url,
       liveUrl: r.homepage && r.homepage.trim() ? r.homepage.trim() : null,
       stars: r.stargazers_count,
+      language: r.language ?? null,
+      topics: Array.isArray(r.topics) ? r.topics.slice(0, 8) : [],
     }));
+}
+
+/**
+ * Ask Haiku to turn a repo's thin metadata into a polished card blurb, a longer
+ * "Learn more" detail paragraph, and a few topic tags. Grounded strictly in the
+ * repo's own name/description/language/topics — no invented features. Falls back
+ * to the raw repo blurb (and no detail/tags) if the model call or JSON parse
+ * fails, so an import never breaks on one bad project.
+ */
+export async function enrichProject(repo: RepoProject): Promise<ProjectEnrichment> {
+  const fallback: ProjectEnrichment = { blurb: repo.blurb, detail: "", tags: [] };
+
+  const context =
+    `Repository name: ${repo.name}\n` +
+    `GitHub description: ${repo.blurb || "(none)"}\n` +
+    `Primary language: ${repo.language ?? "(unknown)"}\n` +
+    `Topics: ${repo.topics.length ? repo.topics.join(", ") : "(none)"}\n` +
+    `Stars: ${repo.stars}`;
+
+  const prompt =
+    `You are writing project cards for Blake's personal portfolio site. Using ONLY ` +
+    `the repository facts below, write an appealing description of this project. Do ` +
+    `not invent features, users, or results that aren't implied by the facts. If the ` +
+    `facts are thin, keep it short and honest rather than padding.\n\n` +
+    `Return STRICT JSON with keys:\n` +
+    `  "blurb"  — one punchy sentence (max ~140 chars) for the card.\n` +
+    `  "detail" — 2-4 sentences expanding on what it is, the tech, and why it's ` +
+    `interesting, shown when the visitor clicks "Learn more".\n` +
+    `  "tags"   — array of 3-5 short lowercase topic tags (tech or theme).\n` +
+    `No prose outside the JSON.\n\n${context}`;
+
+  try {
+    const msg = await claude().messages.create({
+      model: claudeModel(),
+      max_tokens: 500,
+      messages: [{ role: "user", content: prompt }],
+    });
+
+    const raw = msg.content
+      .filter((b): b is Anthropic.TextBlock => b.type === "text")
+      .map((b) => b.text)
+      .join("");
+
+    const json = JSON.parse(raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1));
+    return {
+      blurb: String(json.blurb ?? "").trim() || repo.blurb,
+      detail: String(json.detail ?? "").trim(),
+      tags: Array.isArray(json.tags) ? json.tags.map(String).slice(0, 5) : [],
+    };
+  } catch {
+    return fallback;
+  }
 }

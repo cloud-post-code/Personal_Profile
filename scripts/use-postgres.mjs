@@ -19,7 +19,7 @@ let s = readFileSync(schemaPath, "utf8");
 
 // Long-text fields that should be @db.Text on Postgres.
 const longFields = [
-  "rawText", "summary", "bio", "persona", "blurb", "description", "message",
+  "rawText", "summary", "bio", "persona", "blurb", "detail", "description", "message",
   "overview", "values", "aesthetic", "tone",
 ];
 

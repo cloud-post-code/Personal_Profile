@@ -15,7 +15,7 @@ import { checkPassword, createSession, destroySession, isAuthed } from "@/lib/au
 import { extractLink, extractDocument, extractText, fileToText, writeProfileFromResume } from "@/lib/scrape";
 import { safeExperience, safeSocials } from "@/lib/knowledge";
 import { COLOR_ROLES } from "@/lib/theme";
-import { fetchGithubProjects } from "@/lib/github";
+import { fetchGithubProjects, enrichProject } from "@/lib/github";
 import { saveUpload, saveBytes } from "@/lib/uploads";
 import { describeImage } from "@/lib/vision";
 import path from "node:path";
@@ -386,12 +386,19 @@ export async function importGithub(formData: FormData) {
   const fresh = repos.filter((r) => !seen.has(r.githubUrl));
 
   if (fresh.length) {
+    // Enrich each repo with Haiku (concurrently) so imported cards get a
+    // polished blurb, a "Learn more" detail, and topic tags instead of the
+    // raw GitHub description. enrichProject falls back per-project on failure.
+    const enriched = await Promise.all(fresh.map((r) => enrichProject(r)));
+
     // Most-starred first (fetch already sorted); order them after existing.
     const base = await prisma.project.count();
     await prisma.project.createMany({
       data: fresh.map((r, i) => ({
         name: r.name,
-        blurb: r.blurb,
+        blurb: enriched[i].blurb,
+        detail: enriched[i].detail || null,
+        tags: JSON.stringify(enriched[i].tags),
         githubUrl: r.githubUrl,
         liveUrl: r.liveUrl,
         order: base + i,
