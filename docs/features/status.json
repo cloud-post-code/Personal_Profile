@@ -33,6 +33,13 @@
       "next": "Deploy + run `npx tsx scripts/reindex.ts --all` on production: existing prod chunks predate the origin columns and carry empty originId/originLabel until reindexed."
     },
     {
+      "id": "visual-knowledge-graph",
+      "title": "Visual graph view; Entities and Relations as paginated tabs",
+      "status": "done",
+      "notes": "app/admin/GraphView.tsx (client) adds three panes under the Graph tab: 'Visual graph' renders a force-directed SVG node-link diagram (Fruchterman-Reingold, deterministic circle seeding so it doesn't reshuffle on edits, iterations shed as n grows since it also runs during SSR) with nodes sized by mention count, coloured by entity type, orphans ringed red, click-to-isolate neighbours and a legend; 'Entities' and 'Relations' hold the editing UI, each paginated at 20. GraphPanel keeps stats + origin breakdown + health warnings. Also paced the backfill (EMBED_PACE_MS, default 21s between origins) because one embed request per origin back-to-back trips the provider per-minute limit; pacing lives in the backfill, not the embed layer, so live chat is never throttled. Gate PASS. Verified live: production reindexed to 21 chunks all on voyage-3.5-lite, 0 stale, and the chatbot now answers background questions from the profile origin.",
+      "next": "Visual pane not yet clicked through by Claude (admin login required)."
+    },
+    {
       "id": "github-profile-import",
       "title": "Import all projects from a GitHub profile link",
       "status": "done",
