@@ -108,9 +108,30 @@ model EntityEdge {
   to       Entity @relation("EdgeTo", fields: [toId], references: [id], onDelete: Cascade)
   toId     String
   relation String
+  origins  EntityEdgeOrigin[]
 
   @@unique([fromId, toId, relation])
   @@index([toId])
+}
+
+/// Which origin asserted an edge. Edges are deduped across origins, so a
+/// relation two surfaces both state is owned by both and only disappears when
+/// the last owner is deleted or stops asserting it.
+///
+/// An edge with NO rows here is never auto-pruned: that covers relations added
+/// by hand on the Graph tab and every edge written before provenance existed.
+/// Only an edge whose ownership was recorded and then fully retracted is
+/// deleted, so adding this table can't silently empty an existing graph.
+model EntityEdgeOrigin {
+  id         String     @id @default(cuid())
+  edge       EntityEdge @relation(fields: [edgeId], references: [id], onDelete: Cascade)
+  edgeId     String
+  /// Matches Chunk.originKind / Chunk.originId.
+  originKind String
+  originId   String
+
+  @@unique([edgeId, originKind, originId])
+  @@index([originKind, originId])
 }
 
 /// An uploaded photo. On upload we ask Claude vision for a one-paragraph

@@ -35,9 +35,51 @@ export type OriginInput = {
   sourceId?: string;
 };
 
-/** Remove every chunk an origin produced (mentions cascade with them). */
+/**
+ * Retract everything an origin contributed: its chunks (mentions cascade with
+ * them), its ownership of extracted relations, and any entity left with nothing
+ * supporting it. Deleting content is the admin's retraction mechanism, so it has
+ * to reach the graph too — a relation whose last owner is gone would otherwise
+ * keep being fed to the model as fact long after its source was deleted.
+ */
 export async function dropOrigin(kind: string, id: string): Promise<void> {
   await prisma.chunk.deleteMany({ where: { originKind: kind, originId: id } });
+  await retractEdgeOwnership(kind, id);
+  await pruneUnsupportedEntities();
+}
+
+/**
+ * Drop this origin's claim on every relation it asserted, then delete the ones
+ * left with no owner at all.
+ *
+ * Scoped to edges this origin actually owned: an edge with no ownership rows is
+ * either hand-added on the Graph tab or predates provenance, and neither may be
+ * swept up here.
+ */
+async function retractEdgeOwnership(kind: string, id: string): Promise<void> {
+  const owned = await prisma.entityEdgeOrigin.findMany({
+    where: { originKind: kind, originId: id },
+    select: { edgeId: true },
+  });
+  if (!owned.length) return;
+
+  const edgeIds = [...new Set(owned.map((o) => o.edgeId))];
+  await prisma.entityEdgeOrigin.deleteMany({ where: { originKind: kind, originId: id } });
+  await prisma.entityEdge.deleteMany({
+    where: { id: { in: edgeIds }, origins: { none: {} } },
+  });
+}
+
+/**
+ * Delete entities nothing supports any more — no chunk mentions them and no
+ * relation needs them as an endpoint. An entity with no mentions but a live
+ * edge is kept on purpose: the extractor creates edge endpoints it never
+ * describes, and they still carry the relation.
+ */
+async function pruneUnsupportedEntities(): Promise<void> {
+  await prisma.entity.deleteMany({
+    where: { mentions: { none: {} }, edgesOut: { none: {} }, edgesIn: { none: {} } },
+  });
 }
 
 /**
@@ -45,9 +87,15 @@ export async function dropOrigin(kind: string, id: string): Promise<void> {
  * existed. Those legacy rows carry an empty `originId`, so matching on
  * kind+id alone would leave them behind as duplicates of the content we are
  * about to rewrite.
+ *
+ * Chunks only — graph claims are rewritten by `persistGraph` once extraction
+ * has actually returned. Retracting them here instead would mean a flaky
+ * extraction call silently deletes relations the origin still asserts.
  */
-async function clearOrigin(origin: OriginInput): Promise<void> {
-  await dropOrigin(origin.kind, origin.id);
+async function clearOriginChunks(origin: OriginInput): Promise<void> {
+  await prisma.chunk.deleteMany({
+    where: { originKind: origin.kind, originId: origin.id },
+  });
   if (origin.sourceId) {
     await prisma.chunk.deleteMany({ where: { sourceId: origin.sourceId, originId: "" } });
   }
@@ -55,13 +103,18 @@ async function clearOrigin(origin: OriginInput): Promise<void> {
 
 export async function indexOrigin(origin: OriginInput, opts: IndexOpts = {}): Promise<void> {
   const text = origin.text.trim();
-  if (!text) return clearOrigin(origin);
+  // An origin with no text asserts nothing — retract its claims as well as its
+  // chunks, the same as if it had been deleted.
+  if (!text) {
+    await clearOriginChunks(origin);
+    return dropOrigin(origin.kind, origin.id);
+  }
 
   const pieces = chunkText(text);
   const { vectors, model } = await embedTexts(pieces);
 
   // Replace this origin's chunks (mentions cascade away with them).
-  await clearOrigin(origin);
+  await clearOriginChunks(origin);
   const written: { id: string; text: string }[] = [];
   for (let i = 0; i < pieces.length; i++) {
     const v = vectors[i];
@@ -89,7 +142,7 @@ export async function indexOrigin(origin: OriginInput, opts: IndexOpts = {}): Pr
   } catch {
     return;
   }
-  await persistGraph(graph, written);
+  await persistGraph(graph, written, origin);
 }
 
 /** Index one Source (the Knowledge tab's links, PDFs and notes). */
@@ -113,7 +166,21 @@ export async function indexSource(sourceId: string, opts: IndexOpts = {}): Promi
 async function persistGraph(
   graph: ExtractedGraph,
   chunks: { id: string; text: string }[],
+  origin: OriginInput,
 ): Promise<void> {
+  // Ownership this origin held going in. Re-indexing re-asserts what the text
+  // still says, so anything it drops has to lose this origin as an owner —
+  // captured before the rewrite so the edges can be pruned after it.
+  const priorEdgeIds = (
+    await prisma.entityEdgeOrigin.findMany({
+      where: { originKind: origin.kind, originId: origin.id },
+      select: { edgeId: true },
+    })
+  ).map((o) => o.edgeId);
+  await prisma.entityEdgeOrigin.deleteMany({
+    where: { originKind: origin.kind, originId: origin.id },
+  });
+
   // Upsert every named entity — including edge endpoints the extractor didn't
   // list (they may be described in another origin; the edge still connects).
   const wanted = new Map<string, { name: string; type: string }>();
@@ -154,10 +221,25 @@ async function persistGraph(
   for (const e of graph.edges) {
     const fromId = idByKey.get(entityKey(e.from))!;
     const toId = idByKey.get(entityKey(e.to))!;
-    await prisma.entityEdge.upsert({
+    const edge = await prisma.entityEdge.upsert({
       where: { fromId_toId_relation: { fromId, toId, relation: e.relation } },
       update: {},
       create: { fromId, toId, relation: e.relation },
+      select: { id: true },
+    });
+    // Claim it for this origin. Another origin asserting the same relation
+    // keeps its own row, so the edge survives until the last owner is gone.
+    await prisma.entityEdgeOrigin.createMany({
+      data: [{ edgeId: edge.id, originKind: origin.kind, originId: origin.id }],
+      skipDuplicates: true,
     });
   }
+
+  // Relations this origin used to assert and no longer does, now unowned.
+  if (priorEdgeIds.length) {
+    await prisma.entityEdge.deleteMany({
+      where: { id: { in: priorEdgeIds }, origins: { none: {} } },
+    });
+  }
+  await pruneUnsupportedEntities();
 }

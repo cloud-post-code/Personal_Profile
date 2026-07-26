@@ -72,6 +72,16 @@
       "next": "Admin tab not clicked through by Claude (login required — Claude does not enter passwords). Redraft failures are logged, not surfaced in the UI."
     },
     {
+      "id": "graph-delete-provenance",
+      "title": "Deleting content removes its claims from the entity graph",
+      "feature_dir": "docs/features/graph-delete-provenance",
+      "proof": "docs/features/graph-delete-provenance/PROOF.md",
+      "priority": 1,
+      "status": "passing",
+      "notes": "Deleting a source/project/photo/approved answer removed its Chunk + EntityMention rows but left every Entity and EntityEdge behind, with no provenance to clean them up. That was a live correctness bug, not just debris: retrieve() seeds entities by matching the raw query against ALL entity keys and renders their edges into the prompt as KNOWN RELATIONSHIPS, so a deleted source's extracted relations kept being stated as fact with no chunk supporting them. New EntityEdgeOrigin table records which origin asserted each edge; persistGraph claims edges for the indexing origin; dropOrigin retracts that origin's ownership, deletes edges left with no owner, and prunes entities with no mentions AND no edges. Cross-origin dedup is preserved — a relation two origins assert survives losing one. Edges with NO ownership rows are never auto-pruned, which protects hand-added Graph tab relations and every edge written before this table existed, so shipping it cannot empty an existing graph. clearOrigin was split into clearOriginChunks so a flaky extraction no longer retracts claims mid-reindex; an origin whose text becomes empty now retracts like a delete; mergeInto carries ownership onto rewired edges; deleteSource routes through dropOrigin instead of relying on the Source->Chunk cascade alone. Proof: docs/features/graph-delete-provenance/proof.ts (22 assertions green, was red on 3; the merge assertion verified independently red with lib/retrieval/graph.ts reverted). Gate PASS on this change; a later gate run fails inside the concurrent ai-drafted-answers work (lib/answerDrafts.ts), unrelated to this feature. Schema applied locally with prisma db push.",
+      "next": "Deploy — `prisma db push` runs on start, so EntityEdgeOrigin is created automatically on Railway. Existing prod edges carry no ownership until `npx tsx scripts/reindex.ts --all` re-asserts it; until then they are treated as untracked and are never auto-pruned, so deletes won't retract pre-existing relations. Graph tab not clicked through (admin login required)."
+    },
+    {
       "id": "a2a-agent-interface",
       "title": "Expose the agent to other agents over A2A, plus a hosted agent facts card",
       "feature_dir": "docs/features/a2a-agent-interface",

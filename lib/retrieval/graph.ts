@@ -166,11 +166,25 @@ async function mergeInto(fromId: string, intoId: string): Promise<void> {
     const a = e.fromId === fromId ? intoId : e.fromId;
     const b = e.toId === fromId ? intoId : e.toId;
     if (a === b) continue; // self-loop — carries no information
-    await prisma.entityEdge.upsert({
+    const merged = await prisma.entityEdge.upsert({
       where: { fromId_toId_relation: { fromId: a, toId: b, relation: e.relation } },
       update: {},
       create: { fromId: a, toId: b, relation: e.relation },
+      select: { id: true },
     });
+    // Carry ownership onto the rewired edge, or deleting the origin that
+    // asserted it would no longer find it and the relation would outlive its
+    // source. The old edge's rows cascade away with the entity below.
+    const owners = await prisma.entityEdgeOrigin.findMany({
+      where: { edgeId: e.id },
+      select: { originKind: true, originId: true },
+    });
+    if (owners.length) {
+      await prisma.entityEdgeOrigin.createMany({
+        data: owners.map((o) => ({ ...o, edgeId: merged.id })),
+        skipDuplicates: true,
+      });
+    }
   }
 
   await prisma.entity.delete({ where: { id: fromId } });
