@@ -180,6 +180,34 @@ model ChatMessage {
   @@index([sessionId])
 }
 
+/// A hand-written answer to a question visitors ask over and over — the
+/// starter chips, mostly. When an incoming message normalizes to `matchKey`,
+/// the chatbot serves `answer` directly and never calls the model. Written and
+/// edited on the admin "Answers" tab; a blank `answer` is a to-do, not a
+/// response, so the question falls through to the model until it's filled in.
+model CannedAnswer {
+  id        String   @id @default(cuid())
+  /// The question as written, shown in the admin list.
+  question  String @db.Text
+  /// `question` run through normalizeQuestion() — the actual lookup key.
+  matchKey  String   @unique
+  /// Blake's answer. Empty means "not written yet": falls through to the model.
+  answer    String   @default("") @db.Text
+  /// Optional card to render alongside the answer, named by the tool that
+  /// would have drawn it: show_projects | show_project | show_gallery |
+  /// show_contact_form. Hydrated through the same path the model path uses.
+  cardTool  String?
+  /// JSON args for `cardTool`, e.g. {"id":"..."} or {"layout":"filmstrip"}.
+  cardInput String?
+  /// Off without losing the text.
+  enabled   Boolean  @default(true)
+  /// Times served — the running count of model calls this row has avoided.
+  hits      Int      @default(0)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 /// A contact submission captured by the in-chat A2UI contact form.
 model Contact {
   id        String   @id @default(cuid())

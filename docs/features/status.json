@@ -51,6 +51,16 @@
       "status": "done",
       "notes": "lib/persona.ts is the catalogue (9 persona sections + 12 agent-behavior sections, each with label/hint/rows); the admin form, savePersona, and the chat prompt all iterate it. Stored as JSON in Profile.personaSections. Admin 'Persona & Theme' split into 'Persona' (tagline + 21 textareas, one form) and 'Theme' (aesthetic + ThemePicker, saveTheme). buildSystemPrompt renders only filled sections (grouped, labeled); retired VOICE & WORLDVIEW / Overview / Values lines. Legacy persona/overview/values/tone columns kept unused pending the ingestion pass. Proof: docs/features/persona-sections/proof.ts (green); verified live in browser (save + reload round-trip).",
       "next": "Ingestion: fill sections from an uploaded document / existing knowledge, incl. mapping the legacy persona columns."
+    },
+    {
+      "id": "canned-answers-and-brain",
+      "title": "Canned answers served with zero API calls; chat brain extracted to lib/brain.ts",
+      "feature_dir": "docs/features/canned-answers-and-brain",
+      "proof": "docs/features/canned-answers-and-brain/PROOF.md",
+      "priority": 1,
+      "status": "passing",
+      "notes": "Two tiers only: a hand-written CannedAnswer table matched by normalized string equality (case, spacing, trailing punctuation ignored — nothing fuzzy) and served with no Anthropic call, then Haiku for everything else. No classifier call, no escalation, no second model — ruled out by Blake. Canned rows carry an optional cardTool/cardInput hydrated through the same path the model uses, so the projects starter still renders cards. Part two moved TOOLS/hydrate()/the streaming tool loop out of app/api/chat/route.ts (179 -> 54 lines) into lib/brain.ts as answer({message, history, sessionId, channel}) yielding {t:'text'|'card'} — the route is now only NDJSON, and a second channel needs a transport rather than a second brain. New admin 'Answers' tab (app/admin/AnswersPanel.tsx) bootstraps the 5 starters as blank rows; a blank answer falls through to the model, so the tab is safe half-finished. Saving onto an existing question merges rather than throwing a unique-constraint error, and seeding only fills an empty table so deleted starters stay deleted. Proof: docs/features/canned-answers-and-brain/proof.ts (38 assertions green, was red at import); gate PASS; tsc + eslint clean. Verified live in the browser: the projects chip returned the stored text instantly with hydrated cards and hits went 0 -> 1, and a non-canned question still streamed a real Haiku answer through /api/chat.",
+      "next": "Deploy (prisma db push runs on start, so CannedAnswer is created automatically), then fill the five starter answers on the Answers tab — every one left blank is still costing a model call. Admin tab itself not yet clicked through by Claude (admin login required). The WhatsApp channel this refactor was for is still unbuilt."
     }
   ]
 }

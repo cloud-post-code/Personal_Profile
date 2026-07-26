@@ -1,0 +1,209 @@
+import type Anthropic from "@anthropic-ai/sdk";
+import { claude, claudeModel } from "@/lib/claude";
+import { buildSystemPrompt } from "@/lib/knowledge";
+import { allProjectsBlock, singleProjectBlock, galleryBlock, type UiBlock } from "@/lib/cards";
+import { recordTurn } from "@/lib/activity";
+import { findServableCanned, recordCannedHit } from "@/lib/canned";
+
+/**
+ * The chatbot, independent of how it was reached. `answer()` is the one entry
+ * point: it decides between a canned answer and the model, runs the A2UI tool
+ * loop, and logs the turn. Transports (the /api/chat route today, another
+ * channel later) only translate its events onto the wire.
+ *
+ * Two tiers, deliberately. A canned answer costs nothing; everything else goes
+ * to the model configured in lib/claude.ts. There is no classifier call and no
+ * escalation tier — a cheap router that itself costs a model call isn't cheap.
+ */
+
+export type Msg = { role: "user" | "assistant"; content: string };
+
+/** What the brain emits. The web transport writes these straight out as NDJSON. */
+export type BrainEvent = { t: "text"; v: string } | { t: "card"; v: UiBlock };
+
+/** Web renders cards; other channels are text-only until taught otherwise. */
+export type Channel = "web" | (string & {});
+
+export type BrainInput = {
+  message: string;
+  history?: Msg[];
+  sessionId: string;
+  channel?: Channel;
+};
+
+/**
+ * The Anthropic client, narrowed to what the brain uses. Injectable so tests
+ * can count calls at the provider boundary without faking anything inside it.
+ */
+export type ModelClient = {
+  messages: {
+    stream(params: Anthropic.MessageStreamParams): {
+      // Loose on purpose: the real SDK's stream events are a wide union whose
+      // deltas differ per block type, and the brain only reads text out of it.
+      [Symbol.asyncIterator](): AsyncIterator<{ type: string; delta?: unknown }>;
+      finalMessage(): Promise<{ content: unknown[] }>;
+    };
+  };
+};
+
+export type BrainDeps = { client?: ModelClient };
+
+const TOOLS: Anthropic.Tool[] = [
+  {
+    name: "show_projects",
+    description:
+      "Render cards for ALL of Blake's projects. Use when the visitor asks about his projects in general.",
+    input_schema: { type: "object", properties: {} },
+  },
+  {
+    name: "show_project",
+    description:
+      "Render a single project's card. Use when focused on one specific project. Pass its id from the PROJECTS list.",
+    input_schema: {
+      type: "object",
+      properties: { id: { type: "string", description: "The project id" } },
+      required: ["id"],
+    },
+  },
+  {
+    name: "show_gallery",
+    description:
+      "Render Blake's photos as a gallery. layout 'carousel' is a slideshow; 'filmstrip' is a browsable thumbnail strip with a lightbox.",
+    input_schema: {
+      type: "object",
+      properties: {
+        layout: { type: "string", enum: ["carousel", "filmstrip"] },
+      },
+      required: ["layout"],
+    },
+  },
+  {
+    name: "show_contact_form",
+    description:
+      "Render a contact form so the visitor can leave their name, email, and a message for Blake. Use this whenever someone wants to get in touch, connect, reach out, hire, or collaborate. Their submission is recorded for Blake.",
+    input_schema: { type: "object", properties: {} },
+  },
+];
+
+/** Turn a tool call into the UI block it names. Shared by both tiers. */
+async function hydrate(name: string, input: Record<string, unknown>): Promise<UiBlock | null> {
+  switch (name) {
+    case "show_projects":
+      return allProjectsBlock();
+    case "show_project":
+      return singleProjectBlock(String(input.id ?? ""));
+    case "show_gallery":
+      return galleryBlock(input.layout === "carousel" ? "carousel" : "filmstrip");
+    case "show_contact_form":
+      return { type: "contact" };
+    default:
+      return null;
+  }
+}
+
+function parseCardInput(raw: string | null): Record<string, unknown> {
+  if (!raw) return {};
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** The model tier: stream text, run any tools, let Claude close. */
+async function* runModel(
+  message: string,
+  history: Msg[],
+  client: ModelClient,
+): AsyncGenerator<BrainEvent> {
+  // The visitor's latest question drives retrieval: the prompt carries only the
+  // knowledge relevant to it, not the whole source library.
+  const system = await buildSystemPrompt(message);
+  const convo: Anthropic.MessageParam[] = history.map((m) => ({
+    role: m.role,
+    content: m.content,
+  }));
+  convo.push({ role: "user", content: message });
+
+  // Loop so we can run tools and let Claude continue speaking after.
+  for (let turn = 0; turn < 4; turn++) {
+    const stream = client.messages.stream({
+      model: claudeModel(),
+      max_tokens: 1024,
+      system,
+      tools: TOOLS,
+      messages: convo,
+    });
+
+    for await (const event of stream) {
+      const delta = event.delta as { type?: string; text?: string } | undefined;
+      if (event.type === "content_block_delta" && delta?.type === "text_delta") {
+        yield { t: "text", v: delta.text ?? "" };
+      }
+    }
+
+    const final = await stream.finalMessage();
+    const content = final.content as Anthropic.ContentBlock[];
+    const toolUses = content.filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
+    if (toolUses.length === 0) return; // Claude is done talking.
+
+    const results: Anthropic.ToolResultBlockParam[] = [];
+    for (const tu of toolUses) {
+      const block = await hydrate(tu.name, (tu.input ?? {}) as Record<string, unknown>);
+      if (block) yield { t: "card", v: block };
+      results.push({
+        type: "tool_result",
+        tool_use_id: tu.id,
+        content: block ? "Card rendered to the user." : "No data available.",
+      });
+    }
+
+    // Feed the tool results back so Claude can add closing words.
+    convo.push({ role: "assistant", content });
+    convo.push({ role: "user", content: results });
+  }
+}
+
+/**
+ * Answer one visitor message. Yields text and cards in the order they happen,
+ * then records the turn — the log write is awaited after the last token, so it
+ * costs the visitor nothing and the Activity tab is never a step behind.
+ */
+export async function* answer(
+  input: BrainInput,
+  deps: BrainDeps = {},
+): AsyncGenerator<BrainEvent> {
+  const { message, history = [], sessionId, channel = "web" } = input;
+  const cards = channel === "web";
+  let spoken = "";
+
+  try {
+    const canned = await findServableCanned(message);
+    if (canned) {
+      spoken = canned.answer;
+      yield { t: "text", v: canned.answer };
+      if (cards && canned.cardTool) {
+        const block = await hydrate(canned.cardTool, parseCardInput(canned.cardInput));
+        if (block) yield { t: "card", v: block };
+      }
+      await recordCannedHit(canned.id);
+      return;
+    }
+
+    for await (const event of runModel(message, history, deps.client ?? claude())) {
+      if (event.t === "text") spoken += event.v;
+      if (event.t === "card" && !cards) continue;
+      yield event;
+    }
+  } catch (e) {
+    const note =
+      e instanceof Error && e.message.includes("ANTHROPIC_API_KEY")
+        ? "The chatbot isn't configured yet (missing API key)."
+        : "Something went wrong reaching the model.";
+    yield { t: "text", v: `\n\n[${note}]` };
+  } finally {
+    // Best-effort: a logging failure must never break a visitor's answer.
+    await recordTurn({ sessionId, question: message, answer: spoken }).catch(() => {});
+  }
+}

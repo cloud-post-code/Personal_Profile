@@ -31,7 +31,9 @@ import {
 import { Extractor } from "../Extractor";
 import { GithubImport } from "../GithubImport";
 import { GraphPanel } from "../GraphPanel";
+import { AnswersPanel } from "../AnswersPanel";
 import { graphStats, listEntities, listEdges } from "@/lib/retrieval/graph";
+import { seedStarterAnswers, listCannedAnswers } from "@/lib/canned";
 import { ProjectRow } from "../ProjectRow";
 import { Tabs } from "../Tabs";
 import { SaveButton } from "../SaveButton";
@@ -46,8 +48,18 @@ export const dynamic = "force-dynamic";
 export default async function Dashboard() {
   if (!(await isAuthed())) redirect("/admin");
 
-  const [profile, projects, sources, photos, contacts, chatSessions, gStats, gEntities, gEdges] =
-    await Promise.all([
+  const [
+    profile,
+    projects,
+    sources,
+    photos,
+    contacts,
+    chatSessions,
+    gStats,
+    gEntities,
+    gEdges,
+    canned,
+  ] = await Promise.all([
       getProfile(),
       prisma.project.findMany({ orderBy: { order: "asc" } }),
       prisma.source.findMany({ orderBy: { createdAt: "desc" } }),
@@ -61,6 +73,9 @@ export default async function Dashboard() {
       graphStats(),
       listEntities(),
       listEdges(),
+      // The starter chips ask the same five questions forever, so they're
+      // pre-created as blank rows: the tab opens on a to-do list, not nothing.
+      seedStarterAnswers().then(listCannedAnswers),
     ]);
   const metrics = chatMetrics(chatSessions);
   const unhandled = contacts.filter((c) => !c.handled).length;
@@ -555,6 +570,7 @@ export default async function Dashboard() {
           { key: "theme", label: "Theme", content: themeTab },
           { key: "projects", label: "Projects", content: projectsTab },
           { key: "knowledge", label: "Knowledge", content: knowledgeTab },
+          { key: "answers", label: "Answers", content: <AnswersPanel rows={canned} /> },
           {
             key: "graph",
             label: "Graph",

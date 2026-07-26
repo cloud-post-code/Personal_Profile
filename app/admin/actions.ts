@@ -23,6 +23,7 @@ import {
   indexPhoto,
   indexApprovedAnswer,
 } from "@/lib/retrieval/origins";
+import { saveCannedAnswer, deleteCannedAnswer } from "@/lib/canned";
 import { safeExperience, safeSocials } from "@/lib/knowledge";
 import { PERSONA_SECTIONS, writePersonaSections } from "@/lib/persona";
 import { COLOR_ROLES } from "@/lib/theme";
@@ -363,6 +364,9 @@ export async function deleteSource(formData: FormData) {
   await requireAuth();
   const id = String(formData.get("id") ?? "");
   if (id) await prisma.source.delete({ where: { id } }).catch(() => {});
+  // Chunks cascade off the Source row, but the entities and relations extracted
+  // from it don't — dropOrigin retracts those too.
+  if (id) await reindex(`source ${id}`, () => dropOrigin("source", id));
   revalidateAll();
 }
 
@@ -622,6 +626,30 @@ function toData(r: {
     tags: JSON.stringify(r.tags),
     kind: r.kind,
   };
+}
+
+// ── Canned answers ──────────────────────────────────────────────────────────
+// Thin auth wrappers; the logic lives in lib/canned.ts so it stays testable.
+
+export async function saveCanned(formData: FormData) {
+  await requireAuth();
+  await saveCannedAnswer({
+    id: String(formData.get("id") ?? "").trim() || undefined,
+    question: String(formData.get("question") ?? ""),
+    answer: String(formData.get("answer") ?? ""),
+    cardTool: String(formData.get("cardTool") ?? "") || null,
+    cardInput: String(formData.get("cardInput") ?? "") || null,
+    enabled: formData.get("enabled") === "on",
+    order: Number(formData.get("order") ?? 0) || 0,
+  });
+  revalidatePath("/admin/dashboard");
+}
+
+export async function deleteCanned(formData: FormData) {
+  await requireAuth();
+  const id = String(formData.get("id") ?? "").trim();
+  if (id) await deleteCannedAnswer(id);
+  revalidatePath("/admin/dashboard");
 }
 
 function err(e: unknown): string {
