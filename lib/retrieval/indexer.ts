@@ -9,38 +9,55 @@ import {
 } from "./entities";
 
 /**
- * Index one Source for retrieval: chunk its raw text (falling back to the
- * summary), embed each chunk, extract entities + relations, and persist
- * chunks / entities / mentions / edges. Idempotent — chunks are replaced
- * wholesale, entities and edges are upserted.
+ * Indexing for one *origin* — any admin surface whose content the chatbot
+ * should be able to retrieve: a Source, the Profile, the Persona, a Project, a
+ * Photo, or an approved answer (see `origins.ts` for what each contributes).
  *
- * Callers treat this as best-effort: a thrown error must not un-scan the
- * source, so ingestion wraps it in a catch.
+ * Chunk the text, embed each chunk, extract entities + relations, and persist
+ * chunks / entities / mentions / edges. Idempotent — an origin's chunks are
+ * replaced wholesale, entities and edges are upserted, so entities named in
+ * two different origins converge on one row and the graph links across them.
+ *
+ * Callers treat this as best-effort: a thrown error must not fail the admin
+ * save that triggered it, so call sites wrap it in a catch.
  */
-export async function indexSource(
-  sourceId: string,
-  opts: { extract?: EntityExtractor } = {},
-): Promise<void> {
-  const src = await prisma.source.findUnique({ where: { id: sourceId } });
-  if (!src) return;
 
-  const text = (src.rawText ?? "").trim() || (src.summary ?? "").trim();
-  if (!text) {
-    await prisma.chunk.deleteMany({ where: { sourceId } });
-    return;
-  }
+export type IndexOpts = { extract?: EntityExtractor };
+
+export type OriginInput = {
+  /// source | profile | persona | project | photo | activity
+  kind: string;
+  id: string;
+  /// Human-readable label used when citing this content in the prompt.
+  label: string;
+  text: string;
+  /// Set for source-derived chunks so they cascade with the Source row.
+  sourceId?: string;
+};
+
+/** Remove every chunk an origin produced (mentions cascade with them). */
+export async function dropOrigin(kind: string, id: string): Promise<void> {
+  await prisma.chunk.deleteMany({ where: { originKind: kind, originId: id } });
+}
+
+export async function indexOrigin(origin: OriginInput, opts: IndexOpts = {}): Promise<void> {
+  const text = origin.text.trim();
+  if (!text) return dropOrigin(origin.kind, origin.id);
 
   const pieces = chunkText(text);
   const { vectors, model } = await embedTexts(pieces);
 
-  // Replace this source's chunks (mentions cascade away with them).
-  await prisma.chunk.deleteMany({ where: { sourceId } });
-  const chunkIds: { id: string; text: string }[] = [];
+  // Replace this origin's chunks (mentions cascade away with them).
+  await dropOrigin(origin.kind, origin.id);
+  const written: { id: string; text: string }[] = [];
   for (let i = 0; i < pieces.length; i++) {
     const v = vectors[i];
     const c = await prisma.chunk.create({
       data: {
-        sourceId,
+        originKind: origin.kind,
+        originId: origin.id,
+        originLabel: origin.label,
+        sourceId: origin.sourceId ?? null,
         seq: i,
         text: pieces[i],
         embedding: v ? vecToBytes(v) : null,
@@ -48,18 +65,36 @@ export async function indexSource(
       },
       select: { id: true, text: true },
     });
-    chunkIds.push(c);
+    written.push(c);
   }
 
   // Entity extraction is the only model call here; keep it best-effort so a
   // flaky extraction never loses the chunks we just wrote.
   let graph: ExtractedGraph;
   try {
-    graph = await (opts.extract ?? extractEntities)(text, src.title);
+    graph = await (opts.extract ?? extractEntities)(text, origin.label);
   } catch {
     return;
   }
-  await persistGraph(graph, chunkIds);
+  await persistGraph(graph, written);
+}
+
+/** Index one Source (the Knowledge tab's links, PDFs and notes). */
+export async function indexSource(sourceId: string, opts: IndexOpts = {}): Promise<void> {
+  const src = await prisma.source.findUnique({ where: { id: sourceId } });
+  if (!src) return dropOrigin("source", sourceId);
+
+  const label = src.title ?? src.url ?? src.filename ?? "source";
+  await indexOrigin(
+    {
+      kind: "source",
+      id: sourceId,
+      label,
+      sourceId,
+      text: (src.rawText ?? "").trim() || (src.summary ?? "").trim(),
+    },
+    opts,
+  );
 }
 
 async function persistGraph(
@@ -67,7 +102,7 @@ async function persistGraph(
   chunks: { id: string; text: string }[],
 ): Promise<void> {
   // Upsert every named entity — including edge endpoints the extractor didn't
-  // list (they may be described in another source; the edge still connects).
+  // list (they may be described in another origin; the edge still connects).
   const wanted = new Map<string, { name: string; type: string }>();
   for (const e of graph.entities) wanted.set(entityKey(e.name), e);
   for (const e of graph.edges) {
@@ -89,7 +124,7 @@ async function persistGraph(
 
   // Mentions: an entity is "in" every chunk whose text contains its name
   // (case-insensitive). Extractor-listed entities that match nowhere attach
-  // to the first chunk so they stay reachable from this source.
+  // to the first chunk so they stay reachable from this origin.
   const mentions: { chunkId: string; entityId: string }[] = [];
   for (const e of graph.entities) {
     const key = entityKey(e.name);

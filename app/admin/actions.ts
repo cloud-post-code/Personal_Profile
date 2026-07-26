@@ -15,6 +15,14 @@ import { checkPassword, createSession, destroySession, isAuthed } from "@/lib/au
 import { extractLink, extractDocument, extractText, fileToText, writeProfileFromResume } from "@/lib/scrape";
 import { indexSource } from "@/lib/retrieval/indexer";
 import { renameEntity, deleteEntity, addEdge, deleteEdge } from "@/lib/retrieval/graph";
+import { dropOrigin } from "@/lib/retrieval/indexer";
+import {
+  indexProfile,
+  indexPersona,
+  indexProject,
+  indexPhoto,
+  indexApprovedAnswer,
+} from "@/lib/retrieval/origins";
 import { safeExperience, safeSocials } from "@/lib/knowledge";
 import { PERSONA_SECTIONS, writePersonaSections } from "@/lib/persona";
 import { COLOR_ROLES } from "@/lib/theme";
@@ -32,10 +40,19 @@ async function requireAuth() {
  * source (retrieval falls back to its summary until a rescan/reindex).
  */
 async function indexScanned(sourceId: string): Promise<void> {
+  await reindex(`source ${sourceId}`, () => indexSource(sourceId));
+}
+
+/**
+ * Re-index one origin inline with the admin save that changed it, so edits are
+ * retrievable immediately. Best-effort by design: indexing calls the embedding
+ * and extraction APIs, and neither may ever cost Blake a saved edit.
+ */
+async function reindex(label: string, run: () => Promise<void>): Promise<void> {
   try {
-    await indexSource(sourceId);
+    await run();
   } catch (e) {
-    console.error(`indexSource(${sourceId}) failed:`, e);
+    console.error(`reindex(${label}) failed:`, e);
   }
 }
 
@@ -132,6 +149,7 @@ export async function saveProfile(formData: FormData) {
       other: String(formData.get("other") ?? ""),
     },
   });
+  await reindex("profile", indexProfile);
   revalidateAll();
 }
 
@@ -170,6 +188,7 @@ export async function uploadResume(formData: FormData) {
 
   if (Object.keys(data).length) {
     await prisma.profile.update({ where: { id: 1 }, data });
+    await reindex("profile", indexProfile);
   }
   revalidateAll();
 }
@@ -190,6 +209,7 @@ export async function savePersona(formData: FormData) {
     data: { tagline: String(formData.get("tagline") ?? "") },
   });
   await writePersonaSections(sections);
+  await reindex("persona", indexPersona);
   revalidateAll();
 }
 
@@ -379,7 +399,7 @@ export async function addProject(formData: FormData) {
     imageUrl = `/api/uploads/${await saveUpload(file)}`;
   }
 
-  await prisma.project.create({
+  const created = await prisma.project.create({
     data: {
       name,
       blurb,
@@ -389,6 +409,7 @@ export async function addProject(formData: FormData) {
       order: Number(formData.get("order") ?? 0) || 0,
     },
   });
+  await reindex(`project ${created.id}`, () => indexProject(created.id));
   revalidateAll();
 }
 
@@ -421,13 +442,17 @@ export async function updateProject(formData: FormData) {
       order: Number(formData.get("order") ?? 0) || 0,
     },
   });
+  await reindex(`project ${id}`, () => indexProject(id));
   revalidateAll();
 }
 
 export async function deleteProject(formData: FormData) {
   await requireAuth();
   const id = String(formData.get("id") ?? "");
-  if (id) await prisma.project.delete({ where: { id } }).catch(() => {});
+  if (id) {
+    await prisma.project.delete({ where: { id } }).catch(() => {});
+    await reindex(`project ${id}`, () => dropOrigin("project", id));
+  }
   revalidateAll();
 }
 
@@ -444,7 +469,7 @@ export async function uploadPhoto(formData: FormData) {
   const ext = path.extname(filename);
   const description = await describeImage(bytes, ext);
 
-  await prisma.photo.create({
+  const photo = await prisma.photo.create({
     data: {
       filename,
       description,
@@ -453,6 +478,7 @@ export async function uploadPhoto(formData: FormData) {
       order: Number(formData.get("order") ?? 0) || 0,
     },
   });
+  await reindex(`photo ${photo.id}`, () => indexPhoto(photo.id));
   revalidateAll();
 }
 
@@ -467,13 +493,17 @@ export async function updatePhoto(formData: FormData) {
       caption: String(formData.get("caption") ?? ""),
     },
   });
+  await reindex(`photo ${id}`, () => indexPhoto(id));
   revalidateAll();
 }
 
 export async function deletePhoto(formData: FormData) {
   await requireAuth();
   const id = String(formData.get("id") ?? "");
-  if (id) await prisma.photo.delete({ where: { id } }).catch(() => {});
+  if (id) {
+    await prisma.photo.delete({ where: { id } }).catch(() => {});
+    await reindex(`photo ${id}`, () => dropOrigin("photo", id));
+  }
   revalidateAll();
 }
 
@@ -497,7 +527,18 @@ export async function deleteContact(formData: FormData) {
 export async function deleteChatSession(formData: FormData) {
   await requireAuth();
   const id = String(formData.get("id") ?? "");
-  if (id) await prisma.chatSession.delete({ where: { id } }).catch(() => {});
+  if (!id) return revalidatePath("/admin/dashboard");
+
+  // Any approved answers in this conversation were indexed as knowledge;
+  // chunks don't cascade off ChatMessage, so drop them before the rows go.
+  const approved = await prisma.chatMessage.findMany({
+    where: { sessionId: id, role: "assistant", rating: "up" },
+    select: { id: true },
+  });
+  await prisma.chatSession.delete({ where: { id } }).catch(() => {});
+  for (const m of approved) {
+    await reindex(`activity ${m.id}`, () => dropOrigin("activity", m.id));
+  }
   revalidatePath("/admin/dashboard");
 }
 
@@ -505,6 +546,11 @@ export async function deleteChatSession(formData: FormData) {
  * Save Blake's feedback on one bot answer from the Activity tab: a rating
  * (up/down) and an optional correction note. A "down" + note is injected into
  * future system prompts so the bot doesn't repeat the mistake.
+ *
+ * A 👍 also promotes the answer into the knowledge index. This rating is the
+ * ONLY path by which chat content becomes knowledge — visitors type into the
+ * public chat box, so nothing they produce is indexed until Blake vouches for
+ * it here. Clearing or flipping the rating drops it again.
  */
 export async function saveChatFeedback(formData: FormData) {
   await requireAuth();
@@ -517,6 +563,7 @@ export async function saveChatFeedback(formData: FormData) {
     await prisma.chatMessage
       .update({ where: { id }, data: { rating, note } })
       .catch(() => {});
+    await reindex(`activity ${id}`, () => indexApprovedAnswer(id));
   }
   revalidatePath("/admin/dashboard");
 }

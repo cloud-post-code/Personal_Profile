@@ -21,8 +21,13 @@ import { bytesToVec, cosine, embedModelName, embedTexts } from "./embed";
 
 export type RetrievedChunk = {
   chunkId: string;
-  sourceId: string;
-  /// Human-readable pointer: source title, url, or filename.
+  /// Which admin surface this came from: source | profile | persona |
+  /// project | photo | activity.
+  originKind: string;
+  originId: string;
+  /// Set only for source-derived chunks.
+  sourceId: string | null;
+  /// Human-readable pointer used to cite the chunk in the prompt.
   ref: string;
   text: string;
   score: number;
@@ -41,10 +46,7 @@ export async function retrieve(
   const { seedLimit = 6, graphLimit = 4, charBudget = 6000 } = opts;
 
   const chunks = await prisma.chunk.findMany({
-    include: {
-      source: { select: { title: true, url: true, filename: true, kind: true } },
-      mentions: { select: { entityId: true } },
-    },
+    include: { mentions: { select: { entityId: true } } },
   });
   if (chunks.length === 0) return { chunks: [], relations: [] };
 
@@ -134,11 +136,12 @@ export async function retrieve(
   let used = 0;
   const push = (r: { c: (typeof chunks)[number]; score: number }, via: "rank" | "graph") => {
     if (used + r.c.text.length > charBudget && out.length > 0) return;
-    const s = r.c.source;
     out.push({
       chunkId: r.c.id,
+      originKind: r.c.originKind,
+      originId: r.c.originId,
       sourceId: r.c.sourceId,
-      ref: s.title ?? s.url ?? s.filename ?? "source",
+      ref: r.c.originLabel || r.c.originKind,
       text: r.c.text,
       score: r.score,
       via,

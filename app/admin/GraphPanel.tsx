@@ -1,4 +1,5 @@
 import { ENTITY_TYPES_LIST } from "@/lib/retrieval/entities";
+import { ORIGIN_LABELS } from "@/lib/retrieval/origins";
 import type { GraphEntity, GraphEdge, GraphStats } from "@/lib/retrieval/graph";
 import { saveEntity, removeEntity, createEntityEdge, removeEntityEdge } from "./actions";
 import { field, btn, btnGhost, btnDanger, SectionTitle, Label } from "./ui";
@@ -31,10 +32,11 @@ export function GraphPanel({
     }}>
       <SectionTitle>Knowledge graph</SectionTitle>
       <p style={hint}>
-        Every source you add is split into chunks and read for the people, orgs, projects and
-        topics it names, plus how they relate. The chatbot follows those relations to find
-        facts a plain keyword match would miss — so a wrong or duplicated entity here shows up
-        as a worse answer there. Fix them below.
+        Everything you curate — your profile, persona, projects, photos, saved sources, and the
+        answers you approve on Activity — is split into chunks and read for the people, orgs,
+        projects and topics it names, plus how they relate. The chatbot follows those relations
+        to find facts a plain keyword match would miss, so a wrong or duplicated entity here
+        shows up as a worse answer there. Fix them below.
       </p>
 
       <div style={statGrid}>
@@ -44,6 +46,22 @@ export function GraphPanel({
         <Stat label="Relations" value={stats.edges} />
         <Stat label="Orphans" value={stats.orphanEntities} />
       </div>
+
+      {/* Where the knowledge actually comes from. A graph fed by one origin
+          describes that origin, not the person. */}
+      {stats.origins.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <Label>Indexed from</Label>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {stats.origins.map((o) => (
+              <span key={o.kind} style={originPill}>
+                {ORIGIN_LABELS[o.kind] ?? o.kind}
+                <strong style={{ marginLeft: 6 }}>{o.count}</strong>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Index health — both of these silently degrade retrieval. */}
       {stats.chunksWithoutEmbedding > 0 && (
@@ -237,6 +255,14 @@ const divider: React.CSSProperties = {
   borderTop: "1px solid var(--border)",
   marginTop: 18,
   paddingTop: 16,
+};
+const originPill: React.CSSProperties = {
+  fontSize: 12,
+  border: "1px solid var(--border)",
+  borderRadius: 999,
+  padding: "3px 11px",
+  background: "var(--bg-soft)",
+  color: "var(--on-bg-soft)",
 };
 const edgeRow: React.CSSProperties = {
   display: "flex",

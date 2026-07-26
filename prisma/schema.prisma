@@ -45,9 +45,19 @@ model Source {
 /// with it.
 model Chunk {
   id         String   @id @default(cuid())
-  source     Source   @relation(fields: [sourceId], references: [id], onDelete: Cascade)
-  sourceId   String
-  /// 0-based position within the source.
+  /// Which admin surface this chunk was derived from:
+  /// source | profile | persona | project | photo | activity.
+  /// Everything the admin curates feeds one index, not just Sources.
+  originKind String   @default("source")
+  /// Id of the origin row. The singletons use their kind as the id
+  /// ("profile", "persona"); the rest use Project/Photo/ChatMessage/Source ids.
+  originId   String   @default("")
+  /// Human-readable label used when citing this chunk in the prompt.
+  originLabel String  @default("")
+  /// Set only for source-derived chunks, so they cascade with the Source.
+  source     Source?  @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  sourceId   String?
+  /// 0-based position within the origin.
   seq        Int      @default(0)
   text       String @db.Text
   /// Float32Array bytes; null when embedding failed.
@@ -59,6 +69,7 @@ model Chunk {
   mentions   EntityMention[]
 
   @@index([sourceId])
+  @@index([originKind, originId])
 }
 
 /// A named thing the knowledge base talks about (person, org, project, ...).

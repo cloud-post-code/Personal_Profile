@@ -24,6 +24,9 @@ export type GraphStats = {
   /// Chunks per embedding model. More than one entry means the index is mixed
   /// and cosine is skipped across the boundary (see `search.ts`).
   embedModels: { model: string; count: number }[];
+  /// Chunks per admin surface — shows at a glance whether the graph is being
+  /// fed by everything or by one lopsided origin.
+  origins: { kind: string; count: number }[];
   orphanEntities: number;
 };
 
@@ -48,14 +51,19 @@ export type GraphEdge = {
 };
 
 export async function graphStats(): Promise<GraphStats> {
-  const [sources, chunks, entities, edges, models, orphanEntities] = await Promise.all([
+  const [sources, chunks, entities, edges, models, originRows, orphanEntities] = await Promise.all([
     prisma.source.count(),
     prisma.chunk.count(),
     prisma.entity.count(),
     prisma.entityEdge.count(),
     prisma.chunk.groupBy({ by: ["embedModel"], _count: { _all: true } }),
+    prisma.chunk.groupBy({ by: ["originKind"], _count: { _all: true } }),
     prisma.entity.count({ where: { mentions: { none: {} } } }),
   ]);
+
+  const origins = originRows
+    .map((o) => ({ kind: o.originKind, count: o._count._all }))
+    .sort((a, b) => b.count - a.count);
 
   let chunksWithoutEmbedding = 0;
   const embedModels: { model: string; count: number }[] = [];
@@ -65,7 +73,10 @@ export async function graphStats(): Promise<GraphStats> {
   }
   embedModels.sort((a, b) => b.count - a.count);
 
-  return { sources, chunks, entities, edges, chunksWithoutEmbedding, embedModels, orphanEntities };
+  return {
+    sources, chunks, entities, edges,
+    chunksWithoutEmbedding, embedModels, origins, orphanEntities,
+  };
 }
 
 export async function listEntities(): Promise<GraphEntity[]> {
@@ -73,9 +84,7 @@ export async function listEntities(): Promise<GraphEntity[]> {
     orderBy: { name: "asc" },
     include: {
       _count: { select: { edgesOut: true, edgesIn: true } },
-      mentions: {
-        select: { chunk: { select: { source: { select: { title: true, url: true, filename: true } } } } },
-      },
+      mentions: { select: { chunk: { select: { originLabel: true, originKind: true } } } },
     },
   });
 
@@ -85,9 +94,7 @@ export async function listEntities(): Promise<GraphEntity[]> {
     type: e.type,
     mentions: e.mentions.length,
     sources: [
-      ...new Set(
-        e.mentions.map((m) => m.chunk.source.title ?? m.chunk.source.url ?? m.chunk.source.filename ?? "source"),
-      ),
+      ...new Set(e.mentions.map((m) => m.chunk.originLabel || m.chunk.originKind)),
     ],
     edges: e._count.edgesOut + e._count.edgesIn,
   }));

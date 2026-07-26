@@ -26,6 +26,13 @@
       "next": "Phase 2 continues: persona-aware entity ontology in lib/retrieval/entities.ts + persona-biased ranking."
     },
     {
+      "id": "universal-knowledge-index",
+      "title": "Index every admin surface into one knowledge graph (profile, persona, projects, photos, knowledge, approved answers)",
+      "status": "done",
+      "notes": "Chunk gains originKind/originId/originLabel and sourceId becomes nullable, so the index is origin-agnostic (lib/retrieval/indexer.ts indexOrigin/dropOrigin). lib/retrieval/origins.ts turns each surface into indexable text and is triggered inline by the admin saves (saveProfile/uploadResume, savePersona, add/update/deleteProject, upload/update/deletePhoto, saveChatFeedback, deleteChatSession) — best-effort, never fails a save. ACTIVITY IS APPROVAL-GATED: only assistant answers rated up are indexed, because visitor-typed chat is untrusted input and would otherwise poison the KB. Prompt slimmed: bio/experience/project blurbs/photo descriptions are now retrieved, while identity, contact, persona, project id index and A2UI rules stay always-on. Graph tab shows an 'Indexed from' per-origin breakdown. Proof: docs/features/universal-knowledge-index/proof.ts (25 assertions green); prior three proofs still green; gate PASS.",
+      "next": "Deploy + run `npx tsx scripts/reindex.ts --all` on production: existing prod chunks predate the origin columns and carry empty originId/originLabel until reindexed."
+    },
+    {
       "id": "github-profile-import",
       "title": "Import all projects from a GitHub profile link",
       "status": "done",

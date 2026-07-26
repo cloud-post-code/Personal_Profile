@@ -21,8 +21,18 @@ for (const line of readFileSync(path.join(root, ".env"), "utf8").split("\n")) {
 async function main() {
   const { prisma } = await import("../lib/db");
   const { indexSource } = await import("../lib/retrieval/indexer");
+  const { indexEverything } = await import("../lib/retrieval/origins");
 
   const all = process.argv.includes("--all");
+
+  // --all also rebuilds the non-Source origins (profile, persona, projects,
+  // photos, approved answers); the default pass only fills in unindexed sources.
+  if (all) {
+    const n = await indexEverything({
+      onProgress: (label) => console.log(`  indexed  ${label}`),
+    });
+    console.log(`${n} non-source origin(s) indexed`);
+  }
   const sources = await prisma.source.findMany({
     where: all
       ? { status: "scanned" }

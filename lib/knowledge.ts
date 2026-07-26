@@ -31,6 +31,9 @@ export async function buildSystemPrompt(query?: string): Promise<string> {
     prisma.chunk.count(),
   ]);
 
+  // Just the index — id, name and links. Every project's blurb and write-up is
+  // chunked and retrieved on demand, so the ids are here purely so show_project
+  // can be called and the links can be quoted.
   const projectBlock = projects.length
     ? projects
         .map((p) => {
@@ -40,7 +43,7 @@ export async function buildSystemPrompt(query?: string): Promise<string> {
           ]
             .filter(Boolean)
             .join(" | ");
-          return `- (id:${p.id}) ${p.name}: ${p.blurb}${links ? ` [${links}]` : ""}`;
+          return `- (id:${p.id}) ${p.name}${links ? ` [${links}]` : ""}`;
         })
         .join("\n")
     : "(No projects added yet.)";
@@ -69,26 +72,24 @@ export async function buildSystemPrompt(query?: string): Promise<string> {
 PERSONA (who you are and how you behave — follow it in every answer):
 ${personaBlock}
 
-ABOUT BLAKE (history & background):
-${profile.bio || "(Bio not filled in yet — be honest that details are still being added.)"}
-${profile.tagline ? `Tagline: ${profile.tagline}` : ""}
-${profile.location ? `Based in: ${profile.location}` : ""}
-
-EXPERIENCE:
-${profile.experienceSummary ? `${profile.experienceSummary}\n` : ""}
-${experienceBlock(profile.experience)}
-${profile.other ? `\nEDUCATION / SKILLS / OTHER:\n${profile.other}` : ""}
+WHO YOU ARE:
+${profile.name}${profile.tagline ? ` — ${profile.tagline}` : ""}${
+    profile.location ? `, based in ${profile.location}` : ""
+  }.
 
 HOW TO CONNECT:
 ${connectBlock(profile)}
 
-PROJECTS (each has an id, and up to two links — GitHub and Live):
+PROJECT INDEX (ids for show_project; details come through KNOWLEDGE below):
 ${projectBlock}
 
 PHOTOS:
 ${photoBlock}
 
-KNOWLEDGE SOURCES (extracted from links, PDFs, and notes — this is where Blake's opinions, history, and detail live):
+KNOWLEDGE FOR THIS QUESTION (retrieved from everything Blake curates — his
+profile and experience, persona, project write-ups, photo descriptions, saved
+sources, and answers he approved. Each block is labelled with where it came
+from):
 ${sourceBlock}
 
 USING RICH CARDS (A2UI):
@@ -101,7 +102,7 @@ Always add a short spoken sentence alongside a card — the card supplements you
 
 RULES:
 - Only state facts present above. If you don't know, say so warmly and point them to how they can connect with Blake directly.
-- For questions about Blake's history, background, or opinions, synthesize naturally from the ABOUT and KNOWLEDGE SOURCES sections.
+- For questions about Blake's history, background, or opinions, synthesize naturally from the KNOWLEDGE section — that's where his bio, experience and detail live now.
 - Keep answers concise and conversational.
 - Never invent projects, jobs, dates, or credentials.${correctionBlock}`;
 }
@@ -147,19 +148,6 @@ function connectBlock(p: {
   if (p.github) lines.push(`GitHub: ${p.github}`);
   for (const s of safeSocials(p.socials)) lines.push(`${s.label}: ${s.url}`);
   return lines.length ? lines.join("\n") : "(No contact info added yet.)";
-}
-
-function experienceBlock(raw: string): string {
-  const items = safeExperience(raw);
-  if (!items.length) return "(No experience added yet.)";
-  return items
-    .map((e) => {
-      const head = [e.role, e.company].filter(Boolean).join(" @ ");
-      const when = e.dates ? ` (${e.dates})` : "";
-      const desc = e.description ? ` — ${e.description}` : "";
-      return `- ${head}${when}${desc}`;
-    })
-    .join("\n");
 }
 
 export function safeSocials(raw: string): { label: string; url: string }[] {
