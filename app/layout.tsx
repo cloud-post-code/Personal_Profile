@@ -4,6 +4,7 @@ import { brand, themeOverrideCss, type ThemeColors } from "@/lib/theme";
 import { headingFamily, bodyFamily } from "@/lib/fonts";
 import { getProfile } from "@/lib/db";
 import { safeJson } from "@/lib/util";
+import { PostHogProvider } from "./PostHogProvider";
 import "./globals.css";
 
 // Body + mono are fixed. The heading font default is Space Grotesk, but the
@@ -43,7 +44,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {/* DB-backed theme override — wins over globals.css :root defaults. */}
         <style dangerouslySetInnerHTML={{ __html: override }} />
       </head>
-      <body>{children}</body>
+      <body>
+        <PostHogProvider>{children}</PostHogProvider>
+      </body>
     </html>
   );
 }
