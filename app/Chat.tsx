@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect } from "react";
 import { Cards, type UiBlock } from "./cards/Cards";
+import { Markdown } from "./Markdown";
 
 type Msg = {
   role: "user" | "assistant";
@@ -262,7 +263,11 @@ function Bubble({
       {(content || !hasCards) && (
         <div style={isUser ? styles.userBubble : styles.botBubble}>
           {content ? (
-            <span style={{ whiteSpace: "pre-wrap" }}>{content}</span>
+            isUser ? (
+              <span style={{ whiteSpace: "pre-wrap" }}>{content}</span>
+            ) : (
+              <Markdown text={content} />
+            )
           ) : loading ? (
             <span style={styles.typing}>
               <i style={{ ...styles.tdot, animationDelay: "0ms" }} />
