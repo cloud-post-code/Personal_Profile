@@ -534,7 +534,7 @@ export default async function Dashboard() {
   );
 
   return (
-    <main style={{ maxWidth: 860, margin: "0 auto", padding: "24px 20px 80px" }}>
+    <main style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 20px 80px" }}>
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
         <div>
           <h1 style={{ fontSize: 26 }}>Control room</h1>

@@ -3,10 +3,10 @@
 import { useState } from "react";
 
 /**
- * Client tab switcher for the admin dashboard. Each child panel is passed with
- * a key + label; clicking a tab swaps which panel is shown below. Server-action
- * forms live inside the panels (passed as children from the server component),
- * so all the server logic is untouched.
+ * Client section switcher for the admin dashboard. Each child panel is passed
+ * with a key + label; clicking an entry in the side menu swaps which panel is
+ * shown beside it. Server-action forms live inside the panels (passed as
+ * children from the server component), so all the server logic is untouched.
  */
 export function Tabs({
   tabs,
@@ -17,63 +17,29 @@ export function Tabs({
   const current = tabs.find((t) => t.key === active) ?? tabs[0];
 
   return (
-    <div>
-      <div style={bar}>
+    <div className="admin-shell">
+      <nav className="admin-nav" aria-label="Dashboard sections">
         {tabs.map((t) => {
           const on = t.key === active;
           return (
             <button
               key={t.key}
+              type="button"
+              className="admin-nav-item"
+              aria-current={on ? "page" : undefined}
               onClick={() => setActive(t.key)}
-              style={{
-                ...tab,
-                ...(on ? tabOn : {}),
-              }}
             >
               {t.label}
               {t.badge ? <span style={badgeStyle}>{t.badge}</span> : null}
             </button>
           );
         })}
-      </div>
+      </nav>
       <div>{current?.content}</div>
     </div>
   );
 }
 
-const bar: React.CSSProperties = {
-  display: "flex",
-  gap: 6,
-  flexWrap: "wrap",
-  marginBottom: 20,
-  paddingBottom: 12,
-  borderBottom: "1px solid var(--border)",
-  position: "sticky",
-  top: 0,
-  background: "var(--bg)",
-  zIndex: 5,
-  paddingTop: 4,
-};
-const tab: React.CSSProperties = {
-  padding: "9px 16px",
-  borderRadius: "var(--radius-pill)",
-  border: "1px solid var(--border)",
-  background: "transparent",
-  color: "var(--text)",
-  fontStyle: "italic",
-  fontSize: 14,
-  fontWeight: 600,
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 8,
-};
-const tabOn: React.CSSProperties = {
-  background: "var(--primary)",
-  color: "var(--on-primary)",
-  fontStyle: "normal",
-  border: "1px solid transparent",
-  boxShadow: "var(--glow-primary)",
-};
 const badgeStyle: React.CSSProperties = {
   background: "var(--accent)",
   color: "var(--on-accent)",
