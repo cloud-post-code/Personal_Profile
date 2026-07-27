@@ -1,5 +1,6 @@
 import { prisma } from "../db";
 import { entityKey } from "./entities";
+import { retrieve } from "./search";
 
 /**
  * Read + repair layer for the extracted knowledge graph.
@@ -349,4 +350,55 @@ export async function addEdge(fromId: string, toId: string, relation: string): P
 
 export async function deleteEdge(id: string): Promise<void> {
   await prisma.entityEdge.delete({ where: { id } }).catch(() => {});
+}
+
+export type RetrievalPreview = {
+  chunks: {
+    ref: string;
+    originKind: string;
+    text: string;
+    score: number;
+    /// "rank" = lexical+vector seed; "graph" = pulled in by one-hop expansion.
+    via: "rank" | "graph";
+  }[];
+  relations: string[];
+  /// Entity names whose keys appear verbatim in the query — the same match
+  /// retrieve() uses to seed expansion, so this shows whether the graph
+  /// "sees" the question at all.
+  queryEntities: string[];
+  /// True when nothing is indexed yet, so the UI can say so instead of
+  /// implying the query missed.
+  indexEmpty: boolean;
+};
+
+/**
+ * What the chatbot would be given for this question — the real retrieve()
+ * result, plus which entities the query itself matched. Read-only; exists so
+ * graph edits can be driven by observation instead of re-asking the chatbot
+ * and guessing.
+ */
+export async function retrievalPreview(query: string): Promise<RetrievalPreview> {
+  const q = query.trim();
+  if (!q) return { chunks: [], relations: [], queryEntities: [], indexEmpty: false };
+
+  const [chunkCount, entities] = await Promise.all([
+    prisma.chunk.count(),
+    prisma.entity.findMany({ select: { name: true, key: true } }),
+  ]);
+  const ql = q.toLowerCase();
+  const queryEntities = entities.filter((e) => ql.includes(e.key)).map((e) => e.name);
+
+  const r = await retrieve(q);
+  return {
+    chunks: r.chunks.map((c) => ({
+      ref: c.ref,
+      originKind: c.originKind,
+      text: c.text,
+      score: c.score,
+      via: c.via,
+    })),
+    relations: r.relations,
+    queryEntities,
+    indexEmpty: chunkCount === 0,
+  };
 }

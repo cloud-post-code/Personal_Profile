@@ -1,6 +1,7 @@
 import { ORIGIN_LABELS } from "@/lib/retrieval/origins";
 import type { GraphEntity, GraphEdge, GraphStats, MergeSuggestion } from "@/lib/retrieval/graph";
 import { GraphView } from "./GraphView";
+import { RetrievalPlayground } from "./RetrievalPlayground";
 import { SectionTitle, Label } from "./ui";
 
 /**
@@ -77,6 +78,10 @@ export function GraphPanel({
           <strong>{stats.embedModels[0].model}</strong>.
         </p>
       )}
+
+      <div style={{ borderTop: "1px solid var(--border)", marginTop: 18, paddingTop: 16 }}>
+        <RetrievalPlayground />
+      </div>
 
       <div style={{ borderTop: "1px solid var(--border)", marginTop: 18, paddingTop: 16 }}>
         <GraphView entities={entities} edges={edges} suggestions={suggestions} />

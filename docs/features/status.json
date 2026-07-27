@@ -150,6 +150,16 @@
       "status": "passing",
       "notes": "lib/retrieval/graph.ts suggestedMerges(): duplicate-entity pairs from two deterministic signals — condensed-key containment ('brambleworks' ⊂ 'brambleworksltd', shorter side ≥ 4 chars) and shared-neighbor overlap (Jaccard ≥ 0.5, ≥ 2 shared, both ≥ 2 neighbors) which ALSO requires a shared 3+-char name word, because nearly everything in this graph neighbors Blake and raw overlap would pair unrelated skills ('TypeScript'/'React') for a one-click merge. Survivor = more mentions, then more edges, then longer name. Capped at 20, containment ranked first, each unordered pair once. mergeEntities(from,into) is the one-click path through the existing mergeInto machinery, fail-soft on stale ids. UI: Suggested merges block atop the Entities pane (hidden when empty) + ⚠ count on the pane tab (no colour override — the tab background swaps with the theme); mergeSuggestedEntities server action is the standard thin auth+revalidate wrapper. No LLM call, no schema change. Proof: docs/features/graph-suggested-merges/proof.ts (18 assertions green, was red at 'suggestedMerges is not a function'; zero Anthropic calls). tsc + next lint clean on touched files. Evaluator PASS. Gate: initially failed in the concurrent session's mid-edit google-connect proof; after they fixed it, GATE: PASS with this feature's changes included.",
       "next": "Merge button not clicked in a browser (admin login required)."
+    },
+    {
+      "id": "retrieval-playground",
+      "title": "Retrieval playground on the Graph tab: type a question, see what retrieve() returns",
+      "feature_dir": "docs/features/retrieval-playground",
+      "proof": "docs/features/retrieval-playground/PROOF.md",
+      "priority": 1,
+      "status": "passing",
+      "notes": "Test retrieval box on the Graph tab: lib/retrieval/graph.ts retrievalPreview(query) returns the REAL retrieve() result shaped for display — chunks with origin ref, blended score, and rank/graph provenance, the KNOWN RELATIONSHIPS lines, plus queryEntities (the exact q.includes(key) match retrieve() uses to seed expansion, so the admin can see whether the graph even recognizes the question) and an indexEmpty flag for an honest empty state. previewRetrieval server action is auth-only (read-only, no revalidate); app/admin/RetrievalPlayground.tsx is a small client component (useTransition) above GraphView. Proof: docs/features/retrieval-playground/proof.ts (12 assertions green, was red at 'retrievalPreview is not a function'; zero Anthropic calls). PROOF LESSONS BAKED IN: (1) the draft asserted nonsense queries return zero chunks — false, retrieve() max-normalizes the vector signal so a non-empty index always scores something; replaced with a stronger byte-equivalence assertion (preview === retrieve() output, proving no second retrieval path). (2) Deleting VOYAGE/OPENAI keys before imports does NOT pin the local embedder — Prisma re-loads .env on import; delete AFTER imports. (3) To prove a graph-only hit, every seed slot must be filled by marker-bearing chunks AND the graph-hop chunk must be small enough to fit retrieve()'s 6000-char budget after ~5 seeds. tsc + lint clean; GATE: PASS; evaluator PASS.",
+      "next": "indexEmpty:true branch unasserted (needs an empty DB); box not typed into in a browser (admin login required)."
     }
   ]
 }
