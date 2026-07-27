@@ -21,19 +21,9 @@ export const A2A_RPC_PATH = "/api/a2a";
 /** Where the equivalent HTTP+JSON (REST) binding lives. */
 export const A2A_REST_PATH = "/api/a2a/rest";
 
-/**
- * The site's public origin. Prefers the configured URL; falls back to the
- * proxy headers so a preview deploy advertises itself correctly instead of
- * handing other agents a localhost URL they can't reach.
- */
-export function siteOrigin(headers?: Headers): string {
-  const configured = (process.env.NEXT_PUBLIC_SITE_URL ?? "").trim().replace(/\/+$/, "");
-  if (configured) return configured;
-  const host = headers?.get("x-forwarded-host") ?? headers?.get("host");
-  if (!host) return "http://localhost:3000";
-  const proto = headers?.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
-  return `${proto}://${host}`;
-}
+// Shared with the Google OAuth callback, which needs the same answer; re-exported
+// so the several .well-known routes that import it from here keep working.
+export { siteOrigin } from "@/lib/util";
 
 function slug(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "agent";

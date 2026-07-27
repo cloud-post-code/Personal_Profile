@@ -1,10 +1,7 @@
 import { prisma, getProfile } from "@/lib/db";
 import { safeJson } from "@/lib/util";
-import {
-  googleCalendarClient,
-  googleConfig,
-  type CalendarClient,
-} from "@/lib/google";
+import { googleCalendarClient, type CalendarClient } from "@/lib/google";
+import { googleConnection, googleConnected } from "@/lib/googleConnection";
 import {
   openSlots,
   parseWeeklyHours,
@@ -117,7 +114,7 @@ export function resetBookingCache(): void {
  */
 export async function bookingLive(): Promise<boolean> {
   const p = await getProfile();
-  return p.bookingEnabled && googleConfig() !== null;
+  return p.bookingEnabled && (await googleConnection()) !== null;
 }
 
 /**
@@ -131,7 +128,7 @@ async function computeOpen(
   fresh = false,
 ): Promise<{ slots: Interval[]; connected: boolean }> {
   const now = deps.now ?? Date.now();
-  const cfg = googleConfig();
+  const cfg = await googleConnection();
   const client = deps.client ?? (cfg ? googleCalendarClient(cfg) : null);
   if (!client) return { slots: [], connected: false };
 
@@ -157,7 +154,7 @@ export async function listOpenSlots(deps: BookingDeps = {}): Promise<SlotsResult
   const s = await settings();
   const base = { enabled: s.enabled, timezone: s.tz, minutes: s.minutes };
 
-  if (!s.enabled) return { ...base, connected: googleConfig() !== null, slots: [] };
+  if (!s.enabled) return { ...base, connected: await googleConnected(), slots: [] };
 
   try {
     const { slots, connected } = await computeOpen(s, deps);
@@ -196,7 +193,7 @@ export async function createBooking(
   let open: Interval[];
   let client: CalendarClient | null;
   try {
-    const cfg = googleConfig();
+    const cfg = await googleConnection();
     client = deps.client ?? (cfg ? googleCalendarClient(cfg) : null);
     if (!client) {
       return { ok: false, code: "unconfigured", error: "Booking isn't open right now." };

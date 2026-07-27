@@ -28,6 +28,7 @@ import { redraftAnswer } from "@/lib/answerDrafts";
 import { safeExperience, safeSocials } from "@/lib/knowledge";
 import { PERSONA_SECTIONS, writePersonaSections } from "@/lib/persona";
 import { formatWeeklyHours, type WeeklyHours } from "@/lib/booking/slots";
+import { disconnectGoogleCalendar } from "@/lib/googleConnection";
 import { COLOR_ROLES } from "@/lib/theme";
 import { saveUpload, saveBytes } from "@/lib/uploads";
 import { describeImage } from "@/lib/vision";
@@ -558,6 +559,17 @@ export async function saveBookingSettings(formData: FormData) {
       bookingHours: JSON.stringify(formatWeeklyHours(hours)),
     },
   });
+  revalidateAll();
+}
+
+/**
+ * Hand the calendar grant back. Connecting is a redirect flow and so lives in
+ * app/api/admin/google/*; disconnecting needs no round trip, so it is a plain
+ * server action next to the rest of the Booking tab's saves.
+ */
+export async function disconnectGoogle() {
+  await requireAuth();
+  await disconnectGoogleCalendar();
   revalidateAll();
 }
 

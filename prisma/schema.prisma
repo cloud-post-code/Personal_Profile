@@ -324,6 +324,15 @@ model Profile {
   /// Shown as the calendar event's title, with the guest's name appended.
   bookingTitle     String  @default("Intro call")
 
+  // ── Google Calendar connection (granted from the Booking tab) ──
+  /// The OAuth refresh token, ENCRYPTED with AUTH_SECRET — never the raw token.
+  /// See lib/googleConnection.ts. Empty until Blake connects; GOOGLE_REFRESH_TOKEN
+  /// in the environment still takes precedence when it is set.
+  googleRefreshToken String @default("") @db.Text
+  /// When the grant was made, so the tab can say how old the connection is.
+  /// Google expires refresh tokens for consent screens left in "Testing".
+  googleConnectedAt  DateTime?
+
   updatedAt DateTime @updatedAt
 }
 

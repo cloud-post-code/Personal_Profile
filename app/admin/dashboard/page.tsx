@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import Link from "next/link";
 import { isAuthed } from "@/lib/auth";
 import { prisma, getProfile } from "@/lib/db";
 import { safeTags, safeSocials, safeExperience } from "@/lib/knowledge";
-import { safeJson } from "@/lib/util";
+import { safeJson, siteOrigin } from "@/lib/util";
 import { PERSONA_BLURB, PERSONA_SECTIONS, safePersonaSections } from "@/lib/persona";
 import { FONT_OPTIONS, BODY_FONT_OPTIONS } from "@/lib/fonts";
 import { RADIUS_OPTIONS } from "@/lib/theme";
@@ -26,6 +27,7 @@ import {
   toggleContactHandled,
   deleteContact,
   saveBookingSettings,
+  disconnectGoogle,
   deleteBooking,
   deleteChatSession,
   saveChatFeedback,
@@ -48,7 +50,26 @@ import type { ThemeColors } from "@/lib/theme";
 import { panel, field, btn, btnGhost, btnDanger, SectionTitle, Label } from "../ui";
 import { chatMetrics } from "@/lib/activity";
 import { parseWeeklyHours, type WeeklyHours } from "@/lib/booking/slots";
-import { googleConfigured } from "@/lib/google";
+import { googleRedirectUri } from "@/lib/google";
+import { connectionStatus } from "@/lib/googleConnection";
+
+/** What went wrong on the way back from Google, in words. */
+function googleConnectError(reason: string | undefined): string {
+  switch (reason) {
+    case "access_denied":
+      return "you declined the permissions Google asked about.";
+    case "state-mismatch":
+      return "the request didn't match the one this page started. Click Connect again.";
+    case "no-code":
+      return "Google sent no authorization code back.";
+    case "no-client-credentials":
+      return "GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET aren't set.";
+    case "exchange-failed":
+      return "Google refused the code, or returned no refresh token. If you have connected before, remove this app at myaccount.google.com/permissions and try again.";
+    default:
+      return reason ?? "no reason given.";
+  }
+}
 
 /** Sunday-first, matching the weekday indexing the slot grid uses. */
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -59,8 +80,17 @@ function hhmm(minutes: number): string {
 
 export const dynamic = "force-dynamic";
 
-export default async function Dashboard() {
+export default async function Dashboard({
+  searchParams,
+}: {
+  // The Google OAuth callback returns here with ?tab=booking&google=…, so the
+  // page has to be able to open on a tab and report an outcome.
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   if (!(await isAuthed())) redirect("/admin");
+
+  const query = await searchParams;
+  const one = (k: string) => (Array.isArray(query[k]) ? query[k][0] : query[k]);
 
   const [
     profile,
@@ -103,7 +133,9 @@ export default async function Dashboard() {
     ]);
   const metrics = chatMetrics(chatSessions);
   const unhandled = contacts.filter((c) => !c.handled).length;
-  const googleReady = googleConfigured();
+  const google = await connectionStatus();
+  const redirectUri = googleRedirectUri(siteOrigin(await headers()));
+  const googleOutcome = one("google");
   // LinkedIn is now just a social link. If a legacy linkedin value exists and
   // isn't already in socials, surface it as a pre-filled row so it's not lost.
   const savedSocials = safeSocials(profile.socials);
@@ -436,26 +468,89 @@ export default async function Dashboard() {
       <SectionTitle>Booking</SectionTitle>
 
       {/* Connection state first: every setting below is inert without it. */}
-      <p
+      <div
         style={{
           fontSize: 13,
           marginBottom: 16,
-          padding: "10px 12px",
+          padding: "12px 14px",
           borderRadius: 8,
-          border: `1px solid ${googleReady ? "var(--success-on-surface)" : "var(--border)"}`,
+          border: `1px solid ${google.connected ? "var(--success-on-surface)" : "var(--border)"}`,
         }}
       >
-        {googleReady ? (
-          <>Google Calendar is connected.</>
-        ) : (
+        {googleOutcome === "error" && (
+          <p style={{ color: "var(--danger-on-surface)", marginBottom: 10 }}>
+            Couldn&apos;t connect: {googleConnectError(one("reason"))}
+          </p>
+        )}
+
+        {google.connected ? (
           <>
-            Google Calendar is <strong>not connected</strong> — the booking card stays hidden from
-            visitors. Set GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET, then run{" "}
-            <code>node scripts/google-auth.mjs</code> and paste the refresh token into
-            GOOGLE_REFRESH_TOKEN.
+            <p>
+              Google Calendar is connected
+              {google.connectedAt
+                ? ` — authorized ${google.connectedAt.toLocaleDateString("en-US", { dateStyle: "medium" })}`
+                : ""}
+              .
+            </p>
+            {google.fromEnvironment ? (
+              // Nothing to revoke from here: this token came from the deploy's
+              // environment, so only the deploy can take it away.
+              <p style={{ fontStyle: "italic", marginTop: 6 }}>
+                Using GOOGLE_REFRESH_TOKEN from the environment. Clear that variable to manage the
+                connection from here instead.
+              </p>
+            ) : (
+              <form action={disconnectGoogle} style={{ marginTop: 10 }}>
+                <button type="submit" style={btnDanger}>
+                  Disconnect
+                </button>
+              </form>
+            )}
+          </>
+        ) : google.appConfigured ? (
+          <>
+            <p>
+              Google Calendar is <strong>not connected</strong> — the booking card stays hidden from
+              visitors.
+            </p>
+            <p style={{ marginTop: 10 }}>
+              <a href="/api/admin/google/connect" style={{ ...btn, display: "inline-block", textDecoration: "none" }}>
+                Connect Google Calendar
+              </a>
+            </p>
+            <p style={{ fontStyle: "italic", marginTop: 8 }}>
+              Sign in as the calendar&apos;s owner. This asks only to see when you&apos;re busy and
+              to add events — never to read your meetings.
+            </p>
+          </>
+        ) : (
+          // No client id/secret means the button cannot work, so it isn't shown.
+          // What's missing is a Cloud Console step, so the console steps are.
+          <>
+            <p>
+              Google Calendar is <strong>not connected</strong> — the booking card stays hidden from
+              visitors. Set <code>GOOGLE_CLIENT_ID</code> and <code>GOOGLE_CLIENT_SECRET</code> to
+              get a Connect button here.
+            </p>
+            <ol style={{ marginTop: 8, paddingLeft: 18, lineHeight: 1.7 }}>
+              <li>console.cloud.google.com → new project → enable the Google Calendar API.</li>
+              <li>
+                OAuth consent screen: External, add yourself as a test user, then <strong>publish</strong>{" "}
+                it — while it stays in Testing, Google expires the grant after 7 days.
+              </li>
+              <li>
+                Credentials → OAuth client ID → Web application, with this exact redirect URI:
+                <br />
+                <code>{redirectUri}</code>
+              </li>
+              <li>
+                Put the client id and secret in the environment as <code>GOOGLE_CLIENT_ID</code> /{" "}
+                <code>GOOGLE_CLIENT_SECRET</code> and redeploy.
+              </li>
+            </ol>
           </>
         )}
-      </p>
+      </div>
 
       <form action={saveBookingSettings}>
         <label style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 14, fontSize: 14 }}>
@@ -711,6 +806,7 @@ export default async function Dashboard() {
       </header>
 
       <Tabs
+        initial={one("tab")}
         tabs={[
           { key: "profile", label: "Profile", content: profileTab },
           { key: "persona", label: "Persona", content: personaTab },

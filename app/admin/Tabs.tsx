@@ -10,10 +10,16 @@ import { useState } from "react";
  */
 export function Tabs({
   tabs,
+  initial,
 }: {
   tabs: { key: string; label: string; badge?: number; content: React.ReactNode }[];
+  /** Which panel to open on. Lets a redirect back into the admin land on the
+   *  tab it came from — the Google callback returns to Booking, not Profile. */
+  initial?: string;
 }) {
-  const [active, setActive] = useState(tabs[0]?.key);
+  const [active, setActive] = useState(
+    tabs.some((t) => t.key === initial) ? initial : tabs[0]?.key,
+  );
   const current = tabs.find((t) => t.key === active) ?? tabs[0];
 
   return (

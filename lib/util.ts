@@ -19,3 +19,18 @@ export function safeJson<T>(raw: string | null | undefined, fallback: T): T {
     return fallback;
   }
 }
+
+/**
+ * The site's public origin. Prefers the configured URL; falls back to the
+ * proxy headers so a preview deploy advertises itself correctly instead of
+ * handing other agents — or Google's OAuth redirect — a localhost URL that
+ * doesn't answer.
+ */
+export function siteOrigin(headers?: Headers): string {
+  const configured = (process.env.NEXT_PUBLIC_SITE_URL ?? "").trim().replace(/\/+$/, "");
+  if (configured) return configured;
+  const host = headers?.get("x-forwarded-host") ?? headers?.get("host");
+  if (!host) return "http://localhost:3000";
+  const proto = headers?.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+  return `${proto}://${host}`;
+}
