@@ -53,6 +53,16 @@
       "next": "Ingestion: fill the field from an uploaded document, existing knowledge, or sent email (see the persona-from-email design), incl. mapping the legacy persona/overview/values/tone columns."
     },
     {
+      "id": "persona-knowledge-entries",
+      "title": "Parse the persona into one knowledge entry per claim, and sweep the old ones on every save",
+      "feature_dir": "docs/features/persona-knowledge-entries",
+      "proof": "docs/features/persona-knowledge-entries/PROOF.md",
+      "priority": 1,
+      "status": "passing",
+      "notes": "savePersona already reindexed, but as ONE origin: the whole paragraph competed for a retrieval slot on the average of everything it said, and the graph had a single edge owner called \"Persona\". lib/personaFacts.ts now splits the paragraph with one Claude call into {topic,text} claims (prompted to be self-contained, since each is retrieved without the surrounding paragraph), and indexPersona writes one origin per claim as fact:<slug> labeled \"Persona — <topic>\" — so each gets its own chunk, embedding, entity extraction and edge ownership. MAX_FACTS=8 is a spend limit: every entry costs an embedding request and an entity-extraction call on EVERY save, plus 21s of pacing in a full reindex. Failure is always a downgrade, never an error: no ANTHROPIC_API_KEY, malformed JSON, a provider failure, or prose under MIN_SPLIT_CHARS(200) all index the paragraph whole under the single `persona` origin exactly as before. sweepPersonaOrigins drops every persona origin a pass did not write — required, because indexOrigin only replaces the id it is handed and retrieve() scans the whole chunk table with no origin filter, so a claim removed from the paragraph would otherwise keep being fed to the model as fact; it lives in indexPersona so reindex.ts and indexEverything sweep too, and it also retires the pre-feature single `persona` origin on the first save. The always-on PERSONA block is untouched — the full paragraph still ships verbatim every message. Proof: docs/features/persona-knowledge-entries/proof.ts (45 assertions green, fully offline — both model calls injected and an assertion pins embedModel to local-hash-256-v1 so it fails loudly if it ever goes online). persona-sections and universal-knowledge-index proofs still green; the latter's stub now passes split:async()=>[] so an unrelated proof does not make a Claude call. tsc + next lint clean.",
+      "next": "Persona chunks now get more independent shots at a retrieval seed slot and eat more of the 6000-char budget, duplicating text the model already has in the always-on block. Excluding originKind=='persona' from retrieve() would fix it but breaks universal-knowledge-index/proof.ts:148 — decide deliberately. Also stale: universal-knowledge-index/FEATURE.md:24 and the prisma/schema.prisma:52-54 comment still call persona a singleton origin id. Not yet clicked through in the admin (login required — Claude does not enter passwords)."
+    },
+    {
       "id": "canned-answers-and-brain",
       "title": "Canned answers served with zero API calls; chat brain extracted to lib/brain.ts",
       "feature_dir": "docs/features/canned-answers-and-brain",

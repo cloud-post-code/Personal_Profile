@@ -1,5 +1,6 @@
 import { prisma, getProfile } from "../db";
 import { personaPromptBlock } from "../persona";
+import { splitPersonaFacts, type PersonaFact } from "../personaFacts";
 import { safeExperience, safeTags } from "../knowledge";
 import { indexOrigin, dropOrigin, type IndexOpts } from "./indexer";
 
@@ -51,13 +52,74 @@ export async function indexProfile(opts: IndexOpts = {}): Promise<void> {
   );
 }
 
-/** The filled persona + agent-behavior sections. */
-export async function indexPersona(opts: IndexOpts = {}): Promise<void> {
+/** Origin id used when the persona is indexed as one undivided paragraph. */
+export const PERSONA_WHOLE_ID = "persona";
+/** Prefix for a single parsed persona claim, so `fact:x` can't collide with it. */
+export const PERSONA_FACT_PREFIX = "fact:";
+
+/** Replaceable splitter, so a proof can index the persona without a model call. */
+export type PersonaSplitter = (prose: string) => Promise<PersonaFact[]>;
+
+export type PersonaIndexOpts = IndexOpts & { split?: PersonaSplitter };
+
+/**
+ * The persona, parsed into one origin per claim it makes.
+ *
+ * The paragraph is split (lib/personaFacts.ts) and each claim indexed
+ * separately, so retrieval can match one specific thing rather than the
+ * average of everything the persona says, and each claim owns its own graph
+ * edges. When the split yields nothing — no API key, a failed pass, or a
+ * paragraph too short to be worth dividing — the whole paragraph is indexed
+ * under a single origin, exactly as it was before splitting existed.
+ *
+ * This does not change the always-on PERSONA block in the system prompt; the
+ * full paragraph still ships verbatim on every message.
+ */
+export async function indexPersona(opts: PersonaIndexOpts = {}): Promise<void> {
   const p = await getProfile();
-  await indexOrigin(
-    { kind: "persona", id: "persona", label: "Persona", text: personaPromptBlock(p.personaSections) },
-    opts,
-  );
+  const prose = personaPromptBlock(p.personaSections);
+  const facts = await (opts.split ?? splitPersonaFacts)(prose);
+
+  const written: string[] = [];
+  for (const f of facts) {
+    const id = `${PERSONA_FACT_PREFIX}${f.slug}`;
+    await indexOrigin(
+      { kind: "persona", id, label: `Persona — ${f.topic}`, text: f.text },
+      opts,
+    );
+    written.push(id);
+  }
+  if (!facts.length) {
+    // Empty prose lands here too, where indexOrigin retracts the origin.
+    await indexOrigin(
+      { kind: "persona", id: PERSONA_WHOLE_ID, label: "Persona", text: prose },
+      opts,
+    );
+    written.push(PERSONA_WHOLE_ID);
+  }
+
+  await sweepPersonaOrigins(written);
+}
+
+/**
+ * Drop every persona origin this pass didn't write.
+ *
+ * The set of claims changes shape whenever the paragraph is edited, and
+ * indexOrigin only ever replaces the id it was handed. Without this sweep a
+ * claim Blake deleted keeps its chunks and its graph edges forever — and
+ * retrieve() scans the whole chunk table, so the deleted text would go on being
+ * fed to the model as fact. Lives here rather than in the admin action so
+ * scripts/reindex.ts and indexEverything are cleaned up too.
+ */
+async function sweepPersonaOrigins(keep: string[]): Promise<void> {
+  const rows = await prisma.chunk.findMany({
+    where: { originKind: "persona" },
+    distinct: ["originId"],
+    select: { originId: true },
+  });
+  for (const r of rows) {
+    if (!keep.includes(r.originId)) await dropOrigin("persona", r.originId);
+  }
 }
 
 /** One project card: name, blurb, the longer write-up, and its tags. */

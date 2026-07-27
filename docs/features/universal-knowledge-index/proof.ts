@@ -60,6 +60,12 @@ async function main() {
       entities: [{ name: "Quillhaven Studio", type: "org" }],
       edges: [{ from: "Quillhaven Studio", to: "Tideglass", relation: "built" }],
     }),
+    // Index the persona as one undivided origin, which is what this proof was
+    // written against. Persona splitting has its own proof
+    // (docs/features/persona-knowledge-entries); leaving the real splitter in
+    // here would make a Claude call on every run and let a provider hiccup turn
+    // an unrelated proof red.
+    split: async () => [],
   };
 
   const before = await getProfile();
