@@ -20,6 +20,7 @@ export const CARD_TOOLS = [
   "show_projects",
   "show_project",
   "show_gallery",
+  "show_timeline",
   "show_contact_form",
   "show_booking",
 ] as const;

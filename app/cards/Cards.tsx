@@ -19,11 +19,18 @@ export type PhotoCard = {
   description: string;
   caption: string | null;
 };
+export type TimelineEntry = {
+  role: string;
+  company: string;
+  dates: string;
+  description: string;
+};
 export type UiBlock =
   | { type: "projects"; items: ProjectCard[] }
   | { type: "project"; item: ProjectCard | null }
   | { type: "gallery"; layout: "carousel" | "filmstrip"; items: PhotoCard[] }
   | { type: "contact" }
+  | { type: "timeline"; items: TimelineEntry[]; summary: string }
   | { type: "booking" };
 
 export function Cards({ block }: { block: UiBlock }) {
@@ -55,6 +62,10 @@ export function Cards({ block }: { block: UiBlock }) {
   }
   if (block.type === "contact") {
     return <ContactForm />;
+  }
+  if (block.type === "timeline") {
+    if (block.items.length === 0) return <Empty>No experience added yet.</Empty>;
+    return <Timeline items={block.items} summary={block.summary} />;
   }
   if (block.type === "booking") {
     return <BookingCard />;
@@ -414,6 +425,98 @@ function timeLabel(iso: string, tz: string): string {
     minute: "2-digit",
     ...(tz ? { timeZone: tz } : {}),
   });
+}
+
+/** How many roles show before the card offers to unfold the rest. */
+const TIMELINE_VISIBLE = 4;
+
+/**
+ * Work history as a vertical timeline: a rail down the left, a dot per role.
+ *
+ * Entries render in the order they were stored — see experienceTimelineBlock in
+ * lib/cards.ts for why nothing here tries to sort free-text dates.
+ *
+ * A long career would otherwise push the rest of the conversation off the
+ * screen, so only the first few roles are drawn until the visitor asks for the
+ * rest. The rail stops at the last dot on show rather than running past it,
+ * which is what makes it read as a timeline instead of a bordered list.
+ */
+function Timeline({ items, summary }: { items: TimelineEntry[]; summary: string }) {
+  const [all, setAll] = useState(false);
+  const shown = all ? items : items.slice(0, TIMELINE_VISIBLE);
+  const hidden = items.length - shown.length;
+
+  return (
+    <div data-fill="bg-soft" style={{ ...card, maxWidth: 480 }}>
+      <strong style={{ fontSize: 15, fontFamily: "var(--font-heading)" }}>Experience</strong>
+      {summary && (
+        <p style={{ color: "var(--on-bg-soft)", fontStyle: "italic", fontSize: 13, margin: "6px 0 0" }}>
+          {summary}
+        </p>
+      )}
+
+      <div style={{ marginTop: 14 }}>
+        {shown.map((e, i) => (
+          <div
+            key={`${e.role}-${e.company}-${i}`}
+            style={{
+              position: "relative",
+              paddingLeft: 20,
+              paddingBottom: i === shown.length - 1 ? 0 : 18,
+              // The rail is this element's left edge, so it spans exactly the
+              // entry it belongs to and ends with the final one.
+              borderLeft: `1px solid ${i === shown.length - 1 ? "transparent" : "var(--border)"}`,
+            }}
+          >
+            {/*
+              --accent-on-bg-soft, not --primary: the theme lets `surface`
+              double as `--primary`, which on the default palette paints a
+              navy dot onto a navy card. This token is derived by readableOn()
+              against this exact surface, so the dot survives any theme.
+            */}
+            <span
+              aria-hidden
+              style={{
+                position: "absolute",
+                left: -4.5,
+                top: 4,
+                width: 8,
+                height: 8,
+                borderRadius: 999,
+                background: "var(--accent-on-bg-soft)",
+              }}
+            />
+            {e.dates && (
+              <div style={{ fontSize: 11, color: "var(--accent-on-bg-soft)", marginBottom: 2 }}>
+                {e.dates}
+              </div>
+            )}
+            <div style={{ fontSize: 14, fontWeight: 600, color: "var(--on-bg-soft)" }}>
+              {e.role || e.company}
+            </div>
+            {e.company && e.role && (
+              <div style={{ fontSize: 13, color: "var(--on-bg-soft)", opacity: 0.8 }}>{e.company}</div>
+            )}
+            {e.description && (
+              <p style={{ fontSize: 13, color: "var(--on-bg-soft)", lineHeight: 1.55, marginTop: 5 }}>
+                {e.description}
+              </p>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {(hidden > 0 || all) && items.length > TIMELINE_VISIBLE && (
+        <button
+          onClick={() => setAll((v) => !v)}
+          aria-expanded={all}
+          style={{ ...linkBtn, cursor: "pointer", marginTop: 14 }}
+        >
+          {all ? "Show less ▴" : `${hidden} earlier role${hidden === 1 ? "" : "s"} ▾`}
+        </button>
+      )}
+    </div>
+  );
 }
 
 function ProjectCardView({ p, big }: { p: ProjectCard; big?: boolean }) {

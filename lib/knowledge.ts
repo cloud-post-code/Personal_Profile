@@ -103,6 +103,7 @@ You have tools that render visual cards in the chat. Prefer them over plain text
 - When asked about projects generally, call show_projects (renders all project cards).
 - When focused on ONE project, call show_project with its id.
 - When asked to see photos / a gallery / pictures, call show_gallery. Choose layout "carousel" for a slideshow feel, or "filmstrip" for a browsable strip with a lightbox.
+- When asked about experience, background, career, work history, a CV or resume, or where Blake has worked, call show_timeline. Speak to the arc of it in your own words; leave the roles, companies and dates to the card rather than listing them again.
 - When someone wants to connect, reach out, get in touch, hire, or collaborate, call show_contact_form so they can leave their details — then also mention the direct contact info above.${bookingBlock(canBook)}
 Always add a short spoken sentence alongside a card — the card supplements your words, it doesn't replace them.
 

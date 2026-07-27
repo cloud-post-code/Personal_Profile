@@ -1,7 +1,13 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { claude, claudeModel } from "@/lib/claude";
 import { buildSystemPrompt } from "@/lib/knowledge";
-import { allProjectsBlock, singleProjectBlock, galleryBlock, type UiBlock } from "@/lib/cards";
+import {
+  allProjectsBlock,
+  singleProjectBlock,
+  galleryBlock,
+  experienceTimelineBlock,
+  type UiBlock,
+} from "@/lib/cards";
 import { recordTurn } from "@/lib/activity";
 import { findServableCanned, recordCannedHit } from "@/lib/canned";
 import { bookingLive } from "@/lib/booking/service";
@@ -86,6 +92,12 @@ const TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: "show_timeline",
+    description:
+      "Render Blake's work history as a visual timeline of roles, each with its company, dates and what he did. Use when the visitor asks about his experience, background, career, work history, CV or resume, where he has worked, or what he did before.",
+    input_schema: { type: "object", properties: {} },
+  },
+  {
     name: "show_contact_form",
     description:
       "Render a contact form so the visitor can leave their name, email, and a message for Blake. Use this whenever someone wants to get in touch, connect, reach out, hire, or collaborate. Their submission is recorded for Blake.",
@@ -117,6 +129,8 @@ async function hydrate(name: string, input: Record<string, unknown>): Promise<Ui
       return singleProjectBlock(String(input.id ?? ""));
     case "show_gallery":
       return galleryBlock(input.layout === "carousel" ? "carousel" : "filmstrip");
+    case "show_timeline":
+      return experienceTimelineBlock();
     case "show_contact_form":
       return { type: "contact" };
     case "show_booking":

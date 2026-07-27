@@ -1,5 +1,5 @@
-import { prisma } from "./db";
-import { safeTags } from "./knowledge";
+import { prisma, getProfile } from "./db";
+import { safeTags, safeExperience } from "./knowledge";
 
 /**
  * Shapes the data the A2UI cards render. The chat route calls these to hydrate
@@ -25,11 +25,21 @@ export type PhotoCard = {
   caption: string | null;
 };
 
+export type TimelineEntry = {
+  role: string;
+  company: string;
+  dates: string;
+  description: string;
+};
+
 export type UiBlock =
   | { type: "projects"; items: ProjectCard[] }
   | { type: "project"; item: ProjectCard | null }
   | { type: "gallery"; layout: "carousel" | "filmstrip"; items: PhotoCard[] }
   | { type: "contact" }
+  // Entries in the order Blake stored them, and a one-paragraph summary that is
+  // his own prose, not a join of the entries.
+  | { type: "timeline"; items: TimelineEntry[]; summary: string }
   // The slots are deliberately NOT resolved here. They are live free/busy that
   // goes stale in minutes, and a card sitting in a scrolled-back chat carrying
   // baked-in times would offer a slot that is long gone. The card fetches
@@ -66,6 +76,23 @@ export async function allProjectsBlock(): Promise<UiBlock> {
 export async function singleProjectBlock(id: string): Promise<UiBlock> {
   const p = await prisma.project.findUnique({ where: { id } });
   return { type: "project", item: p ? toProjectCard(p) : null };
+}
+
+/**
+ * Blake's work history, straight off the Profile row.
+ *
+ * The stored order is preserved rather than sorted: `dates` is free text the
+ * admin types ("2021–2024", "Summer '19", "2023 – present"), and a sort that
+ * has to guess at that would reorder a correct list into a wrong one. The order
+ * in the Experience editor IS the order on the card.
+ */
+export async function experienceTimelineBlock(): Promise<UiBlock> {
+  const profile = await getProfile();
+  return {
+    type: "timeline",
+    items: safeExperience(profile.experience),
+    summary: profile.experienceSummary.trim(),
+  };
 }
 
 export async function galleryBlock(

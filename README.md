@@ -316,14 +316,17 @@ Notable properties:
 
 ## A2UI — agent-to-UI
 
-The brain gives Claude four tools and streams the results as renderable blocks:
+The brain gives Claude a set of tools and streams the results as renderable
+blocks:
 
 | Tool | Renders |
 |---|---|
 | `show_projects` | All project cards |
 | `show_project` | One project card, by id |
 | `show_gallery` | Photos as a `carousel` or a `filmstrip` with lightbox |
+| `show_timeline` | Work history as a vertical timeline, from `Profile.experience` |
 | `show_contact_form` | An in-chat contact form, posted to `/api/contact` |
+| `show_booking` | Real open times from the live calendar — offered only when booking is on and Google is connected |
 
 `hydrate()` turns a tool call into a concrete payload
 ([`lib/cards.ts`](lib/cards.ts)); [`app/cards/Cards.tsx`](app/cards/Cards.tsx)
