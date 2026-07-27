@@ -4,7 +4,8 @@ import { CardFields } from "./CardFields";
 import { panel, field, btn, btnGhost, btnDanger, SectionTitle, Label } from "./ui";
 
 /**
- * The "Answers" tab: replies to the questions visitors ask over and over,
+ * The "Preset Answers" sub-tab of the Activity section: replies to the
+ * questions visitors ask over and over,
  * served straight from the database with no model call.
  *
  * A row nobody has written yet arrives as an AI draft, written from the same
@@ -31,7 +32,7 @@ export function AnswersPanel({ rows }: { rows: Row[] }) {
   return (
     <div>
       <div style={panel}>
-        <SectionTitle>Answers</SectionTitle>
+        <SectionTitle>Preset Answers</SectionTitle>
         <p style={{ fontSize: 13, marginBottom: 12, lineHeight: 1.55 }}>
           When a visitor&apos;s question matches one of these, they get the stored
           words instantly and the model is never called. Matching ignores case,

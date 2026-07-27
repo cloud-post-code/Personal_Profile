@@ -627,7 +627,6 @@ export default async function Dashboard({
               />
             ),
           },
-          { key: "answers", label: "Answers", content: <AnswersPanel rows={canned} /> },
           {
             key: "graph",
             label: "Graph",
@@ -649,6 +648,7 @@ export default async function Dashboard({
                 ariaLabel="Activity sections"
                 tabs={[
                   { key: "activity", label: "Conversations", content: activityTab },
+                  { key: "answers", label: "Preset Answers", content: <AnswersPanel rows={canned} /> },
                   {
                     key: "contacts",
                     label: unhandled > 0 ? `Contacts · ${unhandled}` : "Contacts",

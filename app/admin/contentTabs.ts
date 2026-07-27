@@ -3,7 +3,7 @@ export const CONTENT_TAB_KEYS = ["projects", "knowledge", "photos"] as const;
 export type ContentTabKey = (typeof CONTENT_TAB_KEYS)[number];
 
 /** Keys of the sub-tabs inside the combined Activity section. */
-export const ACTIVITY_TAB_KEYS = ["activity", "contacts"] as const;
+export const ACTIVITY_TAB_KEYS = ["activity", "answers", "contacts"] as const;
 export type ActivityTabKey = (typeof ACTIVITY_TAB_KEYS)[number];
 
 /** Keys of the sub-tabs inside the combined Me section. */
@@ -12,10 +12,11 @@ export type MeTabKey = (typeof ME_TAB_KEYS)[number];
 
 /**
  * Deep-link resolution for the dashboard. `projects` and `knowledge` used to
- * be top-level nav keys and now live inside the Content section, `contacts`
- * now lives inside the Activity section, and `persona` now lives inside the
- * Me section — so an old `?tab=` link resolves to the combined entry opened
- * on that sub-tab; every other key passes through untouched.
+ * be top-level nav keys and now live inside the Content section, `answers`
+ * (shown as "Preset Answers") and `contacts` now live inside the Activity
+ * section, and `persona` now lives inside the Me section — so an old `?tab=`
+ * link resolves to the combined entry opened on that sub-tab; every other key
+ * passes through untouched.
  */
 export function resolveAdminTab(tab: string | undefined): {
   nav: string | undefined;
