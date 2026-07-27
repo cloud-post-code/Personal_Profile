@@ -104,6 +104,7 @@ export default async function Dashboard({
     gEntities,
     gEdges,
     gSuggestions,
+    gOverviews,
     canned,
   ] = await Promise.all([
       getProfile(),
@@ -125,6 +126,11 @@ export default async function Dashboard({
       listEntities(),
       listEdges(),
       suggestedMerges(),
+      prisma.chunk.findMany({
+        where: { originKind: "cluster" },
+        orderBy: { originLabel: "asc" },
+        select: { id: true, originLabel: true, text: true },
+      }),
       // The starter chips ask the same five questions forever, so they're
       // pre-created — and any row still blank gets a first draft written from
       // the knowledge base, so the tab opens on a review queue rather than a
@@ -833,6 +839,7 @@ export default async function Dashboard({
                 entities={gEntities}
                 edges={gEdges}
                 suggestions={gSuggestions}
+                overviews={gOverviews}
               />,
           },
           { key: "activity", label: "Activity", content: activityTab },

@@ -30,6 +30,9 @@ export const ORIGIN_LABELS: Record<string, string> = {
   photo: "Photos",
   source: "Knowledge",
   activity: "Approved answers",
+  // Synthesized neighborhood overviews (lib/retrieval/clusters.ts) — not an
+  // admin surface, but they appear in the Graph tab's per-origin breakdown.
+  cluster: "Overviews",
 };
 
 /** Bio, experience and the "everything else" block from the Profile tab. */

@@ -2,7 +2,8 @@ import { ORIGIN_LABELS } from "@/lib/retrieval/origins";
 import type { GraphEntity, GraphEdge, GraphStats, MergeSuggestion } from "@/lib/retrieval/graph";
 import { GraphView } from "./GraphView";
 import { RetrievalPlayground } from "./RetrievalPlayground";
-import { SectionTitle, Label } from "./ui";
+import { rebuildOverviews } from "./actions";
+import { SectionTitle, Label, btnGhost } from "./ui";
 
 /**
  * The Graph tab: index health up top, then the graph itself — as a picture, or
@@ -15,11 +16,13 @@ export function GraphPanel({
   entities,
   edges,
   suggestions,
+  overviews,
 }: {
   stats: GraphStats;
   entities: GraphEntity[];
   edges: GraphEdge[];
   suggestions: MergeSuggestion[];
+  overviews: { id: string; originLabel: string; text: string }[];
 }) {
   const mixedIndex = stats.embedModels.length > 1;
 
@@ -81,6 +84,35 @@ export function GraphPanel({
 
       <div style={{ borderTop: "1px solid var(--border)", marginTop: 18, paddingTop: 16 }}>
         <RetrievalPlayground />
+      </div>
+
+      {/* Neighborhood overviews — what broad questions are served instead of
+          chunks. Rebuilding is explicit: up to 6 Claude calls per press. */}
+      <div style={{ borderTop: "1px solid var(--border)", marginTop: 18, paddingTop: 16 }}>
+        <Label>
+          Overviews — one paragraph per neighborhood of the graph, served for broad questions
+          like &ldquo;tell me about Blake&rdquo;
+        </Label>
+        {overviews.length === 0 ? (
+          <p style={hint}>
+            None yet. Rebuild after the graph has some content — each rebuild summarizes up to 6
+            neighborhoods with one Claude call apiece.
+          </p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 10 }}>
+            {overviews.map((o) => (
+              <div key={o.id} style={overviewBox}>
+                <strong style={{ fontSize: 12, display: "block", marginBottom: 4 }}>
+                  {o.originLabel}
+                </strong>
+                <span style={{ fontSize: 13 }}>{o.text}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <form action={rebuildOverviews}>
+          <button style={{ ...btnGhost, padding: "6px 14px" }}>Rebuild overviews</button>
+        </form>
       </div>
 
       <div style={{ borderTop: "1px solid var(--border)", marginTop: 18, paddingTop: 16 }}>
@@ -151,6 +183,11 @@ const statLabel: React.CSSProperties = {
   textTransform: "uppercase",
   letterSpacing: "0.05em",
   marginTop: 2,
+};
+const overviewBox: React.CSSProperties = {
+  border: "1px solid var(--border)",
+  borderRadius: 10,
+  padding: "8px 12px",
 };
 const originPill: React.CSSProperties = {
   fontSize: 12,

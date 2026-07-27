@@ -685,6 +685,17 @@ export async function removeEntity(formData: FormData) {
   revalidatePath("/admin/dashboard");
 }
 
+/**
+ * Recompute graph neighborhoods and rewrite their overview paragraphs — up to
+ * 6 Claude calls, so it only runs when Blake presses the button.
+ */
+export async function rebuildOverviews() {
+  await requireAuth();
+  const { buildClusterOverviews } = await import("@/lib/retrieval/clusters");
+  await buildClusterOverviews().catch((e) => console.error("rebuildOverviews failed:", e));
+  revalidatePath("/admin/dashboard");
+}
+
 /** Read-only: what retrieve() returns for a question. No revalidate needed. */
 export async function previewRetrieval(query: string): Promise<RetrievalPreview> {
   await requireAuth();

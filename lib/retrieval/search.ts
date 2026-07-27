@@ -45,7 +45,12 @@ export async function retrieve(
 ): Promise<Retrieval> {
   const { seedLimit = 6, graphLimit = 4, charBudget = 6000 } = opts;
 
+  // Cluster overviews are synthesized FROM these chunks (lib/retrieval/
+  // clusters.ts) and are served whole for broad questions; letting them
+  // compete here would serve the same facts twice and crowd out primary
+  // sources under the char budget.
   const chunks = await prisma.chunk.findMany({
+    where: { originKind: { not: "cluster" } },
     include: { mentions: { select: { entityId: true } } },
   });
   if (chunks.length === 0) return { chunks: [], relations: [] };

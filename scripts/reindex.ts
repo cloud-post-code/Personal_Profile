@@ -57,6 +57,19 @@ async function main() {
     }
   }
   console.log(`Done: ${ok}/${sources.length} indexed`);
+  // --all finishes by rebuilding the neighborhood overviews: the graph the
+  // clusters are computed from has just been rewritten. One Claude call per
+  // cluster (max 6), same spend profile as the Graph tab's Rebuild button.
+  if (all) {
+    const { buildClusterOverviews } = await import("../lib/retrieval/clusters");
+    try {
+      const n = await buildClusterOverviews();
+      console.log(`${n} overview(s) rebuilt`);
+    } catch (e) {
+      console.error(`overview rebuild FAILED: ${e instanceof Error ? e.message : e}`);
+    }
+  }
+
   await prisma.$disconnect();
   if (ok < sources.length) process.exit(1);
 }

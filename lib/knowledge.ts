@@ -1,6 +1,7 @@
 import { prisma, getProfile } from "./db";
 import { personaPromptBlock } from "./persona";
 import { retrieve, formatContext } from "./retrieval/search";
+import { broadOverviews } from "./retrieval/clusters";
 import { googleConnected } from "./googleConnection";
 
 /**
@@ -121,6 +122,10 @@ RULES:
 async function knowledgeBlock(query: string | undefined, chunkCount: number): Promise<string> {
   if (query?.trim() && chunkCount > 0) {
     try {
+      // Broad questions ("tell me about Blake") get the curated neighborhood
+      // overviews; anything with a selective token falls through to chunks.
+      const broad = await broadOverviews(query);
+      if (broad) return broad;
       return formatContext(await retrieve(query));
     } catch {
       // Retrieval trouble shouldn't kill the chat — fall through to the dump.
