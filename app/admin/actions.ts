@@ -20,6 +20,7 @@ import {
   addEdge,
   deleteEdge,
   mergeEntities,
+  dismissMerge,
   retrievalPreview,
   type RetrievalPreview,
 } from "@/lib/retrieval/graph";
@@ -629,6 +630,16 @@ export async function previewRetrieval(query: string): Promise<RetrievalPreview>
 export async function mergeSuggestedEntities(formData: FormData) {
   await requireAuth();
   await mergeEntities(
+    String(formData.get("fromId") ?? ""),
+    String(formData.get("intoId") ?? ""),
+  );
+  revalidatePath("/admin/dashboard");
+}
+
+/** "Don't merge": persist that a suggested pair is not the same thing. */
+export async function dismissSuggestedMerge(formData: FormData) {
+  await requireAuth();
+  await dismissMerge(
     String(formData.get("fromId") ?? ""),
     String(formData.get("intoId") ?? ""),
   );

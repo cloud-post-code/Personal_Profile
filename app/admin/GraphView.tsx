@@ -10,6 +10,7 @@ import {
   createEntityEdge,
   removeEntityEdge,
   mergeSuggestedEntities,
+  dismissSuggestedMerge,
 } from "./actions";
 import { field, btn, btnGhost, btnDanger, Label } from "./ui";
 
@@ -88,8 +89,8 @@ function EntitiesPane({
 
 /**
  * Duplicate pairs the graph itself suggests (lib/retrieval/graph.ts
- * suggestedMerges). One click runs the same merge renaming onto an existing
- * name does; a suggestion the admin disagrees with is simply never clicked.
+ * suggestedMerges). Merge runs the same merge renaming onto an existing name
+ * does; Don't merge persists a dismissal so the pair is never suggested again.
  */
 function SuggestedMerges({ suggestions }: { suggestions: MergeSuggestion[] }) {
   return (
@@ -111,11 +112,20 @@ function SuggestedMerges({ suggestions }: { suggestions: MergeSuggestion[] }) {
                 — {s.reason}
               </span>
             </span>
-            <form action={mergeSuggestedEntities}>
-              <input type="hidden" name="fromId" value={s.fromId} />
-              <input type="hidden" name="intoId" value={s.intoId} />
-              <button style={{ ...btnGhost, padding: "3px 9px", fontSize: 12 }}>Merge</button>
-            </form>
+            <div style={{ display: "flex", gap: 6 }}>
+              <form action={mergeSuggestedEntities}>
+                <input type="hidden" name="fromId" value={s.fromId} />
+                <input type="hidden" name="intoId" value={s.intoId} />
+                <button style={{ ...btnGhost, padding: "3px 9px", fontSize: 12 }}>Merge</button>
+              </form>
+              <form action={dismissSuggestedMerge}>
+                <input type="hidden" name="fromId" value={s.fromId} />
+                <input type="hidden" name="intoId" value={s.intoId} />
+                <button style={{ ...btnGhost, padding: "3px 9px", fontSize: 12 }}>
+                  Don&apos;t merge
+                </button>
+              </form>
+            </div>
           </div>
         ))}
       </div>

@@ -230,7 +230,7 @@ const MAX_SUGGESTIONS = 20;
  * fuller names are usually canonical). Containment pairs sort first.
  */
 export async function suggestedMerges(): Promise<MergeSuggestion[]> {
-  const [entities, edges] = await Promise.all([
+  const [entities, edges, dismissals] = await Promise.all([
     prisma.entity.findMany({
       select: {
         id: true,
@@ -240,7 +240,9 @@ export async function suggestedMerges(): Promise<MergeSuggestion[]> {
       },
     }),
     prisma.entityEdge.findMany({ select: { fromId: true, toId: true } }),
+    prisma.mergeDismissal.findMany({ select: { keyA: true, keyB: true } }),
   ]);
+  const dismissed = new Set(dismissals.map((d) => pairKey(d.keyA, d.keyB)));
 
   const neighbors = new Map<string, Set<string>>();
   for (const e of edges) {
@@ -251,6 +253,7 @@ export async function suggestedMerges(): Promise<MergeSuggestion[]> {
   const rows = entities.map((e) => ({
     id: e.id,
     name: e.name,
+    key: e.key,
     condensed: e.key.replace(/[^a-z0-9]/g, ""),
     words: new Set(e.key.split(" ").filter((w) => w.length >= MIN_SHARED_WORD)),
     mentions: e._count.mentions,
@@ -282,6 +285,7 @@ export async function suggestedMerges(): Promise<MergeSuggestion[]> {
     for (let j = i + 1; j < rows.length; j++) {
       const a = rows[i];
       const b = rows[j];
+      if (dismissed.has(pairKey(a.key, b.key))) continue; // admin said "don't merge"
       let reason: string | null = null;
       let rank = 0;
       if (containment(a, b)) {
@@ -314,6 +318,36 @@ export async function suggestedMerges(): Promise<MergeSuggestion[]> {
     .sort((a, b) => b.rank - a.rank)
     .slice(0, MAX_SUGGESTIONS)
     .map(({ rank: _rank, ...s }) => s);
+}
+
+/** Order-independent dismissal key for a pair of normalized entity keys. */
+function pairKey(a: string, b: string): string {
+  return a < b ? `${a}\u0000${b}` : `${b}\u0000${a}`;
+}
+
+/**
+ * "Don't merge": persist that this suggested pair is not the same thing, so
+ * suggestedMerges() stops proposing it. Keyed by the pair's normalized entity
+ * keys (sorted, so direction doesn't matter) rather than ids — the judgment
+ * must survive entity rows being pruned and recreated on re-index. Fails soft
+ * on stale ids; repeating a dismissal is a no-op.
+ */
+export async function dismissMerge(fromId: string, intoId: string): Promise<boolean> {
+  if (!fromId || !intoId || fromId === intoId) return false;
+  const rows = await prisma.entity.findMany({
+    where: { id: { in: [fromId, intoId] } },
+    select: { key: true },
+  });
+  if (rows.length !== 2) return false;
+  const [keyA, keyB] = rows[0].key < rows[1].key
+    ? [rows[0].key, rows[1].key]
+    : [rows[1].key, rows[0].key];
+  await prisma.mergeDismissal.upsert({
+    where: { keyA_keyB: { keyA, keyB } },
+    update: {},
+    create: { keyA, keyB },
+  });
+  return true;
 }
 
 /**

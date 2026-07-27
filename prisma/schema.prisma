@@ -134,6 +134,19 @@ model EntityEdgeOrigin {
   @@index([originKind, originId])
 }
 
+/// A suggested-merge pair the admin rejected with "Don't merge". Keyed by the
+/// two entities' normalized keys, sorted (keyA < keyB), not their ids: entity
+/// rows get pruned and recreated as sources are re-indexed, and the judgment
+/// that two *names* are different things must survive that.
+model MergeDismissal {
+  id        String   @id @default(cuid())
+  keyA      String
+  keyB      String
+  createdAt DateTime @default(now())
+
+  @@unique([keyA, keyB])
+}
+
 /// An uploaded photo. On upload we ask Claude vision for a one-paragraph
 /// description; it's editable afterward. Exposed individually or in galleries.
 model Photo {
