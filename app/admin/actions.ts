@@ -154,6 +154,7 @@ export async function saveProfile(formData: FormData) {
       location: String(formData.get("location") ?? ""),
       email: String(formData.get("email") ?? ""),
       github: String(formData.get("github") ?? ""),
+      bookingLink: String(formData.get("bookingLink") ?? "").trim(),
       socials: JSON.stringify(socials),
       bio: String(formData.get("bio") ?? ""),
       experienceSummary: String(formData.get("experienceSummary") ?? ""),

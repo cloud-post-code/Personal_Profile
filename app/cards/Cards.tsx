@@ -29,9 +29,10 @@ export type UiBlock =
   | { type: "projects"; items: ProjectCard[] }
   | { type: "project"; item: ProjectCard | null }
   | { type: "gallery"; layout: "carousel" | "filmstrip"; items: PhotoCard[] }
-  | { type: "contact" }
+  | { type: "contact"; bookingLink?: string | null }
   | { type: "timeline"; items: TimelineEntry[]; summary: string }
-  | { type: "booking" };
+  | { type: "booking" }
+  | { type: "booking_link"; url: string; name: string };
 
 export function Cards({ block }: { block: UiBlock }) {
   if (block.type === "projects") {
@@ -61,7 +62,7 @@ export function Cards({ block }: { block: UiBlock }) {
     );
   }
   if (block.type === "contact") {
-    return <ContactForm />;
+    return <ContactForm bookingLink={block.bookingLink ?? null} />;
   }
   if (block.type === "timeline") {
     if (block.items.length === 0) return <Empty>No experience added yet.</Empty>;
@@ -70,10 +71,35 @@ export function Cards({ block }: { block: UiBlock }) {
   if (block.type === "booking") {
     return <BookingCard />;
   }
+  if (block.type === "booking_link") {
+    return <BookingLinkCard url={block.url} name={block.name} />;
+  }
   return null;
 }
 
-function ContactForm() {
+/** The external scheduler: one card, one button, opens in a new tab. */
+function BookingLinkCard({ url, name }: { url: string; name: string }) {
+  return (
+    <div data-fill="bg-soft" style={{ ...card, maxWidth: 440 }}>
+      <strong style={{ fontSize: 15, fontFamily: "var(--font-heading)" }}>
+        Book a time with {name}
+      </strong>
+      <p style={{ color: "var(--on-bg-soft)", fontStyle: "italic", fontSize: 13, margin: "6px 0 12px" }}>
+        Pick a slot that suits you — it goes straight onto the calendar.
+      </p>
+      <a
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        style={{ ...linkBtn, ...liveBtn, padding: "10px 18px", display: "inline-block" }}
+      >
+        Open booking page
+      </a>
+    </div>
+  );
+}
+
+function ContactForm({ bookingLink }: { bookingLink: string | null }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
@@ -155,6 +181,19 @@ function ContactForm() {
       >
         {state === "sending" ? "Sending…" : "Send to Blake"}
       </button>
+      {bookingLink && (
+        <p style={{ fontSize: 13, color: "var(--on-bg-soft)", margin: "12px 0 0" }}>
+          Rather talk it through?{" "}
+          <a
+            href={bookingLink}
+            target="_blank"
+            rel="noreferrer"
+            style={{ color: "var(--on-bg-soft)", textDecoration: "underline" }}
+          >
+            Book a time directly
+          </a>
+        </p>
+      )}
     </div>
   );
 }

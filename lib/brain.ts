@@ -6,6 +6,9 @@ import {
   singleProjectBlock,
   galleryBlock,
   experienceTimelineBlock,
+  contactBlock,
+  bookingLinkBlock,
+  bookingLinkUrl,
   type UiBlock,
 } from "@/lib/cards";
 import { recordTurn } from "@/lib/activity";
@@ -120,6 +123,20 @@ const BOOKING_TOOL: Anthropic.Tool = {
   input_schema: { type: "object", properties: {} },
 };
 
+/**
+ * Offered only when Blake has pasted an external booking link into the admin.
+ * Same withholding pattern as BOOKING_TOOL: a card whose button opens nothing
+ * is worse than no card, so an empty link means the tool does not exist.
+ */
+const BOOKING_LINK_TOOL: Anthropic.Tool = {
+  name: "show_booking_link",
+  description:
+    "Render a card linking to Blake's external booking page (Calendly-style), where the visitor " +
+    "picks a time themselves. Use when someone wants to schedule, meet, or asks for a scheduling " +
+    "link — unless show_booking is available, which shows live times and should be preferred.",
+  input_schema: { type: "object", properties: {} },
+};
+
 /** Turn a tool call into the UI block it names. Shared by both tiers. */
 async function hydrate(name: string, input: Record<string, unknown>): Promise<UiBlock | null> {
   switch (name) {
@@ -132,11 +149,14 @@ async function hydrate(name: string, input: Record<string, unknown>): Promise<Ui
     case "show_timeline":
       return experienceTimelineBlock();
     case "show_contact_form":
-      return { type: "contact" };
+      return contactBlock();
     case "show_booking":
       // Guarded here too, not just at tool-offer time: a canned answer can name
       // this tool, and it must not draw a booker after booking is switched off.
       return (await bookingLive()) ? { type: "booking" } : null;
+    case "show_booking_link":
+      // Null once the link is cleared, for the same canned-answer reason.
+      return bookingLinkBlock();
     default:
       return null;
   }
@@ -160,8 +180,14 @@ async function* runModel(
 ): AsyncGenerator<BrainEvent> {
   // The visitor's latest question drives retrieval: the prompt carries only the
   // knowledge relevant to it, not the whole source library.
-  const [system, canBook] = await Promise.all([buildSystemPrompt(message), bookingLive()]);
-  const tools = canBook ? [...TOOLS, BOOKING_TOOL] : TOOLS;
+  const [system, canBook, linkUrl] = await Promise.all([
+    buildSystemPrompt(message),
+    bookingLive(),
+    bookingLinkUrl(),
+  ]);
+  const tools = [...TOOLS];
+  if (canBook) tools.push(BOOKING_TOOL);
+  if (linkUrl) tools.push(BOOKING_LINK_TOOL);
   const convo: Anthropic.MessageParam[] = history.map((m) => ({
     role: m.role,
     content: m.content,

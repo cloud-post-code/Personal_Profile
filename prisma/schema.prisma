@@ -323,6 +323,10 @@ model Profile {
   bookingBufferMinutes Int @default(15)
   /// Shown as the calendar event's title, with the guest's name appended.
   bookingTitle     String  @default("Intro call")
+  /// External scheduling link (Calendly, Cal.com, …), independent of the native
+  /// booking card above. When set it appears on the contact card and the chat
+  /// gains a booking-link card; empty means the feature exists nowhere.
+  bookingLink      String  @default("")
 
   // ── Google Calendar connection (granted from the Booking tab) ──
   /// The OAuth refresh token, ENCRYPTED with AUTH_SECRET — never the raw token.

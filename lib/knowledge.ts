@@ -69,6 +69,7 @@ export async function buildSystemPrompt(query?: string): Promise<string> {
   // the instructions for it are withheld on the same condition — telling Claude
   // about a tool it hasn't been given is how you get an apology instead of a card.
   const canBook = profile.bookingEnabled && (await googleConnected());
+  const bookingLink = profile.bookingLink.trim();
 
   const personaBlock =
     personaPromptBlock(profile.personaSections) ||
@@ -105,7 +106,7 @@ You have tools that render visual cards in the chat. Prefer them over plain text
 - When focused on ONE project, call show_project with its id.
 - When asked to see photos / a gallery / pictures, call show_gallery. Choose layout "carousel" for a slideshow feel, or "filmstrip" for a browsable strip with a lightbox.
 - When asked about experience, background, career, work history, a CV or resume, or where Blake has worked, call show_timeline. Speak to the arc of it in your own words; leave the roles, companies and dates to the card rather than listing them again.
-- When someone wants to connect, reach out, get in touch, hire, or collaborate, call show_contact_form so they can leave their details — then also mention the direct contact info above.${bookingBlock(canBook)}
+- When someone wants to connect, reach out, get in touch, hire, or collaborate, call show_contact_form so they can leave their details — then also mention the direct contact info above.${bookingBlock(canBook, bookingLink)}
 Always add a short spoken sentence alongside a card — the card supplements your words, it doesn't replace them.
 
 RULES:
@@ -153,10 +154,21 @@ async function knowledgeBlock(query: string | undefined, chunkCount: number): Pr
  * Booking beats the contact form when the visitor wants a conversation: one is
  * a confirmed meeting, the other is a message in a queue.
  */
-function bookingBlock(canBook: boolean): string {
-  if (!canBook) return "";
-  return `
-- When someone wants to meet, talk, book a call, get time on the calendar, or asks when Blake is free, call show_booking. It shows his REAL open times from his live calendar and confirms the meeting on the spot — prefer it over show_contact_form whenever a conversation is what they want. Never state specific available times yourself; you don't have them, the card does.`;
+function bookingBlock(canBook: boolean, bookingLink: string): string {
+  const lines: string[] = [];
+  if (canBook) {
+    lines.push(
+      `\n- When someone wants to meet, talk, book a call, get time on the calendar, or asks when Blake is free, call show_booking. It shows his REAL open times from his live calendar and confirms the meeting on the spot — prefer it over show_contact_form whenever a conversation is what they want. Never state specific available times yourself; you don't have them, the card does.`,
+    );
+  }
+  if (bookingLink) {
+    lines.push(
+      canBook
+        ? `\n- show_booking_link renders a card linking to Blake's external booking page. Prefer show_booking's live times; use show_booking_link only when the visitor asks for a link to schedule later or share with someone else.`
+        : `\n- When someone wants to meet, talk, book a call, or find a time, call show_booking_link — it renders a card linking to Blake's booking page, where they pick a time themselves. Prefer it over show_contact_form whenever a conversation is what they want.`,
+    );
+  }
+  return lines.join("");
 }
 
 function connectBlock(p: {

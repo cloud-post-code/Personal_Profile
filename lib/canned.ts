@@ -23,6 +23,7 @@ export const CARD_TOOLS = [
   "show_timeline",
   "show_contact_form",
   "show_booking",
+  "show_booking_link",
 ] as const;
 
 export type CardTool = (typeof CARD_TOOLS)[number];

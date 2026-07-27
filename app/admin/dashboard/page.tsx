@@ -209,6 +209,19 @@ export default async function Dashboard({
             <input name="github" defaultValue={profile.github} style={field} />
           </div>
         </div>
+        <div style={{ marginBottom: 14 }}>
+          <Label>Booking link</Label>
+          <input
+            name="bookingLink"
+            defaultValue={profile.bookingLink}
+            placeholder="https://calendly.com/you/intro"
+            style={field}
+          />
+          <p style={{ fontSize: 12, color: "var(--on-surface)", fontStyle: "italic", margin: "4px 0 0" }}>
+            A Calendly / Cal.com style link. When set, it appears on the contact card and the
+            chat can offer it as its own booking card.
+          </p>
+        </div>
 
         <Label>Social media (add one at a time)</Label>
         <SocialsEditor initial={socials} />
