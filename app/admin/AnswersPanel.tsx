@@ -4,7 +4,7 @@ import { CardFields } from "./CardFields";
 import { panel, field, btn, btnGhost, btnDanger, SectionTitle, Label } from "./ui";
 
 /**
- * The "Preset Answers" sub-tab of the Activity section: replies to the
+ * The "Presets" sub-tab of the Agent Behavior section: replies to the
  * questions visitors ask over and over,
  * served straight from the database with no model call.
  *

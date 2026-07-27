@@ -580,6 +580,40 @@ export default async function Dashboard({
     </section>
   );
 
+  // ── AGENT BEHAVIOR TAB — how the chatbot answers and acts ──
+  const goalsTab = (
+    <section data-fill="surface" style={panel}>
+      <SectionTitle>Goals</SectionTitle>
+      <p style={{ color: "var(--on-surface)", fontStyle: "italic", fontSize: 13, marginBottom: 14 }}>
+        What the chatbot should steer conversations toward — the outcomes you
+        want from a visitor chat.
+      </p>
+      <Empty>Nothing here yet. Goals you add will appear here.</Empty>
+    </section>
+  );
+
+  const rulesTab = (
+    <section data-fill="surface" style={panel}>
+      <SectionTitle>Rules</SectionTitle>
+      <p style={{ color: "var(--on-surface)", fontStyle: "italic", fontSize: 13, marginBottom: 14 }}>
+        Hard rules the chatbot must follow — things it should always or never do,
+        regardless of what a visitor asks.
+      </p>
+      <Empty>Nothing here yet. Rules you add will appear here.</Empty>
+    </section>
+  );
+
+  const a2uiTab = (
+    <section data-fill="surface" style={panel}>
+      <SectionTitle>A2UI</SectionTitle>
+      <p style={{ color: "var(--on-surface)", fontStyle: "italic", fontSize: 13, marginBottom: 14 }}>
+        Controls for the rich cards the chatbot can show in a conversation —
+        projects, photos, contact form and booking.
+      </p>
+      <Empty>Nothing here yet. A2UI settings will appear here.</Empty>
+    </section>
+  );
+
   return (
     <main style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 20px 80px" }}>
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
@@ -608,11 +642,11 @@ export default async function Dashboard({
                 tabs={[
                   { key: "profile", label: "Profile", content: profileTab },
                   { key: "persona", label: "Persona", content: personaTab },
+                  { key: "theme", label: "Theme", content: themeTab },
                 ]}
               />
             ),
           },
-          { key: "theme", label: "Theme", content: themeTab },
           {
             key: "content",
             label: "Content",
@@ -648,12 +682,27 @@ export default async function Dashboard({
                 ariaLabel="Activity sections"
                 tabs={[
                   { key: "activity", label: "Conversations", content: activityTab },
-                  { key: "answers", label: "Preset Answers", content: <AnswersPanel rows={canned} /> },
                   {
                     key: "contacts",
                     label: unhandled > 0 ? `Contacts · ${unhandled}` : "Contacts",
                     content: contactsTab,
                   },
+                ]}
+              />
+            ),
+          },
+          {
+            key: "agent",
+            label: "Agent Behavior",
+            content: (
+              <SubTabs
+                initial={initialSub}
+                ariaLabel="Agent Behavior sections"
+                tabs={[
+                  { key: "answers", label: "Presets", content: <AnswersPanel rows={canned} /> },
+                  { key: "goals", label: "Goals", content: goalsTab },
+                  { key: "rules", label: "Rules", content: rulesTab },
+                  { key: "a2ui", label: "A2UI", content: a2uiTab },
                 ]}
               />
             ),
