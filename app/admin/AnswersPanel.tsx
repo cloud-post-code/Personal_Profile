@@ -1,5 +1,6 @@
-import { CARD_TOOLS, cannedStats } from "@/lib/canned";
+import { cannedStats } from "@/lib/canned";
 import { saveCanned, deleteCanned, redraftCanned } from "./actions";
+import { CardFields } from "./CardFields";
 import { panel, field, btn, btnGhost, btnDanger, SectionTitle, Label } from "./ui";
 
 /**
@@ -95,28 +96,7 @@ function AnswerForm({ row }: { row?: Row }) {
         }}
       />
 
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
-        <div style={{ flex: "1 1 200px" }}>
-          <Label>Show a card</Label>
-          <select name="cardTool" defaultValue={row?.cardTool ?? ""} style={field}>
-            <option value="">No card</option>
-            {CARD_TOOLS.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div style={{ flex: "1 1 200px" }}>
-          <Label>Card options (JSON)</Label>
-          <input
-            name="cardInput"
-            defaultValue={row?.cardInput ?? ""}
-            placeholder='{"layout":"filmstrip"}'
-            style={field}
-          />
-        </div>
-      </div>
+      <CardFields savedTool={row?.cardTool ?? ""} savedInput={row?.cardInput ?? ""} />
 
       <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
         <label style={{ fontSize: 13, display: "flex", gap: 6, alignItems: "center" }}>

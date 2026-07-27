@@ -289,11 +289,98 @@ async function main() {
     await prisma.$disconnect();
   }
 
+  // 15 ── The admin card fields survive the reset React runs after a save.
+  // Last, and after the database work: this installs browser globals for the
+  // rest of the process, which nothing above should ever see.
+  await checkCardFieldsSurviveSave();
+
   if (failures > 0) {
     console.error(`\n${failures} assertion(s) failed`);
     process.exit(1);
   }
   console.log("\nAll proof assertions passed");
+}
+
+/**
+ * Blake picks a card, saves, and the card is still on screen — the assertion
+ * that would have caught the row coming back as "No card" and being wiped by
+ * the next save.
+ *
+ * The real `CardFields` is mounted in a real DOM and driven the way React
+ * drives it around a form action: the fields change, the form resets (React
+ * resets a form once its action resolves), and the row re-renders with what the
+ * database now holds. The second reset is the save that changes nothing — the
+ * case that has no re-render to repair the fields afterwards.
+ */
+async function checkCardFieldsSurviveSave() {
+  const { JSDOM } = await import("jsdom");
+  const dom = new JSDOM("<!doctype html><html><body><div id='root'></div></body></html>", {
+    pretendToBeVisual: true,
+    url: "http://localhost/",
+  });
+  const globals = globalThis as unknown as Record<string, unknown>;
+  globals.window = dom.window;
+  globals.document = dom.window.document;
+  Object.defineProperty(globalThis, "navigator", {
+    value: dom.window.navigator,
+    configurable: true,
+  });
+  globals.HTMLElement = dom.window.HTMLElement;
+  globals.Element = dom.window.Element;
+  globals.Node = dom.window.Node;
+  globals.Event = dom.window.Event;
+  globals.IS_REACT_ACT_ENVIRONMENT = true;
+
+  const React = (await import("react")).default;
+  // The admin components are compiled by Next with the automatic JSX runtime;
+  // tsx compiles them with the classic one, which expects `React` in scope.
+  (globals as { React?: unknown }).React = React;
+  const { act } = await import("react");
+  const { createRoot } = await import("react-dom/client");
+  const { CardFields } = await import("../../../app/admin/CardFields");
+
+  const container = dom.window.document.getElementById("root")!;
+  const root = createRoot(container);
+  const row = (tool: string, input: string) =>
+    React.createElement(
+      "form",
+      null,
+      React.createElement(CardFields, { savedTool: tool, savedInput: input }),
+    );
+  const select = () => container.querySelector("select[name=cardTool]") as HTMLSelectElement;
+  const options = () => container.querySelector("input[name=cardInput]") as HTMLInputElement;
+  const form = () => container.querySelector("form") as HTMLFormElement;
+
+  await act(async () => {
+    root.render(row("", ""));
+  });
+
+  await act(async () => {
+    select().value = "show_projects";
+    select().dispatchEvent(new dom.window.Event("change", { bubbles: true }));
+    options().value = '{"layout":"filmstrip"}';
+    options().dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+  });
+  check("picking a card shows it", select().value === "show_projects", select().value);
+
+  // Save: React resets the form, and the row re-renders as it is now stored.
+  await act(async () => {
+    form().reset();
+    root.render(row("show_projects", '{"layout":"filmstrip"}'));
+  });
+  check("the saved card is still shown after saving",
+    select().value === "show_projects", select().value);
+  check("the saved card options are still shown after saving",
+    options().value === '{"layout":"filmstrip"}', options().value);
+
+  // Saving again changes nothing, so nothing re-renders to undo the reset.
+  await act(async () => {
+    form().reset();
+  });
+  check("saving again does not clear the card",
+    select().value === "show_projects", select().value);
+  check("saving again does not clear the card options",
+    options().value === '{"layout":"filmstrip"}', options().value);
 }
 
 main().catch((e) => {

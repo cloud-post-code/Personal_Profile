@@ -66,6 +66,14 @@ brain, asserts, then deletes everything it made.
     table is a no-op, so a starter Blake deletes stays deleted.
 14. **Cleanup** — `CannedAnswer`, `Project`, `ChatSession`, and `ChatMessage`
     counts return to their pre-run baseline.
+15. **A saved card stays on screen** — the real `CardFields` is mounted in a
+    real DOM and driven the way React drives a row around a form action: Blake
+    picks a card, the form resets (React resets a form once its action
+    resolves), and the row re-renders as it is now stored. The card and its
+    options are still shown, and still shown after a second save that changes
+    nothing — the case with no re-render to repair the fields afterwards.
+    Without this, a saved card came back as "No card" and the next save wrote
+    that emptiness to the database.
 
 Expected evidence: every assertion prints `PASS`, followed by
 `All proof assertions passed`; exit code 0.
@@ -80,6 +88,8 @@ Expected evidence: every assertion prints `PASS`, followed by
 ## Environment And Data
 - Local dev Postgres container `blake-pg` on port 5433, `DATABASE_URL` in `.env`.
 - The `CannedAnswer` migration must be applied before the run.
+- Assertion 15 renders in `jsdom` (devDependency). It runs last and installs
+  browser globals for the rest of the process, so nothing above can see them.
 - No `ANTHROPIC_API_KEY` is required: the canned path makes no call, and the
   model path is driven by an injected double.
 
@@ -93,6 +103,9 @@ Expected evidence: every assertion prints `PASS`, followed by
   pass by storing a pre-baked card payload.
 - The proof must not import from `app/api/chat/route.ts`; if the brain still
   lived there, the import of `lib/brain` would fail.
+- Assertion 15 reads the live DOM values of the real `CardFields` after real
+  React commits, so a component that merely renders the right markup once — the
+  shape that produced the bug — cannot pass it.
 
 ## Red Expectation
 Before implementation the script fails at import time: `lib/brain.ts` does not
