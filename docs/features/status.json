@@ -175,6 +175,14 @@
       "proof": "docs/features/booking-link/PROOF.md",
       "status": "done",
       "notes": "Profile.bookingLink (admin Profile tab, saved by saveProfile). contact block now carries bookingLink and the form renders a 'Book a time directly' link; new booking_link block + show_booking_link tool, offered only when the link is set (withheld like show_booking), hydration guarded for canned answers, listed in CARD_TOOLS so the Answers dropdown picks it up. Prompt ranks the native live booker above the link when both exist. Proof: docs/features/booking-link/proof.ts (10 assertions green); booking-card proof still green; gate PASS."
+    },
+    {
+      "id": "admin-content-tabs",
+      "title": "Combined Content section: Projects / Knowledge / Photos sub-tabs + 'Me' nav button",
+      "feature_dir": "docs/features/admin-content-tabs",
+      "proof": "docs/features/admin-content-tabs/PROOF.md",
+      "status": "done",
+      "notes": "Dashboard nav restructured: Projects and Knowledge merged into one 'Content' entry with a horizontal SubTabs strip (Projects | Knowledge | Photos) at the top of the page; Photos promoted out of the Knowledge tab; Profile entry relabeled 'Me' (key unchanged). Legacy ?tab=projects/knowledge deep links resolve into the Content section via resolveAdminTab (app/admin/contentTabs.ts). Proof: docs/features/admin-content-tabs/proof.ts (17 assertions green); gate PASS."
     }
   ]
 }

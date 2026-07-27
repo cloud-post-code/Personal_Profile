@@ -236,6 +236,40 @@ select {
   box-shadow: var(--glow-primary);
 }
 
+/* Horizontal sub-tab strip at the top of a dashboard section (Content page). */
+.admin-subtabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.admin-subtab {
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text);
+  font-style: italic;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.admin-subtab:hover {
+  background: var(--bg-soft);
+  color: var(--on-bg-soft);
+}
+
+.admin-subtab[aria-selected="true"] {
+  background: var(--primary);
+  color: var(--on-primary);
+  font-style: normal;
+  box-shadow: var(--glow-primary);
+}
+
 @media (max-width: 860px) {
   .admin-shell {
     grid-template-columns: minmax(0, 1fr);

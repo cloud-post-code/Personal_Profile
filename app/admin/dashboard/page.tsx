@@ -39,6 +39,8 @@ import { seedStarterAnswers, listCannedAnswers } from "@/lib/canned";
 import { draftBlankAnswers } from "@/lib/answerDrafts";
 import { ProjectRow } from "../ProjectRow";
 import { Tabs } from "../Tabs";
+import { SubTabs } from "../SubTabs";
+import { resolveAdminTab } from "../contentTabs";
 import { SaveButton } from "../SaveButton";
 import { AutoUploadFile } from "../AutoUploadFile";
 import { ThemePicker } from "../ThemePicker";
@@ -58,6 +60,9 @@ export default async function Dashboard({
 
   const query = await searchParams;
   const one = (k: string) => (Array.isArray(query[k]) ? query[k][0] : query[k]);
+  // Legacy ?tab=projects / ?tab=knowledge links open the Content section on
+  // that sub-tab; every other key still targets its own nav entry.
+  const { nav: initialNav, sub: initialSub } = resolveAdminTab(one("tab"));
 
   const [
     profile,
@@ -398,7 +403,7 @@ export default async function Dashboard({
     </section>
   );
 
-  // ── PHOTOS (rendered inside the Knowledge tab) ──
+  // ── PHOTOS (its own tab in the Content section) ──
   const photosSection = (
     <section data-fill="surface" style={panel}>
       <SectionTitle>Photos (auto-described by Claude vision)</SectionTitle>
@@ -591,20 +596,23 @@ export default async function Dashboard({
       </header>
 
       <Tabs
-        initial={one("tab")}
+        initial={initialNav}
         tabs={[
-          { key: "profile", label: "Profile", content: profileTab },
+          { key: "profile", label: "Me", content: profileTab },
           { key: "persona", label: "Persona", content: personaTab },
           { key: "theme", label: "Theme", content: themeTab },
-          { key: "projects", label: "Projects", content: projectsTab },
           {
-            key: "knowledge",
-            label: "Knowledge",
+            key: "content",
+            label: "Content",
             content: (
-              <>
-                {knowledgeTab}
-                {photosSection}
-              </>
+              <SubTabs
+                initial={initialSub}
+                tabs={[
+                  { key: "projects", label: "Projects", content: projectsTab },
+                  { key: "knowledge", label: "Knowledge", content: knowledgeTab },
+                  { key: "photos", label: "Photos", content: photosSection },
+                ]}
+              />
             ),
           },
           { key: "answers", label: "Answers", content: <AnswersPanel rows={canned} /> },
