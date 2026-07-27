@@ -598,8 +598,20 @@ export default async function Dashboard({
       <Tabs
         initial={initialNav}
         tabs={[
-          { key: "profile", label: "Me", content: profileTab },
-          { key: "persona", label: "Persona", content: personaTab },
+          {
+            key: "profile",
+            label: "Me",
+            content: (
+              <SubTabs
+                initial={initialSub}
+                ariaLabel="Me sections"
+                tabs={[
+                  { key: "profile", label: "Profile", content: profileTab },
+                  { key: "persona", label: "Persona", content: personaTab },
+                ]}
+              />
+            ),
+          },
           { key: "theme", label: "Theme", content: themeTab },
           {
             key: "content",
@@ -627,8 +639,25 @@ export default async function Dashboard({
                 overviews={gOverviews}
               />,
           },
-          { key: "activity", label: "Activity", content: activityTab },
-          { key: "contacts", label: "Contacts", badge: unhandled, content: contactsTab },
+          {
+            key: "activity",
+            label: "Activity",
+            badge: unhandled,
+            content: (
+              <SubTabs
+                initial={initialSub}
+                ariaLabel="Activity sections"
+                tabs={[
+                  { key: "activity", label: "Conversations", content: activityTab },
+                  {
+                    key: "contacts",
+                    label: unhandled > 0 ? `Contacts · ${unhandled}` : "Contacts",
+                    content: contactsTab,
+                  },
+                ]}
+              />
+            ),
+          },
         ]}
       />
     </main>
