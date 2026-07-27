@@ -419,8 +419,8 @@ export default async function Dashboard({
     </section>
   );
 
-  // ── PHOTOS TAB ──
-  const photosTab = (
+  // ── PHOTOS (rendered inside the Knowledge tab) ──
+  const photosSection = (
     <section data-fill="surface" style={panel}>
       <SectionTitle>Photos (auto-described by Claude vision)</SectionTitle>
       <form action={uploadPhoto} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
@@ -812,14 +812,22 @@ export default async function Dashboard({
           { key: "persona", label: "Persona", content: personaTab },
           { key: "theme", label: "Theme", content: themeTab },
           { key: "projects", label: "Projects", content: projectsTab },
-          { key: "knowledge", label: "Knowledge", content: knowledgeTab },
+          {
+            key: "knowledge",
+            label: "Knowledge",
+            content: (
+              <>
+                {knowledgeTab}
+                {photosSection}
+              </>
+            ),
+          },
           { key: "answers", label: "Answers", content: <AnswersPanel rows={canned} /> },
           {
             key: "graph",
             label: "Graph",
             content: <GraphPanel stats={gStats} entities={gEntities} edges={gEdges} />,
           },
-          { key: "photos", label: "Photos", content: photosTab },
           { key: "activity", label: "Activity", content: activityTab },
           { key: "contacts", label: "Contacts", badge: unhandled, content: contactsTab },
           { key: "booking", label: "Booking", badge: bookings.length, content: bookingTab },
