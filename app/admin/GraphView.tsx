@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { ENTITY_TYPES_LIST } from "@/lib/retrieval/entities";
 import type { GraphEntity, GraphEdge, MergeSuggestion } from "@/lib/retrieval/graph";
-import { GraphCanvas } from "./GraphCanvas";
 import {
   saveEntity,
   removeEntity,
@@ -15,49 +14,18 @@ import {
 import { field, btn, btnGhost, btnDanger, Label } from "./ui";
 
 /**
- * The graph, three ways: a rendered node-link picture, and paginated Entities
- * and Relations lists for editing. A picture makes structural faults obvious
- * that a list hides — a hub every edge runs through, a cluster with no link to
- * the person the site is about, a duplicate sitting beside its twin.
+ * The graph's editing lists: paginated Entities and Relations panes, mounted
+ * as sub-tabs of the Graph section (GraphPanel). The rendered node-link
+ * picture lives on the Graph sub-tab (GraphCanvas), where structural faults a
+ * list hides stay obvious — a hub every edge runs through, a cluster with no
+ * link to the person the site is about, a duplicate sitting beside its twin.
  */
 
 const PAGE_SIZE = 20;
-type Pane = "visual" | "entities" | "relations";
-
-export function GraphView({
-  entities,
-  edges,
-  suggestions,
-}: {
-  entities: GraphEntity[];
-  edges: GraphEdge[];
-  suggestions: MergeSuggestion[];
-}) {
-  const [pane, setPane] = useState<Pane>("visual");
-
-  return (
-    <div>
-      <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
-        <PaneTab on={pane === "visual"} onClick={() => setPane("visual")}>Visual graph</PaneTab>
-        <PaneTab on={pane === "entities"} onClick={() => setPane("entities")}>
-          Entities <Count n={entities.length} />
-          {suggestions.length > 0 && <Count n={suggestions.length} danger />}
-        </PaneTab>
-        <PaneTab on={pane === "relations"} onClick={() => setPane("relations")}>
-          Relations <Count n={edges.length} />
-        </PaneTab>
-      </div>
-
-      {pane === "visual" && <GraphCanvas entities={entities} edges={edges} />}
-      {pane === "entities" && <EntitiesPane entities={entities} suggestions={suggestions} />}
-      {pane === "relations" && <RelationsPane entities={entities} edges={edges} />}
-    </div>
-  );
-}
 
 // ── Entities ────────────────────────────────────────────────────────────────
 
-function EntitiesPane({
+export function EntitiesPane({
   entities,
   suggestions,
 }: {
@@ -175,7 +143,7 @@ function EntityRow({ entity }: { entity: GraphEntity }) {
 
 // ── Relations ───────────────────────────────────────────────────────────────
 
-function RelationsPane({ entities, edges }: { entities: GraphEntity[]; edges: GraphEdge[] }) {
+export function RelationsPane({ entities, edges }: { entities: GraphEntity[]; edges: GraphEdge[] }) {
   const [page, setPage] = useState(0);
   const shown = edges.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
 
@@ -269,42 +237,10 @@ function Pager({
   );
 }
 
-function PaneTab({
-  on,
-  onClick,
-  children,
-}: {
-  on: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        padding: "7px 14px",
-        borderRadius: "var(--radius-pill)",
-        border: on ? "1px solid transparent" : "1px solid var(--border)",
-        background: on ? "var(--primary)" : "transparent",
-        color: on ? "var(--on-primary)" : "inherit",
-        fontSize: 13,
-        fontWeight: 600,
-        fontStyle: on ? "normal" : "italic",
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 6,
-      }}
-    >
-      {children}
-    </button>
-  );
-}
-
-// No colour override on the danger variant: the tab's own background swaps
+// No colour override on the danger variant: the sub-tab's own background swaps
 // between --primary and transparent, and a fixed danger colour can vanish
 // against either on some palettes. The glyph carries the warning by itself.
-function Count({ n, danger }: { n: number; danger?: boolean }) {
+export function Count({ n, danger }: { n: number; danger?: boolean }) {
   return (
     <span
       style={{ fontSize: 11, opacity: 0.75, fontWeight: 700 }}

@@ -5,14 +5,18 @@ import { useState } from "react";
 /**
  * Horizontal tab strip across the top of a dashboard section. Same contract
  * as Tabs, but rendered as a bar above the panel instead of a side menu —
- * used for the Content section's Projects / Knowledge / Photos split.
+ * used for the Content section's Projects / Knowledge / Photos split and the
+ * Graph section's Graph / Test / Entities / Relationships / Overviews split.
+ * Labels may be nodes so a tab can carry a count badge.
  */
 export function SubTabs({
   tabs,
   initial,
+  ariaLabel = "Content sections",
 }: {
-  tabs: { key: string; label: string; content: React.ReactNode }[];
+  tabs: { key: string; label: React.ReactNode; content: React.ReactNode }[];
   initial?: string;
+  ariaLabel?: string;
 }) {
   const [active, setActive] = useState(
     tabs.some((t) => t.key === initial) ? initial : tabs[0]?.key,
@@ -21,7 +25,7 @@ export function SubTabs({
 
   return (
     <div>
-      <div className="admin-subtabs" role="tablist" aria-label="Content sections">
+      <div className="admin-subtabs" role="tablist" aria-label={ariaLabel}>
         {tabs.map((t) => {
           const on = t.key === current?.key;
           return (

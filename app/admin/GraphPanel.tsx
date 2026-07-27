@@ -1,15 +1,18 @@
 import { ORIGIN_LABELS } from "@/lib/retrieval/origins";
 import type { GraphEntity, GraphEdge, GraphStats, MergeSuggestion } from "@/lib/retrieval/graph";
-import { GraphView } from "./GraphView";
+import { GraphCanvas } from "./GraphCanvas";
+import { Count, EntitiesPane, RelationsPane } from "./GraphView";
 import { RetrievalPlayground } from "./RetrievalPlayground";
+import { SubTabs } from "./SubTabs";
 import { rebuildOverviews } from "./actions";
 import { SectionTitle, Label, btnGhost } from "./ui";
 
 /**
- * The Graph tab: index health up top, then the graph itself — as a picture, or
- * as editable Entities / Relations lists (see GraphView). A wrong or duplicated
- * entity here shows up as a worse chatbot answer, so this is where it gets
- * corrected.
+ * The Graph section, split into five sub-tabs: Graph (index health + the
+ * node-link picture), Test (retrieval playground), Entities and Relationships
+ * (the editing panes, counts in the tab labels), and Overviews. A wrong or
+ * duplicated entity here shows up as a worse chatbot answer, so this is where
+ * it gets corrected.
  */
 export function GraphPanel({
   stats,
@@ -24,8 +27,6 @@ export function GraphPanel({
   suggestions: MergeSuggestion[];
   overviews: { id: string; originLabel: string; text: string }[];
 }) {
-  const mixedIndex = stats.embedModels.length > 1;
-
   return (
     <section data-fill="surface" style={panel}>
       <SectionTitle>Knowledge graph</SectionTitle>
@@ -36,6 +37,59 @@ export function GraphPanel({
         to find facts a plain keyword match would miss.
       </p>
 
+      <SubTabs
+        ariaLabel="Graph sections"
+        tabs={[
+          {
+            key: "graph",
+            label: "Graph",
+            content: <GraphTab stats={stats} entities={entities} edges={edges} />,
+          },
+          { key: "test", label: "Test", content: <RetrievalPlayground /> },
+          {
+            key: "entities",
+            label: (
+              <>
+                Entities <Count n={entities.length} />
+                {suggestions.length > 0 && <Count n={suggestions.length} danger />}
+              </>
+            ),
+            content: <EntitiesPane entities={entities} suggestions={suggestions} />,
+          },
+          {
+            key: "relations",
+            label: (
+              <>
+                Relationships <Count n={edges.length} />
+              </>
+            ),
+            content: <RelationsPane entities={entities} edges={edges} />,
+          },
+          {
+            key: "overviews",
+            label: "Overviews",
+            content: <OverviewsTab overviews={overviews} />,
+          },
+        ]}
+      />
+    </section>
+  );
+}
+
+/** Index health up top, then the graph itself as a picture. */
+function GraphTab({
+  stats,
+  entities,
+  edges,
+}: {
+  stats: GraphStats;
+  entities: GraphEntity[];
+  edges: GraphEdge[];
+}) {
+  const mixedIndex = stats.embedModels.length > 1;
+
+  return (
+    <div>
       <div style={statGrid}>
         <Stat label="Sources" value={stats.sources} />
         <Stat label="Chunks" value={stats.chunks} />
@@ -82,43 +136,49 @@ export function GraphPanel({
         </p>
       )}
 
-      <div style={{ borderTop: "1px solid var(--border)", marginTop: 18, paddingTop: 16 }}>
-        <RetrievalPlayground />
+      <div style={{ borderTop: "1px solid var(--border)", marginTop: 4, paddingTop: 16 }}>
+        <GraphCanvas entities={entities} edges={edges} />
       </div>
+    </div>
+  );
+}
 
-      {/* Neighborhood overviews — what broad questions are served instead of
-          chunks. Rebuilding is explicit: up to 6 Claude calls per press. */}
-      <div style={{ borderTop: "1px solid var(--border)", marginTop: 18, paddingTop: 16 }}>
-        <Label>
-          Overviews — one paragraph per neighborhood of the graph, served for broad questions
-          like &ldquo;tell me about Blake&rdquo;
-        </Label>
-        {overviews.length === 0 ? (
-          <p style={hint}>
-            None yet. Rebuild after the graph has some content — each rebuild summarizes up to 6
-            neighborhoods with one Claude call apiece.
-          </p>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 10 }}>
-            {overviews.map((o) => (
-              <div key={o.id} style={overviewBox}>
-                <strong style={{ fontSize: 12, display: "block", marginBottom: 4 }}>
-                  {o.originLabel}
-                </strong>
-                <span style={{ fontSize: 13 }}>{o.text}</span>
-              </div>
-            ))}
-          </div>
-        )}
-        <form action={rebuildOverviews}>
-          <button style={{ ...btnGhost, padding: "6px 14px" }}>Rebuild overviews</button>
-        </form>
-      </div>
-
-      <div style={{ borderTop: "1px solid var(--border)", marginTop: 18, paddingTop: 16 }}>
-        <GraphView entities={entities} edges={edges} suggestions={suggestions} />
-      </div>
-    </section>
+/**
+ * Neighborhood overviews — what broad questions are served instead of chunks.
+ * Rebuilding is explicit: up to 6 Claude calls per press.
+ */
+function OverviewsTab({
+  overviews,
+}: {
+  overviews: { id: string; originLabel: string; text: string }[];
+}) {
+  return (
+    <div>
+      <Label>
+        Overviews — one paragraph per neighborhood of the graph, served for broad questions
+        like &ldquo;tell me about Blake&rdquo;
+      </Label>
+      {overviews.length === 0 ? (
+        <p style={hint}>
+          None yet. Rebuild after the graph has some content — each rebuild summarizes up to 6
+          neighborhoods with one Claude call apiece.
+        </p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 10 }}>
+          {overviews.map((o) => (
+            <div key={o.id} style={overviewBox}>
+              <strong style={{ fontSize: 12, display: "block", marginBottom: 4 }}>
+                {o.originLabel}
+              </strong>
+              <span style={{ fontSize: 13 }}>{o.text}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      <form action={rebuildOverviews}>
+        <button style={{ ...btnGhost, padding: "6px 14px" }}>Rebuild overviews</button>
+      </form>
+    </div>
   );
 }
 
