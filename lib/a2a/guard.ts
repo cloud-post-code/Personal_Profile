@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { checkPassword } from "@/lib/auth";
+import { clientIp } from "@/lib/util";
 
 /**
  * Who is allowed to talk to the agent, and how often.
@@ -65,11 +66,7 @@ function sweep(store: Map<string, { count: number; resetAt: number }>, now: numb
   for (const [key, entry] of store) if (now >= entry.resetAt) store.delete(key);
 }
 
-export function clientIp(headers: Headers): string {
-  const forwarded = headers.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0].trim();
-  return headers.get("x-real-ip") ?? "unknown";
-}
+export { clientIp } from "@/lib/util";
 
 /** The optional dedicated token, preferred over handing out the admin password. */
 export function a2aApiKey(): string {
