@@ -15,6 +15,9 @@ export type ExtractedGraph = {
 export type EntityExtractor = (
   text: string,
   title: string | null,
+  /// Names of entities already in the graph, best-established first; the
+  /// prompt asks for these exact spellings so re-mentions don't fork variants.
+  known?: string[],
 ) => Promise<ExtractedGraph>;
 
 export const ENTITY_TYPES_LIST = [
@@ -28,8 +31,22 @@ export function entityKey(name: string): string {
   return name.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
-export const extractEntities: EntityExtractor = async (text, title) => {
-  const prompt =
+/** Most known-entity names fed back into the prompt; bounds prompt growth. */
+export const MAX_KNOWN_IN_PROMPT = 200;
+
+export function buildExtractionPrompt(
+  text: string,
+  title: string | null,
+  known: string[] = [],
+): string {
+  const knownBlock = known.length
+    ? `\nEntities already in the graph from other sources — when the text ` +
+      `refers to one of these, reuse the exact name as written here rather ` +
+      `than a variant or abbreviation:\n` +
+      known.slice(0, MAX_KNOWN_IN_PROMPT).map((n) => `- ${n}`).join("\n") +
+      `\n`
+    : "";
+  return (
     `Extract a small knowledge graph from this source about Blake (a personal ` +
     `website's owner). Return STRICT JSON with keys:\n` +
     `- "entities": array of {"name", "type"} — the distinct named things the ` +
@@ -41,8 +58,14 @@ export const extractEntities: EntityExtractor = async (text, title) => {
     `in the text between those entities (or Blake), relation a short verb ` +
     `phrase like "works at", "built", "uses", "located in". 0-15 items. Use ` +
     `entity names exactly as listed in "entities" (adding "Blake" is allowed).\n` +
-    `No prose outside the JSON.\n\n` +
-    `Title: ${title ?? "(none)"}\n\nTEXT:\n${text.slice(0, 12000)}`;
+    `No prose outside the JSON.\n` +
+    knownBlock +
+    `\nTitle: ${title ?? "(none)"}\n\nTEXT:\n${text.slice(0, 12000)}`
+  );
+}
+
+export const extractEntities: EntityExtractor = async (text, title, known = []) => {
+  const prompt = buildExtractionPrompt(text, title, known);
 
   const msg = await claude().messages.create({
     model: claudeModel(),

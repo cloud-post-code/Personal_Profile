@@ -4,6 +4,7 @@ import { embedTexts, vecToBytes } from "./embed";
 import {
   extractEntities,
   entityKey,
+  MAX_KNOWN_IN_PROMPT,
   type EntityExtractor,
   type ExtractedGraph,
 } from "./entities";
@@ -134,11 +135,24 @@ export async function indexOrigin(origin: OriginInput, opts: IndexOpts = {}): Pr
     written.push(c);
   }
 
+  // Names already in the graph steer the extractor toward reusing canonical
+  // spellings instead of forking variants ("Blake" vs "Blake Mauri").
+  // Most-mentioned first so the best-established names survive the prompt cap.
+  // Best-effort: an empty list only costs dedup quality, never the index.
+  const known = await prisma.entity
+    .findMany({
+      select: { name: true },
+      orderBy: { mentions: { _count: "desc" } },
+      take: MAX_KNOWN_IN_PROMPT,
+    })
+    .then((rows) => rows.map((r) => r.name))
+    .catch(() => [] as string[]);
+
   // Entity extraction is the only model call here; keep it best-effort so a
   // flaky extraction never loses the chunks we just wrote.
   let graph: ExtractedGraph;
   try {
-    graph = await (opts.extract ?? extractEntities)(text, origin.label);
+    graph = await (opts.extract ?? extractEntities)(text, origin.label, known);
   } catch {
     return;
   }
