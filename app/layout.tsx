@@ -3,7 +3,7 @@ import { Space_Grotesk, Inter, JetBrains_Mono } from "next/font/google";
 import { brand, themeOverrideCss, type ThemeColors } from "@/lib/theme";
 import { headingFamily, bodyFamily } from "@/lib/fonts";
 import { getProfile } from "@/lib/db";
-import { safeJson } from "@/lib/util";
+import { safeJson, siteOrigin } from "@/lib/util";
 import { PostHogProvider } from "./PostHogProvider";
 import "./globals.css";
 
@@ -14,8 +14,17 @@ const body = Inter({ subsets: ["latin"], variable: "--font-body", display: "swap
 const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono", display: "swap" });
 
 export const metadata: Metadata = {
+  // Absolute base for the share image URL — scrapers reject relative og:image.
+  metadataBase: new URL(siteOrigin()),
   title: `${brand.name} — ${brand.tagline}`,
   description: `Blake's personal website. Chat with an AI host about his projects, background, and recent work.`,
+  openGraph: {
+    title: `${brand.name} — ${brand.tagline}`,
+    description: `Blake's personal website. Chat with an AI host about his projects, background, and recent work.`,
+    type: "website",
+  },
+  // The image itself comes from app/opengraph-image.tsx (file-based metadata).
+  twitter: { card: "summary_large_image" },
 };
 
 // The <head> theme override is DB-driven and wraps every route, so always
