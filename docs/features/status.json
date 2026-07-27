@@ -82,6 +82,16 @@
       "next": "Admin tab not clicked through by Claude (login required — Claude does not enter passwords). Redraft failures are logged, not surfaced in the UI."
     },
     {
+      "id": "persona-prompt-handoff",
+      "title": "Persona tab: copy a prompt into ChatGPT/Claude/Gemini and paste the answer back",
+      "feature_dir": "docs/features/persona-prompt-handoff",
+      "proof": "docs/features/persona-prompt-handoff/PROOF.md",
+      "priority": 1,
+      "status": "passing",
+      "notes": "Writing the persona paragraph from a blank page is the hardest step in setting the site up, and the assistants Blake already uses hold the raw material. A block above the Persona field (app/admin/PersonaPrompt.tsx) explains the handoff and offers Copy prompt / View prompt; the prompt lives as Markdown at docs/prompts/persona-extraction.md and is read server-side by lib/personaPrompt.ts (cached at module load, throws rather than serving an empty box) and passed to the client as a prop, so Copy needs no round trip. Collapsed by default — the 900-line prompt only renders once View is pressed. A denied clipboard expands the prompt instead of failing silently. Touches dashboard/page.tsx in only three lines (two imports, one element) because another session is concurrently editing that file. Proof: docs/features/persona-prompt-handoff/proof.ts (11 assertions green), run with a proof-local tsconfig because the app sets jsx:preserve for Next; gate PASS.",
+      "next": "Not clicked through in a browser — /admin/dashboard is password-gated and Claude does not enter credentials. Worth one manual check on the deployed HTTPS site that Copy actually writes to the clipboard (navigator.clipboard needs a secure context)."
+    },
+    {
       "id": "graph-delete-provenance",
       "title": "Deleting content removes its claims from the entity graph",
       "feature_dir": "docs/features/graph-delete-provenance",

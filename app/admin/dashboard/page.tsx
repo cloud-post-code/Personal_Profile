@@ -32,6 +32,8 @@ import { Extractor } from "../Extractor";
 import { GithubImport } from "../GithubImport";
 import { GraphPanel } from "../GraphPanel";
 import { AnswersPanel } from "../AnswersPanel";
+import { PersonaPrompt } from "../PersonaPrompt";
+import { personaExtractionPrompt } from "@/lib/personaPrompt";
 import { graphStats, listEntities, listEdges } from "@/lib/retrieval/graph";
 import { seedStarterAnswers, listCannedAnswers } from "@/lib/canned";
 import { draftBlankAnswers } from "@/lib/answerDrafts";
@@ -191,6 +193,8 @@ export default async function Dashboard() {
       <p style={{ color: "var(--on-surface)", fontStyle: "italic", fontSize: 13, marginBottom: 18 }}>
         {PERSONA_BLURB}
       </p>
+
+      <PersonaPrompt prompt={personaExtractionPrompt()} />
 
       <form action={savePersona}>
         <Label>Tagline (shown under your name on the live site)</Label>
