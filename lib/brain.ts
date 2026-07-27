@@ -4,6 +4,7 @@ import { buildSystemPrompt } from "@/lib/knowledge";
 import { allProjectsBlock, singleProjectBlock, galleryBlock, type UiBlock } from "@/lib/cards";
 import { recordTurn } from "@/lib/activity";
 import { findServableCanned, recordCannedHit } from "@/lib/canned";
+import { bookingLive } from "@/lib/booking/service";
 
 /**
  * The chatbot, independent of how it was reached. `answer()` is the one entry
@@ -92,6 +93,21 @@ const TOOLS: Anthropic.Tool[] = [
   },
 ];
 
+/**
+ * Offered only when booking is switched on and Google is connected. A booking
+ * card that can never return a slot is a worse outcome than not offering to
+ * meet, so the tool is withheld rather than left to fail politely.
+ */
+const BOOKING_TOOL: Anthropic.Tool = {
+  name: "show_booking",
+  description:
+    "Render a booking card showing Blake's real open times, pulled live from his Google Calendar. " +
+    "The visitor picks a slot and it is confirmed on his calendar with a video link. Use this when " +
+    "someone wants to meet, talk, book a call, or find a time — prefer it over the contact form when " +
+    "a conversation is what they're after.",
+  input_schema: { type: "object", properties: {} },
+};
+
 /** Turn a tool call into the UI block it names. Shared by both tiers. */
 async function hydrate(name: string, input: Record<string, unknown>): Promise<UiBlock | null> {
   switch (name) {
@@ -103,6 +119,10 @@ async function hydrate(name: string, input: Record<string, unknown>): Promise<Ui
       return galleryBlock(input.layout === "carousel" ? "carousel" : "filmstrip");
     case "show_contact_form":
       return { type: "contact" };
+    case "show_booking":
+      // Guarded here too, not just at tool-offer time: a canned answer can name
+      // this tool, and it must not draw a booker after booking is switched off.
+      return (await bookingLive()) ? { type: "booking" } : null;
     default:
       return null;
   }
@@ -126,7 +146,8 @@ async function* runModel(
 ): AsyncGenerator<BrainEvent> {
   // The visitor's latest question drives retrieval: the prompt carries only the
   // knowledge relevant to it, not the whole source library.
-  const system = await buildSystemPrompt(message);
+  const [system, canBook] = await Promise.all([buildSystemPrompt(message), bookingLive()]);
+  const tools = canBook ? [...TOOLS, BOOKING_TOOL] : TOOLS;
   const convo: Anthropic.MessageParam[] = history.map((m) => ({
     role: m.role,
     content: m.content,
@@ -139,7 +160,7 @@ async function* runModel(
       model: claudeModel(),
       max_tokens: 1024,
       system,
-      tools: TOOLS,
+      tools,
       messages: convo,
     });
 

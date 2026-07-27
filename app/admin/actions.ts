@@ -27,6 +27,7 @@ import { saveCannedAnswer, deleteCannedAnswer } from "@/lib/canned";
 import { redraftAnswer } from "@/lib/answerDrafts";
 import { safeExperience, safeSocials } from "@/lib/knowledge";
 import { PERSONA_SECTIONS, writePersonaSections } from "@/lib/persona";
+import { formatWeeklyHours, type WeeklyHours } from "@/lib/booking/slots";
 import { COLOR_ROLES } from "@/lib/theme";
 import { saveUpload, saveBytes } from "@/lib/uploads";
 import { describeImage } from "@/lib/vision";
@@ -525,6 +526,77 @@ export async function deleteContact(formData: FormData) {
   await requireAuth();
   const id = String(formData.get("id") ?? "");
   if (id) await prisma.contact.delete({ where: { id } }).catch(() => {});
+  revalidatePath("/admin/dashboard");
+}
+
+/**
+ * Booking availability. Hours arrive as one "09:00-12:00, 13:00-17:00" string
+ * per weekday — parsed here and stored as the structured JSON the slot grid
+ * reads, so a typo becomes "no availability that day" rather than a runtime
+ * error on the public card.
+ */
+export async function saveBookingSettings(formData: FormData) {
+  await requireAuth();
+  await getProfile();
+
+  const hours: WeeklyHours = {};
+  for (let weekday = 0; weekday < 7; weekday++) {
+    const windows = parseDayWindows(String(formData.get(`hours_${weekday}`) ?? ""));
+    if (windows.length) hours[weekday] = windows;
+  }
+
+  await prisma.profile.update({
+    where: { id: 1 },
+    data: {
+      bookingEnabled: formData.get("bookingEnabled") === "on",
+      bookingTz: String(formData.get("bookingTz") ?? "UTC").trim() || "UTC",
+      bookingTitle: String(formData.get("bookingTitle") ?? "").trim() || "Intro call",
+      bookingMinutes: clampInt(formData.get("bookingMinutes"), 15, 5, 480),
+      bookingLeadHours: clampInt(formData.get("bookingLeadHours"), 12, 0, 720),
+      bookingDays: clampInt(formData.get("bookingDays"), 14, 1, 120),
+      bookingBufferMinutes: clampInt(formData.get("bookingBufferMinutes"), 0, 0, 240),
+      bookingHours: JSON.stringify(formatWeeklyHours(hours)),
+    },
+  });
+  revalidateAll();
+}
+
+/** "09:00-12:00, 13:00-17:00" → [[540,720],[780,1020]]. Junk is dropped. */
+function parseDayWindows(raw: string): [number, number][] {
+  const out: [number, number][] = [];
+  for (const part of raw.split(",")) {
+    const m = /^\s*(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})\s*$/.exec(part);
+    if (!m) continue;
+    const from = clockMinutes(m[1]);
+    const to = clockMinutes(m[2]);
+    if (from === null || to === null || to <= from) continue;
+    out.push([from, to]);
+  }
+  return out.sort((a, b) => a[0] - b[0]);
+}
+
+function clockMinutes(hhmm: string): number | null {
+  const [h, m] = hhmm.split(":").map(Number);
+  if (h > 23 || m > 59) return null;
+  return h * 60 + m;
+}
+
+function clampInt(raw: FormDataEntryValue | null, fallback: number, min: number, max: number): number {
+  const n = Number.parseInt(String(raw ?? ""), 10);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, n));
+}
+
+/**
+ * Remove a booking record. This does NOT cancel the Google event — the calendar
+ * is the source of truth and cancelling belongs there, where the guest gets
+ * told. Deleting here only drops Blake's copy, which also frees the slot to be
+ * booked again, so it is the right move only after cancelling in Google.
+ */
+export async function deleteBooking(formData: FormData) {
+  await requireAuth();
+  const id = String(formData.get("id") ?? "");
+  if (id) await prisma.booking.delete({ where: { id } }).catch(() => {});
   revalidatePath("/admin/dashboard");
 }
 

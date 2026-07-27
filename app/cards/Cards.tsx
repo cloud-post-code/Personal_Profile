@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 /** Shared A2UI block types (mirrors lib/cards.ts). */
 export type ProjectCard = {
@@ -23,7 +23,8 @@ export type UiBlock =
   | { type: "projects"; items: ProjectCard[] }
   | { type: "project"; item: ProjectCard | null }
   | { type: "gallery"; layout: "carousel" | "filmstrip"; items: PhotoCard[] }
-  | { type: "contact" };
+  | { type: "contact" }
+  | { type: "booking" };
 
 export function Cards({ block }: { block: UiBlock }) {
   if (block.type === "projects") {
@@ -54,6 +55,9 @@ export function Cards({ block }: { block: UiBlock }) {
   }
   if (block.type === "contact") {
     return <ContactForm />;
+  }
+  if (block.type === "booking") {
+    return <BookingCard />;
   }
   return null;
 }
@@ -142,6 +146,274 @@ function ContactForm() {
       </button>
     </div>
   );
+}
+
+type Slot = { start: string; end: string };
+type SlotsPayload = {
+  enabled: boolean;
+  connected: boolean;
+  timezone: string;
+  minutes: number;
+  slots: Slot[];
+};
+type Confirmed = { start: string; end: string; meetUrl: string | null };
+
+/**
+ * The booking card: real open times from Blake's calendar, picked and confirmed
+ * in the chat.
+ *
+ * Slots are fetched on mount rather than carried in the block, because a card
+ * scrolled back to ten minutes later would otherwise still be offering times
+ * that have since been taken. A lost race (409) refetches rather than just
+ * apologising, so the visitor's next tap is against fresh data.
+ *
+ * Everything is rendered in the VISITOR's timezone, with Blake's named
+ * underneath — the commonest way a booking UI wastes someone's morning is by
+ * quietly showing them somebody else's clock.
+ */
+function BookingCard() {
+  const [data, setData] = useState<SlotsPayload | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [day, setDay] = useState<string | null>(null);
+  const [picked, setPicked] = useState<Slot | null>(null);
+  const [done, setDone] = useState<Confirmed | null>(null);
+  // Resolved after mount so the server and the first client render agree.
+  const [tz, setTz] = useState("");
+
+  useEffect(() => {
+    setTz(Intl.DateTimeFormat().resolvedOptions().timeZone || "");
+  }, []);
+
+  async function load() {
+    try {
+      const res = await fetch("/api/booking/slots");
+      const body = (await res.json()) as SlotsPayload & { ok?: boolean };
+      if (!res.ok || !body.ok) {
+        setFailed(true);
+        return;
+      }
+      setData(body);
+      setFailed(false);
+    } catch {
+      setFailed(true);
+    }
+  }
+
+  useEffect(() => {
+    void load();
+  }, []);
+
+  if (done) return <BookingDone confirmed={done} tz={tz} />;
+
+  if (failed) {
+    return <Empty>Couldn&apos;t reach the calendar just now — try the contact form instead.</Empty>;
+  }
+  if (!data) return <Empty>Checking Blake&apos;s calendar…</Empty>;
+  if (!data.enabled || !data.connected) {
+    return <Empty>Booking isn&apos;t open right now — the contact form is the way in.</Empty>;
+  }
+  if (data.slots.length === 0) {
+    return <Empty>No open times in the next couple of weeks. Try the contact form.</Empty>;
+  }
+
+  const byDay = groupByDay(data.slots, tz);
+  const days = [...byDay.keys()];
+  const activeDay = day && byDay.has(day) ? day : days[0];
+
+  if (picked) {
+    return (
+      <BookingForm
+        slot={picked}
+        tz={tz}
+        onCancel={() => setPicked(null)}
+        onDone={setDone}
+        onStale={async () => {
+          setPicked(null);
+          await load();
+        }}
+      />
+    );
+  }
+
+  return (
+    <div data-fill="bg-soft" style={{ ...card, maxWidth: 440 }}>
+      <strong style={{ fontSize: 15, fontFamily: "var(--font-heading)" }}>Book a time</strong>
+      <p style={{ color: "var(--on-bg-soft)", fontStyle: "italic", fontSize: 13, margin: "6px 0 12px" }}>
+        {data.minutes} minutes, live from Blake&apos;s calendar. Times shown in
+        {tz ? ` your timezone (${tz})` : " your local time"}.
+      </p>
+
+      <div style={chipRow}>
+        {days.map((key) => (
+          <button
+            key={key}
+            onClick={() => setDay(key)}
+            style={{ ...linkBtn, ...(key === activeDay ? liveBtn : {}), cursor: "pointer" }}
+          >
+            {dayLabel(byDay.get(key)![0].start, tz)}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ ...chipRow, marginTop: 10 }}>
+        {(byDay.get(activeDay) ?? []).map((s) => (
+          <button
+            key={s.start}
+            onClick={() => setPicked(s)}
+            style={{ ...linkBtn, cursor: "pointer" }}
+          >
+            {timeLabel(s.start, tz)}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Name, email and an optional note, then the slot is claimed. */
+function BookingForm({
+  slot,
+  tz,
+  onCancel,
+  onDone,
+  onStale,
+}: {
+  slot: Slot;
+  tz: string;
+  onCancel: () => void;
+  onDone: (c: Confirmed) => void;
+  onStale: () => void | Promise<void>;
+}) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [note, setNote] = useState("");
+  const [state, setState] = useState<"idle" | "sending" | "error">("idle");
+  const [error, setError] = useState("");
+
+  async function submit() {
+    if (state === "sending") return;
+    setState("sending");
+    setError("");
+    try {
+      const res = await fetch("/api/booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, note, start: slot.start, guestTz: tz }),
+      });
+      const body = await res.json();
+      if (res.status === 409) {
+        // Somebody took it between the card loading and this click.
+        await onStale();
+        return;
+      }
+      if (!res.ok || !body.ok) {
+        setError(body.error || "Something went wrong.");
+        setState("error");
+        return;
+      }
+      onDone({ start: body.start, end: body.end, meetUrl: body.meetUrl ?? null });
+    } catch {
+      setError("Network error. Try again.");
+      setState("error");
+    }
+  }
+
+  const ready = !!name && !!email && state !== "sending";
+  return (
+    <div data-fill="bg-soft" style={{ ...card, maxWidth: 440 }}>
+      <strong style={{ fontSize: 15, fontFamily: "var(--font-heading)" }}>
+        {dayLabel(slot.start, tz)} at {timeLabel(slot.start, tz)}
+      </strong>
+      <p style={{ color: "var(--on-bg-soft)", fontStyle: "italic", fontSize: 13, margin: "6px 0 12px" }}>
+        Your details, and it&apos;s on both calendars.
+      </p>
+      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" style={cf} />
+      <input
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        placeholder="Your email (the invite goes here)"
+        type="email"
+        style={cf}
+      />
+      <textarea
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        placeholder="What's it about? (optional)"
+        rows={2}
+        style={{ ...cf, resize: "vertical" }}
+      />
+      {state === "error" && (
+        <p style={{ color: "var(--danger-on-bg-soft)", fontSize: 13, marginBottom: 8 }}>{error}</p>
+      )}
+      <div style={{ display: "flex", gap: 8 }}>
+        <button
+          onClick={submit}
+          disabled={!ready}
+          style={{ ...linkBtn, ...liveBtn, padding: "10px 18px", opacity: ready ? 1 : 0.55 }}
+        >
+          {state === "sending" ? "Booking…" : "Confirm"}
+        </button>
+        <button onClick={onCancel} style={{ ...linkBtn, cursor: "pointer" }}>
+          Pick another
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function BookingDone({ confirmed, tz }: { confirmed: Confirmed; tz: string }) {
+  return (
+    <div data-fill="bg-soft" style={{ ...card, borderColor: "var(--success-on-bg-soft)" }}>
+      <strong style={{ fontSize: 15 }}>You&apos;re booked.</strong>
+      <p style={{ color: "var(--on-bg-soft)", fontStyle: "italic", fontSize: 14, marginTop: 6 }}>
+        {dayLabel(confirmed.start, tz)} at {timeLabel(confirmed.start, tz)} — the invite is on its way
+        to your inbox.
+      </p>
+      {confirmed.meetUrl && (
+        <a
+          href={confirmed.meetUrl}
+          target="_blank"
+          rel="noreferrer"
+          style={{ ...linkBtn, ...liveBtn, display: "inline-block", marginTop: 10 }}
+        >
+          ↗ Video link
+        </a>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Slots bucketed by the visitor's local calendar date. Keyed with `en-CA`
+ * because it renders YYYY-MM-DD, which sorts correctly as a string — the slots
+ * arrive in order, so insertion order carries through.
+ */
+function groupByDay(slots: Slot[], tz: string): Map<string, Slot[]> {
+  const out = new Map<string, Slot[]>();
+  for (const s of slots) {
+    const key = new Date(s.start).toLocaleDateString("en-CA", tz ? { timeZone: tz } : {});
+    const bucket = out.get(key);
+    if (bucket) bucket.push(s);
+    else out.set(key, [s]);
+  }
+  return out;
+}
+
+function dayLabel(iso: string, tz: string): string {
+  return new Date(iso).toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    ...(tz ? { timeZone: tz } : {}),
+  });
+}
+
+function timeLabel(iso: string, tz: string): string {
+  return new Date(iso).toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+    ...(tz ? { timeZone: tz } : {}),
+  });
 }
 
 function ProjectCardView({ p, big }: { p: ProjectCard; big?: boolean }) {
@@ -281,6 +553,11 @@ function Empty({ children }: { children: React.ReactNode }) {
   );
 }
 
+const chipRow: React.CSSProperties = {
+  display: "flex",
+  gap: 6,
+  flexWrap: "wrap",
+};
 const grid: React.CSSProperties = {
   display: "grid",
   gap: 12,

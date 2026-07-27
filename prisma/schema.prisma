@@ -303,7 +303,57 @@ model Profile {
   /// Heading font weight: 500 | 600 | 700 | 800. Empty = default.
   themeHeadingWeight String @default("")
 
+  // ── Booking (the in-chat booking card, backed by Google Calendar) ──
+  /// Master switch. Off until Google is connected, so a half-configured deploy
+  /// never shows a visitor a booker that cannot book.
+  bookingEnabled   Boolean @default(false)
+  /// IANA zone the weekly hours below are expressed in, and the zone the
+  /// calendar event is written with. Wall-clock hours are meaningless without it.
+  bookingTz        String  @default("America/New_York")
+  /// Meeting length in minutes; also the step of the slot grid.
+  bookingMinutes   Int     @default(30)
+  /// JSON {mon:[["09:00","17:00"]], tue:[...], ...} weekly availability windows.
+  /// Absent or empty day = not available that day.
+  bookingHours     String  @default("{}") @db.Text
+  /// Hours of notice before the earliest bookable slot.
+  bookingLeadHours Int     @default(12)
+  /// How many days ahead the card offers.
+  bookingDays      Int     @default(14)
+  /// Gap enforced on both sides of an existing calendar event, in minutes.
+  bookingBufferMinutes Int @default(15)
+  /// Shown as the calendar event's title, with the guest's name appended.
+  bookingTitle     String  @default("Intro call")
+
   updatedAt DateTime @updatedAt
+}
+
+/// A meeting a visitor booked through the in-chat booking card. This is Blake's
+/// own record: the authoritative event lives in Google Calendar, and whatever
+/// later happens to it there (edited, moved, deleted) does not reach back here.
+///
+/// `startsAt` is unique on purpose. Between reading free/busy and writing the
+/// event there is a window where two visitors can pick the same slot; the row is
+/// claimed before the Google call, so the constraint — not a hopeful re-check —
+/// is what makes the loser lose. Cancelling is done in Google Calendar, and the
+/// row is deleted from the admin, which is also what frees the slot again.
+model Booking {
+  id            String   @id @default(cuid())
+  name          String
+  email         String
+  note          String   @default("") @db.Text
+  /// Slot bounds as instants (UTC).
+  startsAt      DateTime @unique
+  endsAt        DateTime
+  /// IANA zone the visitor saw the slot in, so the admin can read their local
+  /// time back without guessing where they were.
+  guestTz       String   @default("")
+  /// Google Calendar event id — the trace from this row to the real event.
+  googleEventId String?
+  /// Google Meet link, when Google issued one.
+  meetUrl       String?
+  createdAt     DateTime @default(now())
+
+  @@index([startsAt])
 }
 
 /// One A2A task: work another agent asked this agent to do over the A2A

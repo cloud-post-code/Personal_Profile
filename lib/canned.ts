@@ -21,6 +21,7 @@ export const CARD_TOOLS = [
   "show_project",
   "show_gallery",
   "show_contact_form",
+  "show_booking",
 ] as const;
 
 export type CardTool = (typeof CARD_TOOLS)[number];

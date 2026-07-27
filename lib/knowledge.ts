@@ -1,6 +1,7 @@
 import { prisma, getProfile } from "./db";
 import { personaPromptBlock } from "./persona";
 import { retrieve, formatContext } from "./retrieval/search";
+import { googleConfigured } from "./google";
 
 /**
  * Assembles the chatbot's system prompt: a persona core (profile, projects,
@@ -63,6 +64,11 @@ export async function buildSystemPrompt(query?: string): Promise<string> {
         .join("\n")}`
     : "";
 
+  // The booking tool is withheld from the model unless it can actually book, so
+  // the instructions for it are withheld on the same condition — telling Claude
+  // about a tool it hasn't been given is how you get an apology instead of a card.
+  const canBook = profile.bookingEnabled && googleConfigured();
+
   const personaBlock =
     personaPromptBlock(profile.personaSections) ||
     "Warm, curious, a builder at heart. Enthusiastic about making useful things. Speaks plainly, with a bit of playful energy.";
@@ -97,7 +103,7 @@ You have tools that render visual cards in the chat. Prefer them over plain text
 - When asked about projects generally, call show_projects (renders all project cards).
 - When focused on ONE project, call show_project with its id.
 - When asked to see photos / a gallery / pictures, call show_gallery. Choose layout "carousel" for a slideshow feel, or "filmstrip" for a browsable strip with a lightbox.
-- When someone wants to connect, reach out, get in touch, hire, or collaborate, call show_contact_form so they can leave their details — then also mention the direct contact info above.
+- When someone wants to connect, reach out, get in touch, hire, or collaborate, call show_contact_form so they can leave their details — then also mention the direct contact info above.${bookingBlock(canBook)}
 Always add a short spoken sentence alongside a card — the card supplements your words, it doesn't replace them.
 
 RULES:
@@ -134,6 +140,17 @@ async function knowledgeBlock(query: string | undefined, chunkCount: number): Pr
       }${s.url ? `\n  ${s.url}` : ""}`;
     })
     .join("\n");
+}
+
+/**
+ * The booking instruction, only when there is a booking tool to instruct about.
+ * Booking beats the contact form when the visitor wants a conversation: one is
+ * a confirmed meeting, the other is a message in a queue.
+ */
+function bookingBlock(canBook: boolean): string {
+  if (!canBook) return "";
+  return `
+- When someone wants to meet, talk, book a call, get time on the calendar, or asks when Blake is free, call show_booking. It shows his REAL open times from his live calendar and confirms the meeting on the spot — prefer it over show_contact_form whenever a conversation is what they want. Never state specific available times yourself; you don't have them, the card does.`;
 }
 
 function connectBlock(p: {

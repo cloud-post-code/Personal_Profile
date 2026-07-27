@@ -29,7 +29,12 @@ export type UiBlock =
   | { type: "projects"; items: ProjectCard[] }
   | { type: "project"; item: ProjectCard | null }
   | { type: "gallery"; layout: "carousel" | "filmstrip"; items: PhotoCard[] }
-  | { type: "contact" };
+  | { type: "contact" }
+  // The slots are deliberately NOT resolved here. They are live free/busy that
+  // goes stale in minutes, and a card sitting in a scrolled-back chat carrying
+  // baked-in times would offer a slot that is long gone. The card fetches
+  // /api/booking/slots when it mounts, and again after a lost race.
+  | { type: "booking" };
 
 function toProjectCard(p: {
   id: string;
