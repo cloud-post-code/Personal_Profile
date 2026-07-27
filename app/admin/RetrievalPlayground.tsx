@@ -26,7 +26,7 @@ export function RetrievalPlayground() {
 
   return (
     <div style={{ marginBottom: 16 }}>
-      <Label>Test retrieval — see what the chatbot is given for a question</Label>
+      <Label>Type a question and see exactly what the chatbot would be given for it</Label>
       <form
         onSubmit={(e) => {
           e.preventDefault();

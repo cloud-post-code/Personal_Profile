@@ -10,6 +10,9 @@
   visual canvas, Test holds the retrieval playground, Entities and
   Relationships hold the editing panes (with count badges in the labels), and
   Overviews holds the overview list + rebuild button.
+- The strip sits above the panels (SubTabs is the section's top-level
+  element, like Content), and every tab's content is its own titled panel:
+  Knowledge graph / Test retrieval / Entities / Relationships / Overviews.
 - `GraphView.tsx` no longer has its own pane switcher; it exports the
   `EntitiesPane` and `RelationsPane` that the sub-tabs mount.
 

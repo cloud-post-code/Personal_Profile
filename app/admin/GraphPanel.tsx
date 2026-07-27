@@ -8,11 +8,12 @@ import { rebuildOverviews } from "./actions";
 import { SectionTitle, Label, btnGhost } from "./ui";
 
 /**
- * The Graph section, split into five sub-tabs: Graph (index health + the
- * node-link picture), Test (retrieval playground), Entities and Relationships
- * (the editing panes, counts in the tab labels), and Overviews. A wrong or
- * duplicated entity here shows up as a worse chatbot answer, so this is where
- * it gets corrected.
+ * The Graph section: a sub-tab strip above the panels, same layout as the
+ * Content section — Graph (index health + the node-link picture), Test
+ * (retrieval playground), Entities and Relationships (the editing panes,
+ * counts in the tab labels), and Overviews. Each tab is its own titled panel.
+ * A wrong or duplicated entity here shows up as a worse chatbot answer, so
+ * this is where it gets corrected.
  */
 export function GraphPanel({
   stats,
@@ -28,50 +29,80 @@ export function GraphPanel({
   overviews: { id: string; originLabel: string; text: string }[];
 }) {
   return (
-    <section data-fill="surface" style={panel}>
-      <SectionTitle>Knowledge graph</SectionTitle>
-      <p style={hint}>
-        Everything you curate — your profile, persona, projects, photos, saved sources, and the
-        answers you approve on Activity — is split into chunks and read for the people, orgs,
-        projects and topics it names, plus how they relate. The chatbot follows those relations
-        to find facts a plain keyword match would miss.
-      </p>
+    <SubTabs
+      ariaLabel="Graph sections"
+      tabs={[
+        {
+          key: "graph",
+          label: "Graph",
+          content: (
+            <Panel title="Knowledge graph">
+              <p style={hint}>
+                Everything you curate — your profile, persona, projects, photos, saved sources,
+                and the answers you approve on Activity — is split into chunks and read for the
+                people, orgs, projects and topics it names, plus how they relate. The chatbot
+                follows those relations to find facts a plain keyword match would miss.
+              </p>
+              <GraphTab stats={stats} entities={entities} edges={edges} />
+            </Panel>
+          ),
+        },
+        {
+          key: "test",
+          label: "Test",
+          content: (
+            <Panel title="Test retrieval">
+              <RetrievalPlayground />
+            </Panel>
+          ),
+        },
+        {
+          key: "entities",
+          label: (
+            <>
+              Entities <Count n={entities.length} />
+              {suggestions.length > 0 && <Count n={suggestions.length} danger />}
+            </>
+          ),
+          content: (
+            <Panel title="Entities">
+              <EntitiesPane entities={entities} suggestions={suggestions} />
+            </Panel>
+          ),
+        },
+        {
+          key: "relations",
+          label: (
+            <>
+              Relationships <Count n={edges.length} />
+            </>
+          ),
+          content: (
+            <Panel title="Relationships">
+              <RelationsPane entities={entities} edges={edges} />
+            </Panel>
+          ),
+        },
+        {
+          key: "overviews",
+          label: "Overviews",
+          content: (
+            <Panel title="Overviews">
+              <OverviewsTab overviews={overviews} />
+            </Panel>
+          ),
+        },
+      ]}
+    />
+  );
+}
 
-      <SubTabs
-        ariaLabel="Graph sections"
-        tabs={[
-          {
-            key: "graph",
-            label: "Graph",
-            content: <GraphTab stats={stats} entities={entities} edges={edges} />,
-          },
-          { key: "test", label: "Test", content: <RetrievalPlayground /> },
-          {
-            key: "entities",
-            label: (
-              <>
-                Entities <Count n={entities.length} />
-                {suggestions.length > 0 && <Count n={suggestions.length} danger />}
-              </>
-            ),
-            content: <EntitiesPane entities={entities} suggestions={suggestions} />,
-          },
-          {
-            key: "relations",
-            label: (
-              <>
-                Relationships <Count n={edges.length} />
-              </>
-            ),
-            content: <RelationsPane entities={entities} edges={edges} />,
-          },
-          {
-            key: "overviews",
-            label: "Overviews",
-            content: <OverviewsTab overviews={overviews} />,
-          },
-        ]}
-      />
+/** One sub-tab's surface: the same titled maroon panel the Content tabs use. */
+function Panel({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section data-fill="surface" style={panel}>
+      <SectionTitle>{title}</SectionTitle>
+      {children}
     </section>
   );
 }
@@ -154,10 +185,10 @@ function OverviewsTab({
 }) {
   return (
     <div>
-      <Label>
-        Overviews — one paragraph per neighborhood of the graph, served for broad questions
-        like &ldquo;tell me about Blake&rdquo;
-      </Label>
+      <p style={hint}>
+        One paragraph per neighborhood of the graph, served for broad questions like &ldquo;tell
+        me about Blake&rdquo;.
+      </p>
       {overviews.length === 0 ? (
         <p style={hint}>
           None yet. Rebuild after the graph has some content — each rebuild summarizes up to 6

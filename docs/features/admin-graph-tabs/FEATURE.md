@@ -28,9 +28,14 @@ its own screen.
 
 ## Behavior
 
-- The Graph panel keeps its title and intro paragraph, then renders a
-  horizontal tab strip (Graph | Test | Entities | Relationships | Overviews).
+- The Graph section renders the horizontal tab strip (Graph | Test | Entities
+  | Relationships | Overviews) at the top of the page, above the panels —
+  the same layout as the Content section's Projects | Knowledge | Photos.
   Graph is the default tab.
+- Each tab is its own titled panel: "Knowledge graph" (with the intro
+  paragraph), "Test retrieval", "Entities", "Relationships", "Overviews" —
+  so switching tabs reads as switching pages, not swapping the bottom half of
+  one long panel.
 - The Entities tab label shows the entity count and, when the graph suggests
   merges, a ⚠ count; the Relationships tab label shows the relation count —
   same badges the old pane switcher had.

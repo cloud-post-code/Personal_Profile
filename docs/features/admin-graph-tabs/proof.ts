@@ -112,6 +112,13 @@ check(
   "Entities and Relationships labels carry Count badges, warning on Entities",
   panel.includes("Count") && panel.includes("danger"),
 );
+check(
+  "the strip sits above the panels: SubTabs is GraphPanel's top-level element",
+  /return \(\s*<SubTabs/.test(panel),
+);
+for (const title of ["Knowledge graph", "Test retrieval", "Entities", "Relationships", "Overviews"]) {
+  check(`each tab is its own titled panel: "${title}"`, panel.includes(`title="${title}"`));
+}
 
 check(
   "GraphView exports EntitiesPane and RelationsPane",
