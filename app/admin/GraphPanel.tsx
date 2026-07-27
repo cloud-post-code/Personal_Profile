@@ -1,5 +1,5 @@
 import { ORIGIN_LABELS } from "@/lib/retrieval/origins";
-import type { GraphEntity, GraphEdge, GraphStats } from "@/lib/retrieval/graph";
+import type { GraphEntity, GraphEdge, GraphStats, MergeSuggestion } from "@/lib/retrieval/graph";
 import { GraphView } from "./GraphView";
 import { SectionTitle, Label } from "./ui";
 
@@ -13,10 +13,12 @@ export function GraphPanel({
   stats,
   entities,
   edges,
+  suggestions,
 }: {
   stats: GraphStats;
   entities: GraphEntity[];
   edges: GraphEdge[];
+  suggestions: MergeSuggestion[];
 }) {
   const mixedIndex = stats.embedModels.length > 1;
 
@@ -77,7 +79,7 @@ export function GraphPanel({
       )}
 
       <div style={{ borderTop: "1px solid var(--border)", marginTop: 18, paddingTop: 16 }}>
-        <GraphView entities={entities} edges={edges} />
+        <GraphView entities={entities} edges={edges} suggestions={suggestions} />
       </div>
     </section>
   );

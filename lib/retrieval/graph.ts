@@ -195,6 +195,139 @@ export async function deleteEntity(id: string): Promise<void> {
   await prisma.entity.delete({ where: { id } }).catch(() => {});
 }
 
+export type MergeSuggestion = {
+  /// Merge `from` into `into`; `into` survives.
+  fromId: string;
+  fromName: string;
+  intoId: string;
+  intoName: string;
+  /// Human-readable, shown next to the pair so the admin can judge it.
+  reason: string;
+};
+
+const MIN_CONDENSED_KEY = 4;
+const MIN_SHARED_NEIGHBORS = 2;
+const MIN_NEIGHBOR_JACCARD = 0.5;
+const MIN_SHARED_WORD = 3;
+const MAX_SUGGESTIONS = 20;
+
+/**
+ * Likely-duplicate entity pairs, computed from the graph itself — no model
+ * call, so the list is deterministic and free. Two signals:
+ *
+ * - Name containment: one condensed key inside the other ("brambleworks" ⊂
+ *   "brambleworksltd"), shorter side at least MIN_CONDENSED_KEY chars so
+ *   pairs like "AI" ⊂ "AI Safety" don't fire.
+ * - Shared neighbors + a shared name word: mostly-overlapping edge-neighbor
+ *   sets AND a common word of MIN_SHARED_WORD+ chars. The word requirement is
+ *   load-bearing: nearly everything in this graph neighbors Blake, so raw
+ *   neighbor overlap would pair unrelated skills ("TypeScript" / "React"),
+ *   and a one-click merge of a false positive is worse than a missed
+ *   suggestion.
+ *
+ * The higher-mention entity survives (ties: more edges, then longer name —
+ * fuller names are usually canonical). Containment pairs sort first.
+ */
+export async function suggestedMerges(): Promise<MergeSuggestion[]> {
+  const [entities, edges] = await Promise.all([
+    prisma.entity.findMany({
+      select: {
+        id: true,
+        name: true,
+        key: true,
+        _count: { select: { mentions: true, edgesOut: true, edgesIn: true } },
+      },
+    }),
+    prisma.entityEdge.findMany({ select: { fromId: true, toId: true } }),
+  ]);
+
+  const neighbors = new Map<string, Set<string>>();
+  for (const e of edges) {
+    (neighbors.get(e.fromId) ?? neighbors.set(e.fromId, new Set()).get(e.fromId)!).add(e.toId);
+    (neighbors.get(e.toId) ?? neighbors.set(e.toId, new Set()).get(e.toId)!).add(e.fromId);
+  }
+
+  const rows = entities.map((e) => ({
+    id: e.id,
+    name: e.name,
+    condensed: e.key.replace(/[^a-z0-9]/g, ""),
+    words: new Set(e.key.split(" ").filter((w) => w.length >= MIN_SHARED_WORD)),
+    mentions: e._count.mentions,
+    edges: e._count.edgesOut + e._count.edgesIn,
+    neighbors: neighbors.get(e.id) ?? new Set<string>(),
+  }));
+
+  type Row = (typeof rows)[number];
+  const containment = (a: Row, b: Row): boolean => {
+    const [short, long] =
+      a.condensed.length <= b.condensed.length ? [a.condensed, b.condensed] : [b.condensed, a.condensed];
+    return short.length >= MIN_CONDENSED_KEY && long.includes(short);
+  };
+  const sharesWord = (a: Row, b: Row): boolean => {
+    for (const w of a.words) if (b.words.has(w)) return true;
+    return false;
+  };
+  const neighborOverlap = (a: Row, b: Row): number => {
+    if (a.neighbors.size < MIN_SHARED_NEIGHBORS || b.neighbors.size < MIN_SHARED_NEIGHBORS) return 0;
+    let shared = 0;
+    for (const n of a.neighbors) if (b.neighbors.has(n)) shared++;
+    if (shared < MIN_SHARED_NEIGHBORS) return 0;
+    const union = a.neighbors.size + b.neighbors.size - shared;
+    return shared / union >= MIN_NEIGHBOR_JACCARD ? shared : 0;
+  };
+
+  const found: (MergeSuggestion & { rank: number })[] = [];
+  for (let i = 0; i < rows.length; i++) {
+    for (let j = i + 1; j < rows.length; j++) {
+      const a = rows[i];
+      const b = rows[j];
+      let reason: string | null = null;
+      let rank = 0;
+      if (containment(a, b)) {
+        reason = "one name contains the other";
+        rank = 2;
+      } else {
+        const shared = sharesWord(a, b) ? neighborOverlap(a, b) : 0;
+        if (shared) {
+          reason = `share a name word and ${shared} graph neighbors`;
+          rank = 1;
+        }
+      }
+      if (!reason) continue;
+      // Survivor: more mentions, then more edges, then the longer name.
+      const cmp =
+        b.mentions - a.mentions || b.edges - a.edges || b.name.length - a.name.length;
+      const [from, into] = cmp > 0 ? [a, b] : [b, a];
+      found.push({
+        fromId: from.id,
+        fromName: from.name,
+        intoId: into.id,
+        intoName: into.name,
+        reason,
+        rank: rank * 1000 + from.mentions + into.mentions,
+      });
+    }
+  }
+
+  return found
+    .sort((a, b) => b.rank - a.rank)
+    .slice(0, MAX_SUGGESTIONS)
+    .map(({ rank: _rank, ...s }) => s);
+}
+
+/**
+ * One-click merge for a suggestion: fold `fromId` into `intoId` through the
+ * same machinery renaming onto an existing name uses. Fails soft — a stale
+ * form resubmit (either side already merged away) changes nothing.
+ */
+export async function mergeEntities(fromId: string, intoId: string): Promise<boolean> {
+  if (!fromId || !intoId || fromId === intoId) return false;
+  const endpoints = await prisma.entity.count({ where: { id: { in: [fromId, intoId] } } });
+  if (endpoints !== 2) return false;
+  await mergeInto(fromId, intoId);
+  return true;
+}
+
 /**
  * Assert a relation the extractor missed. Returns false for a self-loop or a
  * missing endpoint; repeating the same triple is a no-op.

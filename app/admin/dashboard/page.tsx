@@ -38,7 +38,7 @@ import { GraphPanel } from "../GraphPanel";
 import { AnswersPanel } from "../AnswersPanel";
 import { PersonaPrompt } from "../PersonaPrompt";
 import { personaExtractionPrompt } from "@/lib/personaPrompt";
-import { graphStats, listEntities, listEdges } from "@/lib/retrieval/graph";
+import { graphStats, listEntities, listEdges, suggestedMerges } from "@/lib/retrieval/graph";
 import { seedStarterAnswers, listCannedAnswers } from "@/lib/canned";
 import { draftBlankAnswers } from "@/lib/answerDrafts";
 import { ProjectRow } from "../ProjectRow";
@@ -103,6 +103,7 @@ export default async function Dashboard({
     gStats,
     gEntities,
     gEdges,
+    gSuggestions,
     canned,
   ] = await Promise.all([
       getProfile(),
@@ -123,6 +124,7 @@ export default async function Dashboard({
       graphStats(),
       listEntities(),
       listEdges(),
+      suggestedMerges(),
       // The starter chips ask the same five questions forever, so they're
       // pre-created — and any row still blank gets a first draft written from
       // the knowledge base, so the tab opens on a review queue rather than a
@@ -826,7 +828,12 @@ export default async function Dashboard({
           {
             key: "graph",
             label: "Graph",
-            content: <GraphPanel stats={gStats} entities={gEntities} edges={gEdges} />,
+            content: <GraphPanel
+                stats={gStats}
+                entities={gEntities}
+                edges={gEdges}
+                suggestions={gSuggestions}
+              />,
           },
           { key: "activity", label: "Activity", content: activityTab },
           { key: "contacts", label: "Contacts", badge: unhandled, content: contactsTab },

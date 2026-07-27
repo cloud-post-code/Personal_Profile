@@ -2,9 +2,15 @@
 
 import { useState } from "react";
 import { ENTITY_TYPES_LIST } from "@/lib/retrieval/entities";
-import type { GraphEntity, GraphEdge } from "@/lib/retrieval/graph";
+import type { GraphEntity, GraphEdge, MergeSuggestion } from "@/lib/retrieval/graph";
 import { GraphCanvas } from "./GraphCanvas";
-import { saveEntity, removeEntity, createEntityEdge, removeEntityEdge } from "./actions";
+import {
+  saveEntity,
+  removeEntity,
+  createEntityEdge,
+  removeEntityEdge,
+  mergeSuggestedEntities,
+} from "./actions";
 import { field, btn, btnGhost, btnDanger, Label } from "./ui";
 
 /**
@@ -20,9 +26,11 @@ type Pane = "visual" | "entities" | "relations";
 export function GraphView({
   entities,
   edges,
+  suggestions,
 }: {
   entities: GraphEntity[];
   edges: GraphEdge[];
+  suggestions: MergeSuggestion[];
 }) {
   const [pane, setPane] = useState<Pane>("visual");
 
@@ -32,6 +40,7 @@ export function GraphView({
         <PaneTab on={pane === "visual"} onClick={() => setPane("visual")}>Visual graph</PaneTab>
         <PaneTab on={pane === "entities"} onClick={() => setPane("entities")}>
           Entities <Count n={entities.length} />
+          {suggestions.length > 0 && <Count n={suggestions.length} danger />}
         </PaneTab>
         <PaneTab on={pane === "relations"} onClick={() => setPane("relations")}>
           Relations <Count n={edges.length} />
@@ -39,7 +48,7 @@ export function GraphView({
       </div>
 
       {pane === "visual" && <GraphCanvas entities={entities} edges={edges} />}
-      {pane === "entities" && <EntitiesPane entities={entities} />}
+      {pane === "entities" && <EntitiesPane entities={entities} suggestions={suggestions} />}
       {pane === "relations" && <RelationsPane entities={entities} edges={edges} />}
     </div>
   );
@@ -47,12 +56,19 @@ export function GraphView({
 
 // ── Entities ────────────────────────────────────────────────────────────────
 
-function EntitiesPane({ entities }: { entities: GraphEntity[] }) {
+function EntitiesPane({
+  entities,
+  suggestions,
+}: {
+  entities: GraphEntity[];
+  suggestions: MergeSuggestion[];
+}) {
   const [page, setPage] = useState(0);
   const shown = entities.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
 
   return (
     <div>
+      {suggestions.length > 0 && <SuggestedMerges suggestions={suggestions} />}
       <Label>Rename to correct, or rename onto another entity to merge the two</Label>
       {entities.length === 0 ? (
         <p style={hint}>Nothing extracted yet. Add a source on the Knowledge tab.</p>
@@ -66,6 +82,43 @@ function EntitiesPane({ entities }: { entities: GraphEntity[] }) {
           <Pager page={page} total={entities.length} onPage={setPage} noun="entities" />
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * Duplicate pairs the graph itself suggests (lib/retrieval/graph.ts
+ * suggestedMerges). One click runs the same merge renaming onto an existing
+ * name does; a suggestion the admin disagrees with is simply never clicked.
+ */
+function SuggestedMerges({ suggestions }: { suggestions: MergeSuggestion[] }) {
+  return (
+    <div
+      style={{
+        border: "1px solid var(--accent-on-surface)",
+        borderRadius: 10,
+        padding: "10px 12px",
+        marginBottom: 14,
+      }}
+    >
+      <Label>Suggested merges — pairs that look like the same thing twice</Label>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {suggestions.map((s) => (
+          <div key={`${s.fromId}:${s.intoId}`} style={edgeRow}>
+            <span style={{ fontSize: 13, minWidth: 0 }}>
+              Merge <strong>{s.fromName}</strong> into <strong>{s.intoName}</strong>{" "}
+              <span style={{ fontStyle: "italic", color: "var(--accent-on-surface)" }}>
+                — {s.reason}
+              </span>
+            </span>
+            <form action={mergeSuggestedEntities}>
+              <input type="hidden" name="fromId" value={s.fromId} />
+              <input type="hidden" name="intoId" value={s.intoId} />
+              <button style={{ ...btnGhost, padding: "3px 9px", fontSize: 12 }}>Merge</button>
+            </form>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -238,9 +291,17 @@ function PaneTab({
   );
 }
 
-function Count({ n }: { n: number }) {
+// No colour override on the danger variant: the tab's own background swaps
+// between --primary and transparent, and a fixed danger colour can vanish
+// against either on some palettes. The glyph carries the warning by itself.
+function Count({ n, danger }: { n: number; danger?: boolean }) {
   return (
-    <span style={{ fontSize: 11, opacity: 0.75, fontWeight: 700 }}>{n}</span>
+    <span
+      style={{ fontSize: 11, opacity: 0.75, fontWeight: 700 }}
+      title={danger ? `${n} suggested merge${n === 1 ? "" : "s"}` : undefined}
+    >
+      {danger ? `⚠ ${n}` : n}
+    </span>
   );
 }
 

@@ -14,7 +14,7 @@ import { prisma, getProfile } from "@/lib/db";
 import { checkPassword, createSession, destroySession, isAuthed } from "@/lib/auth";
 import { extractLink, extractDocument, extractText, fileToText, writeProfileFromResume } from "@/lib/scrape";
 import { indexSource } from "@/lib/retrieval/indexer";
-import { renameEntity, deleteEntity, addEdge, deleteEdge } from "@/lib/retrieval/graph";
+import { renameEntity, deleteEntity, addEdge, deleteEdge, mergeEntities } from "@/lib/retrieval/graph";
 import { dropOrigin } from "@/lib/retrieval/indexer";
 import {
   indexProfile,
@@ -674,6 +674,16 @@ export async function removeEntity(formData: FormData) {
   await requireAuth();
   const id = String(formData.get("id") ?? "");
   if (id) await deleteEntity(id);
+  revalidatePath("/admin/dashboard");
+}
+
+/** One-click merge for a suggested duplicate pair. Stale ids fail soft. */
+export async function mergeSuggestedEntities(formData: FormData) {
+  await requireAuth();
+  await mergeEntities(
+    String(formData.get("fromId") ?? ""),
+    String(formData.get("intoId") ?? ""),
+  );
   revalidatePath("/admin/dashboard");
 }
 
