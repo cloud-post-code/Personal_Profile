@@ -2,7 +2,7 @@ import { prisma, getProfile } from "./db";
 import { personaPromptBlock } from "./persona";
 import { retrieve, formatContext } from "./retrieval/search";
 import { broadOverviews } from "./retrieval/clusters";
-import { googleConnected } from "./googleConnection";
+import { googleConfigured } from "./google";
 
 /**
  * Assembles the chatbot's system prompt: a persona core (profile, projects,
@@ -68,7 +68,7 @@ export async function buildSystemPrompt(query?: string): Promise<string> {
   // The booking tool is withheld from the model unless it can actually book, so
   // the instructions for it are withheld on the same condition — telling Claude
   // about a tool it hasn't been given is how you get an apology instead of a card.
-  const canBook = profile.bookingEnabled && (await googleConnected());
+  const canBook = profile.bookingEnabled && googleConfigured();
   const bookingLink = profile.bookingLink.trim();
 
   const personaBlock =

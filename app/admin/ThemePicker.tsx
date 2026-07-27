@@ -18,6 +18,17 @@ function ratioLabel(bg: string, fg: string): string {
   return r ? `${r.toFixed(1)}:1` : "—";
 }
 
+/** The px range themeVarLines will honor; anything else falls back to default. */
+const FONT_SIZE_MIN = 12;
+const FONT_SIZE_MAX = 24;
+
+/** Pull a typed base size back into range; blank or junk resets to the default. */
+function clampFontSize(v: string): string {
+  const n = Math.round(Number(v));
+  if (!Number.isFinite(n) || v.trim() === "") return "16";
+  return String(Math.min(FONT_SIZE_MAX, Math.max(FONT_SIZE_MIN, n)));
+}
+
 type FontOption = { key: string; label: string; family: string };
 type RadiusOption = { key: string; label: string; preview: string };
 
@@ -115,14 +126,19 @@ export function ThemePicker({
         </div>
         <div style={{ ...grid2, marginTop: 10 }}>
           <div>
-            <Label>Base text size — {fontSize}px</Label>
+            <Label>Base text size (px)</Label>
             <input
-              type="range"
-              min={13}
-              max={20}
+              type="number"
+              min={FONT_SIZE_MIN}
+              max={FONT_SIZE_MAX}
+              step={1}
               value={fontSize}
+              // Typing is left alone — half-entered values like "" or "1" have
+              // to survive keystrokes — and the range is enforced on blur so
+              // the saved value is one the theme renderer actually honors.
               onChange={(e) => setFontSize(e.target.value)}
-              style={{ width: "100%" }}
+              onBlur={(e) => setFontSize(clampFontSize(e.target.value))}
+              style={{ ...field, marginBottom: 0 }}
             />
           </div>
           <div>

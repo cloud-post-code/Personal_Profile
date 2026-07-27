@@ -1,17 +1,11 @@
 #!/usr/bin/env node
 /**
- * One-time Google Calendar authorization — the escape hatch.
+ * One-time Google Calendar authorization.
  *
  *   node scripts/google-auth.mjs
  *
- * You normally do not need this. Click "Connect Google Calendar" on the admin's
- * Booking tab instead: it runs the same consent flow in the browser and stores
- * the refresh token itself (encrypted, on the Profile row).
- *
- * This script stays for the cases the button can't cover — no admin access to
- * hand, or pinning a specific token via GOOGLE_REFRESH_TOKEN, which overrides
- * whatever the admin has connected. It prints a token to paste into .env (and
- * into Railway).
+ * Prints a GOOGLE_REFRESH_TOKEN to paste into .env (and into Railway). Run it
+ * again only if the token is revoked or you change scopes.
  *
  * Before running, in https://console.cloud.google.com:
  *   1. Create a project and enable the Google Calendar API.

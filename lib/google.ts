@@ -8,11 +8,8 @@ import type { Interval } from "@/lib/booking/slots";
  * insert. The repo already speaks to a REST API with bare `fetch`
  * (lib/github.ts), and this follows it.
  *
- * Authentication is a long-lived **refresh token**, granted by Blake from the
- * Booking tab's Connect button (or, as an escape hatch, by running
- * `node scripts/google-auth.mjs`). Where that token is kept and how it is
- * resolved is lib/googleConnection.ts; this file only knows how to obtain one,
- * spend one, and hand one back. A service account was not an option: the
+ * Authentication is a long-lived **refresh token** obtained once by running
+ * `node scripts/google-auth.mjs`. A service account was not an option: the
  * calendar is a personal @gmail.com account, where a robot identity can only be
  * granted access by an explicit share and still could not send invitations as
  * its owner.
@@ -30,15 +27,7 @@ export const GOOGLE_SCOPES = [
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
-const REVOKE_URL = "https://oauth2.googleapis.com/revoke";
 const API = "https://www.googleapis.com/calendar/v3";
-
-/**
- * Where Google sends the owner back after consent. Registering a redirect URI
- * is a manual step in the Cloud Console, so this is a constant the admin can
- * display verbatim rather than something derived per environment.
- */
-export const GOOGLE_CALLBACK_PATH = "/api/admin/google/callback";
 
 /** Refresh a minute early rather than discover expiry mid-booking. */
 const EXPIRY_MARGIN_MS = 60_000;
@@ -74,111 +63,37 @@ export type GoogleConfig = {
   calendarId: string;
 };
 
-/** The OAuth *application* — everything except which account granted access. */
-export type GoogleOAuthApp = {
-  clientId: string;
-  clientSecret: string;
-  calendarId: string;
-};
-
-/**
- * The client id and secret, from the environment. These identify the app
- * registered in the Cloud Console, not the account: no button can obtain them,
- * so unlike the refresh token they stay environment variables.
- */
-export function googleOAuthApp(): GoogleOAuthApp | null {
+/** The configured credentials, or null when the integration is not set up. */
+export function googleConfig(): GoogleConfig | null {
   const clientId = (process.env.GOOGLE_CLIENT_ID ?? "").trim();
   const clientSecret = (process.env.GOOGLE_CLIENT_SECRET ?? "").trim();
-  if (!clientId || !clientSecret) return null;
+  const refreshToken = (process.env.GOOGLE_REFRESH_TOKEN ?? "").trim();
+  if (!clientId || !clientSecret || !refreshToken) return null;
   return {
     clientId,
     clientSecret,
+    refreshToken,
     calendarId: (process.env.GOOGLE_CALENDAR_ID ?? "primary").trim() || "primary",
   };
 }
 
-/** The redirect URI to register in the Cloud Console, for a given site origin. */
-export function googleRedirectUri(origin: string): string {
-  return `${origin.replace(/\/+$/, "")}${GOOGLE_CALLBACK_PATH}`;
+export function googleConfigured(): boolean {
+  return googleConfig() !== null;
 }
 
-/**
- * The consent URL. `state` is the CSRF nonce the callback must see come back;
- * it is optional only so the standalone CLI script, which owns its own
- * short-lived loopback listener, can omit it.
- */
-export function authorizationUrl(clientId: string, redirectUri: string, state?: string): string {
+/** The consent URL `scripts/google-auth.mjs` sends the owner to, once. */
+export function authorizationUrl(clientId: string, redirectUri: string): string {
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: redirectUri,
     response_type: "code",
     scope: GOOGLE_SCOPES.join(" "),
     // Without both of these Google returns an access token and no refresh
-    // token, and the refresh token is the entire point of the round trip.
+    // token, and the script's whole purpose is the refresh token.
     access_type: "offline",
     prompt: "consent",
   });
-  if (state) params.set("state", state);
   return `${AUTH_URL}?${params.toString()}`;
-}
-
-/**
- * Trade the callback's one-time code for a refresh token.
- *
- * A grant that carries no refresh token is treated as a failure rather than a
- * quiet success. Google omits it when it already has a live grant for this
- * client, and storing an empty string while telling Blake "connected" would
- * leave booking dead in a way nothing else would ever explain.
- */
-export async function exchangeCode(
-  app: GoogleOAuthApp,
-  code: string,
-  redirectUri: string,
-): Promise<{ refreshToken: string; scope: string }> {
-  const res = await fetch(TOKEN_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      code,
-      client_id: app.clientId,
-      client_secret: app.clientSecret,
-      redirect_uri: redirectUri,
-      grant_type: "authorization_code",
-    }),
-  });
-
-  const body = (await res.json().catch(() => ({}))) as {
-    refresh_token?: string;
-    scope?: string;
-    error?: string;
-    error_description?: string;
-  };
-
-  if (!res.ok) {
-    throw new Error(
-      `Google rejected the authorization code (${res.status}): ` +
-        `${body.error_description ?? body.error ?? "no detail"}`,
-    );
-  }
-  if (!body.refresh_token) {
-    throw new Error(
-      "Google returned no refresh token. It already has a grant for this app — " +
-        "remove it at https://myaccount.google.com/permissions and connect again.",
-    );
-  }
-  return { refreshToken: body.refresh_token, scope: body.scope ?? "" };
-}
-
-/**
- * Hand the grant back. Best-effort by design: the caller is disconnecting, and
- * a revoke that fails must not stop the token being forgotten locally.
- */
-export async function revokeRefreshToken(refreshToken: string): Promise<void> {
-  await fetch(REVOKE_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ token: refreshToken }),
-  });
 }
 
 /**
@@ -216,7 +131,7 @@ export async function accessToken(cfg: GoogleConfig, now = Date.now()): Promise<
     // hit (Google expires them for unpublished consent screens), so say so.
     throw new Error(
       `Google token exchange failed (${res.status}): ${body.error_description ?? body.error ?? "no access_token"}. ` +
-        `Reconnect Google Calendar from the admin's Booking tab.`,
+        `Re-run scripts/google-auth.mjs to reauthorize.`,
     );
   }
 
