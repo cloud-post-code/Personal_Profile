@@ -68,8 +68,9 @@ export function A2uiPanel({ rows }: { rows: UiCardRow[] }) {
         live wiring: &ldquo;when the agent should show it&rdquo; goes into the
         chatbot&apos;s instructions, and deleting a card takes it away from the
         chatbot entirely. Deleting every card restores the starter set. Pick a
-        card to draw its preview — previews render the stored sample, not your
-        live data.
+        card to draw its preview — built-in cards preview a stored sample and
+        use your live data in chat; custom-built cards show exactly what you
+        saved.
       </p>
 
       {/* ── Toolbar: search, sort, add ── */}

@@ -24,6 +24,8 @@ export const CARD_TOOLS = [
   "show_contact_form",
   "show_booking",
   "show_booking_link",
+  // Custom-designed cards from the admin card builder, drawn by key.
+  "show_card",
 ] as const;
 
 export type CardTool = (typeof CARD_TOOLS)[number];

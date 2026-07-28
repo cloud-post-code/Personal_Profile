@@ -25,6 +25,16 @@ export type TimelineEntry = {
   dates: string;
   description: string;
 };
+export type CustomElement =
+  | { kind: "heading"; text: string }
+  | { kind: "text"; text: string }
+  | { kind: "list"; items: string[] }
+  | { kind: "badges"; items: string[] }
+  | { kind: "stats"; items: { label: string; value: string }[] }
+  | { kind: "buttons"; items: { label: string; url: string }[] }
+  | { kind: "image"; src: string; alt?: string }
+  | { kind: "quote"; text: string; by?: string }
+  | { kind: "divider" };
 export type UiBlock =
   | { type: "projects"; items: ProjectCard[] }
   | { type: "project"; item: ProjectCard | null }
@@ -32,7 +42,8 @@ export type UiBlock =
   | { type: "contact"; bookingLink?: string | null }
   | { type: "timeline"; items: TimelineEntry[]; summary: string }
   | { type: "booking" }
-  | { type: "booking_link"; url: string; name: string };
+  | { type: "booking_link"; url: string; name: string }
+  | { type: "custom"; title?: string; elements: CustomElement[] };
 
 export function Cards({ block }: { block: UiBlock }) {
   if (block.type === "projects") {
@@ -74,7 +85,117 @@ export function Cards({ block }: { block: UiBlock }) {
   if (block.type === "booking_link") {
     return <BookingLinkCard url={block.url} name={block.name} />;
   }
+  if (block.type === "custom") {
+    return <CustomCard title={block.title} elements={block.elements} />;
+  }
   return null;
+}
+
+/**
+ * A card composed in the admin card builder from the CustomElement vocabulary.
+ * Rendered defensively: the elements come from stored model output, so an
+ * unknown kind or a malformed entry is skipped, never a crash in a visitor's
+ * chat. External links open in a new tab like every other card link here.
+ */
+function CustomCard({ title, elements }: { title?: string; elements: CustomElement[] }) {
+  if (!Array.isArray(elements)) return null;
+  return (
+    <div data-fill="bg-soft" style={{ ...card, maxWidth: 480 }}>
+      {title && (
+        <strong style={{ fontSize: 15, fontFamily: "var(--font-heading)", display: "block", marginBottom: 8 }}>
+          {title}
+        </strong>
+      )}
+      {elements.map((el, i) => (
+        <CustomEl key={i} el={el} />
+      ))}
+    </div>
+  );
+}
+
+function CustomEl({ el }: { el: CustomElement }) {
+  if (!el || typeof el !== "object") return null;
+  switch (el.kind) {
+    case "heading":
+      return (
+        <div style={{ fontSize: 14, fontWeight: 600, fontFamily: "var(--font-heading)", margin: "10px 0 4px" }}>
+          {el.text}
+        </div>
+      );
+    case "text":
+      return (
+        <p style={{ fontSize: 14, color: "var(--on-bg-soft)", lineHeight: 1.55, margin: "4px 0" }}>{el.text}</p>
+      );
+    case "list":
+      if (!Array.isArray(el.items)) return null;
+      return (
+        <ul style={{ margin: "4px 0", paddingLeft: 18 }}>
+          {el.items.map((it, i) => (
+            <li key={i} style={{ fontSize: 14, color: "var(--on-bg-soft)", lineHeight: 1.55 }}>
+              {it}
+            </li>
+          ))}
+        </ul>
+      );
+    case "badges":
+      if (!Array.isArray(el.items)) return null;
+      return (
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: "6px 0" }}>
+          {el.items.map((it, i) => (
+            <span key={i} style={{ fontSize: 11, color: "var(--accent-on-bg-soft)" }}>
+              #{it}
+            </span>
+          ))}
+        </div>
+      );
+    case "stats":
+      if (!Array.isArray(el.items)) return null;
+      return (
+        <div style={{ display: "flex", gap: 18, flexWrap: "wrap", margin: "8px 0" }}>
+          {el.items.map((s, i) => (
+            <div key={i}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: "var(--on-bg-soft)" }}>{s?.value}</div>
+              <div style={{ fontSize: 11, color: "var(--on-bg-soft)", opacity: 0.75 }}>{s?.label}</div>
+            </div>
+          ))}
+        </div>
+      );
+    case "buttons":
+      if (!Array.isArray(el.items)) return null;
+      return (
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "8px 0 2px" }}>
+          {el.items.map((b, i) => (
+            <a key={i} href={b?.url} target="_blank" rel="noreferrer" style={{ ...linkBtn, ...(i === 0 ? liveBtn : {}) }}>
+              {b?.label}
+            </a>
+          ))}
+        </div>
+      );
+    case "image":
+      if (!el.src) return null;
+      // eslint-disable-next-line @next/next/no-img-element
+      return <img src={el.src} alt={el.alt ?? ""} style={{ width: "100%", borderRadius: 10, margin: "6px 0" }} />;
+    case "quote":
+      return (
+        <blockquote
+          style={{
+            margin: "8px 0",
+            paddingLeft: 12,
+            borderLeft: "2px solid var(--accent-on-bg-soft)",
+            fontStyle: "italic",
+            fontSize: 14,
+            color: "var(--on-bg-soft)",
+          }}
+        >
+          {el.text}
+          {el.by && <div style={{ fontSize: 12, marginTop: 4, fontStyle: "normal", opacity: 0.75 }}>— {el.by}</div>}
+        </blockquote>
+      );
+    case "divider":
+      return <hr style={{ border: "none", borderTop: "1px solid var(--border)", margin: "10px 0" }} />;
+    default:
+      return null;
+  }
 }
 
 /** The external scheduler: one card, one button, opens in a new tab. */

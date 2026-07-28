@@ -135,7 +135,11 @@ export function CardBuilder({
                 </p>
               )}
             </div>
-            <Label>Preview (sample content — the live card uses your real data)</Label>
+            <Label>
+              {draft.tool === "show_card"
+                ? "Preview — a custom card shows exactly this content to visitors"
+                : "Preview (sample content — the live card uses your real data)"}
+            </Label>
             {block ? (
               <Cards block={block} />
             ) : (

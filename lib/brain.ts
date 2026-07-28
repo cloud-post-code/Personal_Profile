@@ -14,7 +14,7 @@ import {
 import { recordTurn } from "@/lib/activity";
 import { findServableCanned, recordCannedHit } from "@/lib/canned";
 import { bookingLive } from "@/lib/booking/service";
-import { cardCatalog, toolUsableNow } from "@/lib/uiCards";
+import { cardCatalog, toolUsableNow, customCardBlock } from "@/lib/uiCards";
 
 /**
  * The chatbot, independent of how it was reached. `answer()` is the one entry
@@ -138,6 +138,25 @@ const BOOKING_LINK_TOOL: Anthropic.Tool = {
   input_schema: { type: "object", properties: {} },
 };
 
+/**
+ * The tool for cards designed in the admin card builder. One tool for all of
+ * them, keyed: the key enum makes the model's choice a closed set, and the
+ * per-card "when to show it" guidance lives in the system prompt beside it.
+ */
+function customCardTool(keys: string[]): Anthropic.Tool {
+  return {
+    name: "show_card",
+    description:
+      "Render one of Blake's custom-designed cards. Pass the card's key exactly as given " +
+      "in the USING RICH CARDS instructions.",
+    input_schema: {
+      type: "object",
+      properties: { key: { type: "string", enum: keys, description: "The card's key" } },
+      required: ["key"],
+    },
+  };
+}
+
 /** Turn a tool call into the UI block it names. Shared by both tiers. */
 async function hydrate(name: string, input: Record<string, unknown>): Promise<UiBlock | null> {
   switch (name) {
@@ -158,6 +177,10 @@ async function hydrate(name: string, input: Record<string, unknown>): Promise<Ui
     case "show_booking_link":
       // Null once the link is cleared, for the same canned-answer reason.
       return bookingLinkBlock();
+    case "show_card":
+      // Null when the key doesn't name a custom card any more — a canned
+      // answer can outlive the card it pointed at.
+      return customCardBlock(String(input.key ?? ""));
     default:
       return null;
   }
@@ -199,6 +222,9 @@ async function* runModel(
       catalogTools.has(t.name) &&
       toolUsableNow(t.name, { canBook, hasBookingLink: !!linkUrl }),
   );
+  // Custom-designed cards share one keyed tool, built from the catalog.
+  const customKeys = catalog.filter((c) => c.tool === "show_card").map((c) => c.key);
+  if (customKeys.length) tools.push(customCardTool(customKeys));
   const convo: Anthropic.MessageParam[] = history.map((m) => ({
     role: m.role,
     content: m.content,

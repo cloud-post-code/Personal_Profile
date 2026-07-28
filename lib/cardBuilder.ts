@@ -30,11 +30,14 @@ const TOOL_TO_TYPE: Record<CardTool, string> = {
   show_contact_form: "contact",
   show_booking: "booking",
   show_booking_link: "booking_link",
+  show_card: "custom",
 };
 
 const BUILDER_BRIEF = `You design "A2UI cards" for a personal portfolio site's chatbot. A card is a rich UI block the chatbot can draw in a conversation. Your job: turn the owner's description into ONE card definition.
 
-The available tools and the exact JSON shape each one's sample must have ("type" must match the tool):
+There are two ways to build a card. FIRST decide which fits:
+
+1. A LIVE-DATA card, when the owner wants the site's own content (their projects, photos, work history, contact form, booking). These hydrate from the database at chat time, so their sample is ILLUSTRATIVE ("Sample Project A" style). Tools and exact sample shapes ("type" must match the tool):
 - show_projects → {"type":"projects","items":[ProjectCard, …]} — a grid of project cards
 - show_project → {"type":"project","item":ProjectCard} — one project, drawn wide
 - show_gallery → {"type":"gallery","layout":"carousel"|"filmstrip","items":[PhotoCard, …]} — photos
@@ -43,17 +46,22 @@ The available tools and the exact JSON shape each one's sample must have ("type"
 - show_booking → {"type":"booking"} — live open times from the calendar (no other fields)
 - show_booking_link → {"type":"booking_link","url":"https://…","name":"Blake"} — external scheduler link
 
-Field shapes:
+2. A CUSTOM card (tool "show_card"), for anything else — services and prices, an FAQ, testimonials, a skills breakdown, whatever the owner describes. You design it yourself from typed elements, and the content you write IS what visitors will see (nothing is hydrated later — write it fully and well). Shape:
+{"type":"custom","title":"…","elements":[Element, …]}
+Element is one of:
+{"kind":"heading","text":"…"} | {"kind":"text","text":"…"} | {"kind":"list","items":["…"]} | {"kind":"badges","items":["…"]} | {"kind":"stats","items":[{"label":"…","value":"…"}]} | {"kind":"buttons","items":[{"label":"…","url":"https://…"}]} | {"kind":"image","src":"placeholder"} | {"kind":"quote","text":"…","by":"…"} | {"kind":"divider"}
+
+Field shapes for live-data samples:
 ProjectCard = {"id":string,"name":string,"blurb":string,"detail":string|null,"githubUrl":string|null,"liveUrl":string|null,"imageUrl":string|null,"tags":[string,…]}
 PhotoCard = {"id":string,"src":string,"description":string,"caption":string|null}
 TimelineEntry = {"role":string,"company":string,"dates":string,"description":string}
 
 Rules:
-- The sample is ILLUSTRATIVE content ("Sample Project A" style), not real data — the live card is hydrated from the site's database at chat time.
+- Prefer a live-data tool when the intent clearly matches one; design a custom card for everything else.
 - For every image field (src, imageUrl), use the exact string "placeholder" — the system swaps it for a generated placeholder image. Never use a real URL for images.
+- In a custom card, only include facts the owner actually stated. Where you need specifics they didn't give (a price, a link), keep it generic and flag it in "note" so they know to revise.
 - "reason" is the instruction the chatbot will actually receive about when to show this card. Write it as guidance, starting "When …".
 - "note" is an optional admin-facing caveat; usually "".
-- Pick the tool that best matches the owner's intent.
 
 Respond with ONLY a JSON object (no prose, no code fences):
 {"label":"…","tool":"show_…","description":"one line on what it renders","reason":"When …","note":"","sampleBlock":{…the block object…}}`;

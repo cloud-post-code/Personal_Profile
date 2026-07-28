@@ -164,7 +164,13 @@ async function knowledgeBlock(query: string | undefined, chunkCount: number): Pr
 export function cardRulesSection(cards: CardGuidance[]): string {
   const lines = cards
     .filter((c) => c.reason.trim())
-    .map((c) => `- ${c.tool}: ${c.reason.trim()}`);
+    // Custom cards share one tool, so the key is part of the instruction:
+    // it is the argument the model must pass to draw THIS card.
+    .map((c) =>
+      c.tool === "show_card"
+        ? `- show_card with key "${c.key}": ${c.reason.trim()}`
+        : `- ${c.tool}: ${c.reason.trim()}`,
+    );
   if (!lines.length) return "";
   return `
 

@@ -32,10 +32,29 @@ export type TimelineEntry = {
   description: string;
 };
 
+/**
+ * One element of a custom-designed card. A closed vocabulary rather than
+ * markup: the card builder's model output becomes visitor-facing UI, and a
+ * fixed set of typed elements is what keeps that safe and on-theme.
+ */
+export type CustomElement =
+  | { kind: "heading"; text: string }
+  | { kind: "text"; text: string }
+  | { kind: "list"; items: string[] }
+  | { kind: "badges"; items: string[] }
+  | { kind: "stats"; items: { label: string; value: string }[] }
+  | { kind: "buttons"; items: { label: string; url: string }[] }
+  | { kind: "image"; src: string; alt?: string }
+  | { kind: "quote"; text: string; by?: string }
+  | { kind: "divider" };
+
 export type UiBlock =
   | { type: "projects"; items: ProjectCard[] }
   | { type: "project"; item: ProjectCard | null }
   | { type: "gallery"; layout: "carousel" | "filmstrip"; items: PhotoCard[] }
+  // A card designed in the admin card builder. Unlike the tool-drawn blocks
+  // above, the stored content IS the card — nothing is hydrated at chat time.
+  | { type: "custom"; title?: string; elements: CustomElement[] }
   // Optional because older stored blocks (canned answers, A2A payloads) predate
   // the field; absent reads the same as "no link configured".
   | { type: "contact"; bookingLink?: string | null }

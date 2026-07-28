@@ -37,6 +37,7 @@ const BLOCK_TYPES = [
   "timeline",
   "booking",
   "booking_link",
+  "custom",
 ] as const;
 
 /**
@@ -127,7 +128,7 @@ export async function deleteUiCard(id: string) {
   await prisma.uiCard.delete({ where: { id } });
 }
 
-export type CardGuidance = { tool: string; reason: string };
+export type CardGuidance = { tool: string; reason: string; key: string };
 
 /**
  * Whether a card's tool can succeed RIGHT NOW. The booking tools depend on
@@ -155,13 +156,25 @@ export async function cardCatalog(): Promise<CardGuidance[]> {
   try {
     const rows = await prisma.uiCard.findMany({
       orderBy: [{ order: "asc" }, { createdAt: "asc" }],
-      select: { tool: true, reason: true },
+      select: { tool: true, reason: true, key: true },
     });
     if (rows.length > 0) return rows;
   } catch {
     // fall through to starters
   }
-  return STARTER_CARDS.map((c) => ({ tool: c.tool, reason: c.reason }));
+  return STARTER_CARDS.map((c) => ({ tool: c.tool, reason: c.reason, key: c.key }));
+}
+
+/**
+ * A custom card's stored block, for the show_card tool at chat time. Only
+ * "custom" blocks are served: pointing show_card at a built-in card would draw
+ * its SAMPLE content to a visitor as if it were real.
+ */
+export async function customCardBlock(key: string): Promise<UiBlock | null> {
+  if (!key.trim()) return null;
+  const row = await prisma.uiCard.findUnique({ where: { key: key.trim() } });
+  const block = row ? parseSampleBlock(row.sampleBlock) : null;
+  return block && block.type === "custom" ? block : null;
 }
 
 /**
