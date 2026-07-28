@@ -65,7 +65,7 @@ function SuggestedMerges({ suggestions }: { suggestions: MergeSuggestion[] }) {
     <div
       style={{
         border: "1px solid var(--accent-on-surface)",
-        borderRadius: 10,
+        borderRadius: "var(--radius-sm)",
         padding: "10px 12px",
         marginBottom: 14,
       }}
@@ -107,7 +107,7 @@ function EntityRow({ entity }: { entity: GraphEntity }) {
     <div
       style={{
         border: `1px solid ${orphan ? "var(--danger-on-surface)" : "var(--border)"}`,
-        borderRadius: 10,
+        borderRadius: "var(--radius-sm)",
         padding: "10px 12px",
       }}
     >
@@ -263,6 +263,6 @@ const edgeRow: React.CSSProperties = {
   gap: 10,
   alignItems: "center",
   border: "1px solid var(--border)",
-  borderRadius: 8,
+  borderRadius: "var(--radius-sm)",
   padding: "6px 12px",
 };

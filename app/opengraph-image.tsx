@@ -109,6 +109,7 @@ export default async function OgImage() {
   const onPrimary = v["--on-primary"] ?? onSurface;
   const radiusLg = v["--radius-lg"] ?? "22px";
   const radiusMd = v["--radius-md"] ?? "14px";
+  const radiusPill = v["--radius-pill"] ?? "999px";
   // themeVarLines only emits 400–900 in hundreds, matching next/og's Weight union.
   const headingWeight = (Number(v["--heading-weight"] ?? "700") || 700) as 400 | 500 | 600 | 700 | 800 | 900;
 
@@ -203,7 +204,7 @@ export default async function OgImage() {
                 background: bgSoft,
                 border: `1px solid ${border}`,
                 color: onBgSoft,
-                borderRadius: 999,
+                borderRadius: radiusPill,
                 padding: "11px 20px",
                 fontSize: 17,
                 whiteSpace: "nowrap",

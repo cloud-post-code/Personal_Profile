@@ -165,7 +165,7 @@ select {
 }
 ::-webkit-scrollbar-thumb {
   background: var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
 }
 
 /* Utility classes used across pages */

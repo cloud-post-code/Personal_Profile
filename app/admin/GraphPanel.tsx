@@ -220,7 +220,7 @@ function Notice({ children }: { children: React.ReactNode }) {
         fontSize: 13,
         color: "var(--danger-on-surface)",
         border: "1px solid color-mix(in srgb, var(--danger-on-surface) 45%, transparent)",
-        borderRadius: 8,
+        borderRadius: "var(--radius-sm)",
         padding: "8px 12px",
         marginBottom: 10,
       }}
@@ -263,7 +263,7 @@ const statGrid: React.CSSProperties = {
 };
 const statTile: React.CSSProperties = {
   border: "1px solid var(--border)",
-  borderRadius: 10,
+  borderRadius: "var(--radius-sm)",
   padding: "10px 12px",
   background: "var(--bg-soft)",
   color: "var(--on-bg-soft)",
@@ -277,13 +277,13 @@ const statLabel: React.CSSProperties = {
 };
 const overviewBox: React.CSSProperties = {
   border: "1px solid var(--border)",
-  borderRadius: 10,
+  borderRadius: "var(--radius-sm)",
   padding: "8px 12px",
 };
 const originPill: React.CSSProperties = {
   fontSize: 12,
   border: "1px solid var(--border)",
-  borderRadius: 999,
+  borderRadius: "var(--radius-pill)",
   padding: "3px 11px",
   background: "var(--bg-soft)",
   color: "var(--on-bg-soft)",

@@ -204,14 +204,14 @@ const listItem: React.CSSProperties = { lineHeight: 1.45 };
 const codeInline: React.CSSProperties = {
   fontFamily: "inherit",
   background: "color-mix(in srgb, currentColor 10%, transparent)",
-  borderRadius: 5,
+  borderRadius: "var(--radius-sm)",
   padding: "1px 5px",
   fontSize: "0.92em",
 };
 const codeBlock: React.CSSProperties = {
   fontFamily: "inherit",
   background: "color-mix(in srgb, currentColor 8%, transparent)",
-  borderRadius: 8,
+  borderRadius: "var(--radius-sm)",
   padding: "10px 12px",
   margin: 0,
   whiteSpace: "pre-wrap",

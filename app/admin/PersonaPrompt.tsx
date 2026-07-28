@@ -36,7 +36,7 @@ export function PersonaPrompt({ prompt }: { prompt: string }) {
     <div
       style={{
         border: "1px solid var(--border)",
-        borderRadius: 10,
+        borderRadius: "var(--radius-md)",
         padding: 14,
         marginBottom: 18,
       }}
@@ -82,7 +82,7 @@ export function PersonaPrompt({ prompt }: { prompt: string }) {
             overflow: "auto",
             background: "var(--surface)",
             border: "1px solid var(--border)",
-            borderRadius: 8,
+            borderRadius: "var(--radius-sm)",
             padding: 12,
             fontSize: 12,
             lineHeight: 1.5,

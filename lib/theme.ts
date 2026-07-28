@@ -75,13 +75,18 @@ export function themeCssVars(): string {
 
 /**
  * Corner-roundness presets. Each drives the --radius-* CSS tokens so the whole
- * site (buttons, cards, inputs) shares one curvature. `pill` stays capped so
- * cards/inputs don't collapse into lozenges. Shown in the admin "Corners" picker.
+ * site (buttons, cards, inputs) shares one curvature. Shown in the admin
+ * "Corners" picker.
+ *
+ * `pill` is the radius for lozenge-shaped things — chips, tabs, badges, round
+ * icon buttons. It stays fully round for both soft presets, but a Sharp theme
+ * squares them off too: leaving them at 999px was the one thing the picker
+ * could never restyle, so "Sharp" still rendered a page full of capsules.
  */
 export const RADIUS_PRESETS = {
-  sharp: { label: "Sharp", sm: "2px", md: "3px", lg: "4px" },
-  rounded: { label: "Rounded (default)", sm: "8px", md: "14px", lg: "22px" },
-  pill: { label: "Pill (extra soft)", sm: "14px", md: "22px", lg: "32px" },
+  sharp: { label: "Sharp", sm: "2px", md: "3px", lg: "4px", pill: "3px" },
+  rounded: { label: "Rounded (default)", sm: "8px", md: "14px", lg: "22px", pill: "999px" },
+  pill: { label: "Pill (extra soft)", sm: "14px", md: "22px", lg: "32px", pill: "999px" },
 } as const;
 
 export type RadiusKey = keyof typeof RADIUS_PRESETS;
@@ -398,6 +403,7 @@ export function themeVarLines(opts: {
     lines.push(`--radius-sm:${preset.sm};`);
     lines.push(`--radius-md:${preset.md};`);
     lines.push(`--radius-lg:${preset.lg};`);
+    lines.push(`--radius-pill:${preset.pill};`);
   }
 
   // Base font size (px) and heading weight.

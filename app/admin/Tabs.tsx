@@ -49,7 +49,7 @@ export function Tabs({
 const badgeStyle: React.CSSProperties = {
   background: "var(--accent)",
   color: "var(--on-accent)",
-  borderRadius: 999,
+  borderRadius: "var(--radius-pill)",
   fontSize: 11,
   fontWeight: 700,
   padding: "0 6px",

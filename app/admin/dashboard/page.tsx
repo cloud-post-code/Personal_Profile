@@ -130,9 +130,9 @@ export default async function Dashboard({
       <div style={{ display: "flex", gap: 16, alignItems: "center", marginBottom: 20 }}>
         {profile.headshot ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={profile.headshot} alt="headshot" style={{ width: 72, height: 72, borderRadius: 999, objectFit: "cover", border: "1px solid var(--border)" }} />
+          <img src={profile.headshot} alt="headshot" style={{ width: 72, height: 72, borderRadius: "var(--radius-pill)", objectFit: "cover", border: "1px solid var(--border)" }} />
         ) : (
-          <div style={{ width: 72, height: 72, borderRadius: 999, background: "var(--bg-soft)", border: "1px solid var(--border)" }} />
+          <div style={{ width: 72, height: 72, borderRadius: "var(--radius-pill)", background: "var(--bg-soft)", border: "1px solid var(--border)" }} />
         )}
         <form action={uploadHeadshot}>
           <Label>Headshot</Label>
@@ -407,9 +407,9 @@ export default async function Dashboard({
       <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12 }}>
         {photos.length === 0 && <Empty>No photos yet.</Empty>}
         {photos.map((ph) => (
-          <div key={ph.id} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 10 }}>
+          <div key={ph.id} style={{ border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: 10 }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={`/api/uploads/${ph.filename}`} alt={ph.description || "photo"} style={{ width: "100%", borderRadius: 8, display: "block", marginBottom: 8 }} />
+            <img src={`/api/uploads/${ph.filename}`} alt={ph.description || "photo"} style={{ width: "100%", borderRadius: "var(--radius-sm)", display: "block", marginBottom: 8 }} />
             <form action={updatePhoto}>
               <input type="hidden" name="id" value={ph.id} />
               <textarea name="description" defaultValue={ph.description} rows={3} placeholder="One-paragraph description…" style={{ ...field, marginBottom: 6, fontSize: 13, resize: "vertical" }} />
@@ -432,7 +432,7 @@ export default async function Dashboard({
       {contacts.length === 0 && <Empty>No submissions yet. They arrive via the in-chat contact form.</Empty>}
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {contacts.map((c) => (
-          <div key={c.id} style={{ border: `1px solid ${c.handled ? "var(--border)" : "var(--primary)"}`, borderRadius: 10, padding: 14, opacity: c.handled ? 0.6 : 1 }}>
+          <div key={c.id} style={{ border: `1px solid ${c.handled ? "var(--border)" : "var(--primary)"}`, borderRadius: "var(--radius-sm)", padding: 14, opacity: c.handled ? 0.6 : 1 }}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start" }}>
               <div style={{ minWidth: 0 }}>
                 <strong style={{ fontSize: 14 }}>{c.name}</strong>{" "}
@@ -502,7 +502,7 @@ export default async function Dashboard({
                       gap: 10,
                       alignItems: "center",
                       border: "1px solid var(--border)",
-                      borderRadius: 8,
+                      borderRadius: "var(--radius-sm)",
                       padding: "7px 12px",
                     }}
                   >
@@ -524,7 +524,7 @@ export default async function Dashboard({
                         fontWeight: 700,
                         color: "var(--accent-on-bg-soft)",
                         background: "var(--bg-soft)",
-                        borderRadius: 999,
+                        borderRadius: "var(--radius-pill)",
                         padding: "1px 9px",
                       }}
                     >
@@ -539,7 +539,7 @@ export default async function Dashboard({
           <Label>All conversations</Label>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {chatSessions.map((s) => (
-          <details key={s.id} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px" }}>
+          <details key={s.id} style={{ border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "12px 14px" }}>
             <summary style={{ cursor: "pointer", display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", listStyle: "none" }}>
               <span style={{ minWidth: 0, flex: 1 }}>
                 <strong style={{ fontSize: 14, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -751,7 +751,7 @@ function MessageRow({
           background: isUser ? "var(--primary)" : "var(--bg-soft)",
           color: isUser ? "var(--on-primary)" : "var(--on-bg-soft)",
           border: isUser ? "1px solid transparent" : "1px solid var(--border)",
-          borderRadius: 12,
+          borderRadius: "var(--radius-md)",
           padding: "8px 12px",
           fontSize: 13,
           whiteSpace: "pre-wrap",
@@ -832,7 +832,7 @@ function Stat({ label, value }: { label: string; value: number }) {
       data-fill="bg-soft"
       style={{
         border: "1px solid var(--border)",
-        borderRadius: 10,
+        borderRadius: "var(--radius-sm)",
         padding: "12px 14px",
         background: "var(--bg-soft)",
         color: "var(--on-bg-soft)",

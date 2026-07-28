@@ -30,7 +30,7 @@ export function ProjectRow({ project }: { project: ProjectRowData }) {
         onSubmit={() => setEditing(false)}
         style={{
           border: "1px solid var(--primary)",
-          borderRadius: 10,
+          borderRadius: "var(--radius-sm)",
           padding: "12px 14px",
         }}
       >
@@ -93,7 +93,7 @@ export function ProjectRow({ project }: { project: ProjectRowData }) {
         justifyContent: "space-between",
         alignItems: "center",
         border: "1px solid var(--border)",
-        borderRadius: 10,
+        borderRadius: "var(--radius-sm)",
         padding: "10px 14px",
         gap: 10,
       }}
@@ -135,7 +135,7 @@ export function ProjectRow({ project }: { project: ProjectRowData }) {
                 style={{
                   fontSize: 11,
                   padding: "2px 8px",
-                  borderRadius: 999,
+                  borderRadius: "var(--radius-pill)",
                   border: "1px solid var(--border)",
                   color: "var(--on-surface)",
                   fontStyle: "italic",

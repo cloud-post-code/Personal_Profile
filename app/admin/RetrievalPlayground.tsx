@@ -102,7 +102,7 @@ const meta: React.CSSProperties = {
 const pill: React.CSSProperties = {
   fontSize: 11,
   border: "1px solid var(--border)",
-  borderRadius: 999,
+  borderRadius: "var(--radius-pill)",
   padding: "2px 9px",
   background: "var(--bg-soft)",
   color: "var(--on-bg-soft)",
@@ -110,7 +110,7 @@ const pill: React.CSSProperties = {
 };
 const chunkBox: React.CSSProperties = {
   border: "1px solid var(--border)",
-  borderRadius: 10,
+  borderRadius: "var(--radius-sm)",
   padding: "8px 12px",
 };
 const chunkText: React.CSSProperties = {

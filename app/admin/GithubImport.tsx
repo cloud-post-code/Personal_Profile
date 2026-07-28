@@ -147,7 +147,7 @@ export function GithubImport() {
                   style={{
                     fontSize: 11,
                     padding: "1px 8px",
-                    borderRadius: 999,
+                    borderRadius: "var(--radius-pill)",
                     background: "var(--primary)",
                     color: "var(--on-primary)",
                     fontWeight: 600,
@@ -168,7 +168,7 @@ export function GithubImport() {
                       style={{
                         fontSize: 11,
                         padding: "2px 8px",
-                        borderRadius: 999,
+                        borderRadius: "var(--radius-pill)",
                         border: "1px solid var(--border)",
                         color: "var(--on-bg-soft)",
                         fontStyle: "italic",

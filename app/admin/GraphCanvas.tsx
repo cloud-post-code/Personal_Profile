@@ -257,7 +257,7 @@ export function GraphCanvas({
         style={{
           height: 560,
           border: "1px solid var(--border)",
-          borderRadius: 10,
+          borderRadius: "var(--radius-md)",
           background: "var(--bg-soft)",
         }}
       />
@@ -272,7 +272,7 @@ export function GraphCanvas({
       </div>
 
       {selected && (
-        <div style={{ marginTop: 12, border: "1px solid var(--border)", borderRadius: 10, padding: "10px 14px" }}>
+        <div style={{ marginTop: 12, border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "10px 14px" }}>
           <strong style={{ fontSize: 14 }}>{selected.name}</strong>{" "}
           <span style={{ fontSize: 12, fontStyle: "italic" }}>({selected.type})</span>
           <div style={{ fontSize: 12, marginTop: 4 }}>

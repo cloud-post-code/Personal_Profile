@@ -65,7 +65,7 @@ export function KnowledgePanel({
 /** One stored source: what it is, whether the scan worked, and its summary. */
 function SourceRow({ source: s }: { source: KnowledgeSource }) {
   return (
-    <div style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 14 }}>
+    <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: 14 }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start" }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 4, flexWrap: "wrap" }}>
@@ -110,7 +110,7 @@ function SourceRow({ source: s }: { source: KnowledgeSource }) {
 function TypePill({ t }: { t: string }) {
   const icon = t === "pdf" ? "PDF" : t === "doc" ? "DOC" : t === "text" ? "TXT" : "LINK";
   return (
-    <span style={{ fontSize: 11, color: "var(--on-surface)", fontStyle: "italic", border: "1px solid var(--border)", borderRadius: 999, padding: "1px 7px" }}>{icon}</span>
+    <span style={{ fontSize: 11, color: "var(--on-surface)", fontStyle: "italic", border: "1px solid var(--border)", borderRadius: "var(--radius-pill)", padding: "1px 7px" }}>{icon}</span>
   );
 }
 
@@ -122,6 +122,6 @@ function StatusPill({ status }: { status: string }) {
   };
   const s = map[status] ?? map.pending;
   return (
-    <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: s.c, border: `1px solid ${s.c}`, borderRadius: 999, padding: "1px 7px" }}>{s.t}</span>
+    <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: s.c, border: `1px solid ${s.c}`, borderRadius: "var(--radius-pill)", padding: "1px 7px" }}>{s.t}</span>
   );
 }

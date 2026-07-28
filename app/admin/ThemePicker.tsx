@@ -204,7 +204,7 @@ export function ThemePicker({
             <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--on-surface)" }}>
               {/* A strip of the applied palette, so the name has something to
                   read against while the eye is still on this row. */}
-              <span style={{ display: "flex", borderRadius: 4, overflow: "hidden", border: "1px solid var(--border)" }}>
+              <span style={{ display: "flex", borderRadius: "var(--radius-sm)", overflow: "hidden", border: "1px solid var(--border)" }}>
                 {PRESET_SWATCH_ROLES.map((role) => (
                   <span
                     key={role}
@@ -342,7 +342,7 @@ export function ThemePicker({
       {/* ── Live preview ── */}
       <div>
         <strong style={{ fontSize: 13, color: "var(--on-surface)", display: "block", marginBottom: 10 }}>Live preview</strong>
-        <div className="theme-preview" style={{ borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)" }}>
+        <div className="theme-preview" style={{ borderRadius: "var(--radius-md)", overflow: "hidden", border: "1px solid var(--border)" }}>
           {/* Scoped CSS vars so the preview renders exactly like the live site. */}
           <style>{`.theme-preview{${previewCss}}`}</style>
           <PreviewCard />
@@ -450,7 +450,7 @@ function ColorField({
               display: "block",
               width: 32,
               height: 32,
-              borderRadius: 8,
+              borderRadius: "var(--radius-sm)",
               background: shown,
               border: "2px solid var(--border)",
             }}
