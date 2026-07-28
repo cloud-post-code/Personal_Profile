@@ -212,6 +212,11 @@ export function A2uiPanel() {
   // have switched a card off for visitors.
   const [hidden, setHidden] = useState<string[]>([]);
   const [sort, setSort] = useState<SortKey>("default");
+  // Collapsed by default. Eight cards drawn at once — three of which are tall,
+  // and two of which mount live fetches — turn the tab into a long scroll you
+  // have to hunt through. Closed, it reads as an index of what the chatbot can
+  // draw; a card renders only once it has been asked for.
+  const [open, setOpen] = useState<string[]>([]);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -231,7 +236,15 @@ export function A2uiPanel() {
     );
   }, [query, hidden, sort]);
 
+  const isOpen = (id: string) => open.includes(id);
+
+  function toggle(id: string) {
+    setOpen((o) => (o.includes(id) ? o.filter((x) => x !== id) : [...o, id]));
+  }
+
+  /** Jumping to a closed card opens it — landing on a bare heading is a dud. */
   function jumpTo(id: string) {
+    setOpen((o) => (o.includes(id) ? o : [...o, id]));
     document.getElementById(anchorId(id))?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
@@ -239,9 +252,10 @@ export function A2uiPanel() {
     <section data-fill="surface" style={panel}>
       <SectionTitle>A2UI</SectionTitle>
       <p style={{ color: "var(--on-surface)", fontStyle: "italic", fontSize: 13, marginBottom: 14 }}>
-        The rich cards the chatbot can show in a conversation. Each one below is
-        a sample on invented content, drawn by the same component visitors see —
-        so this is what the card looks like, not what your data says.
+        The rich cards the chatbot can show in a conversation. Pick one to draw
+        it — each is a sample on invented content, rendered by the same component
+        visitors see, so it shows what the card looks like, not what your data
+        says.
       </p>
 
       {/* ── Toolbar: search and sort ── */}
@@ -265,6 +279,11 @@ export function A2uiPanel() {
             </option>
           ))}
         </select>
+        {open.length > 0 && (
+          <button type="button" onClick={() => setOpen([])} style={btnGhost as React.CSSProperties}>
+            Close all
+          </button>
+        )}
         {hidden.length > 0 && (
           <button type="button" onClick={() => setHidden([])} style={btnGhost as React.CSSProperties}>
             Restore {hidden.length} hidden
@@ -314,12 +333,26 @@ export function A2uiPanel() {
         <div
           key={s.id}
           id={anchorId(s.id)}
-          style={{ marginBottom: i === visible.length - 1 ? 0 : 26, scrollMarginTop: 12 }}
+          style={{
+            marginBottom: i === visible.length - 1 ? 0 : isOpen(s.id) ? 26 : 10,
+            scrollMarginTop: 12,
+          }}
         >
-          <div style={{ display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap", marginBottom: 4 }}>
-            <strong style={{ fontSize: 14 }}>{s.label}</strong>
-            <code style={toolName}>{s.tool}</code>
-            <span style={{ fontSize: 13, color: "var(--on-surface)" }}>{s.renders}</span>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={() => toggle(s.id)}
+              aria-expanded={isOpen(s.id)}
+              aria-controls={`${anchorId(s.id)}-body`}
+              style={rowToggle}
+            >
+              <span aria-hidden style={{ fontSize: 11, opacity: 0.7 }}>
+                {isOpen(s.id) ? "▾" : "▸"}
+              </span>
+              <strong style={{ fontSize: 14 }}>{s.label}</strong>
+              <code style={toolName}>{s.tool}</code>
+              <span style={{ fontSize: 13, fontWeight: 400 }}>{s.renders}</span>
+            </button>
             <button
               type="button"
               onClick={() => setHidden((h) => [...h, s.id])}
@@ -329,19 +362,39 @@ export function A2uiPanel() {
               Delete
             </button>
           </div>
-          {s.note && (
-            <p style={{ fontSize: 12, fontStyle: "italic", color: "var(--accent-on-surface)", margin: "0 0 8px" }}>
-              {s.note}
-            </p>
+          {isOpen(s.id) && (
+            <div id={`${anchorId(s.id)}-body`}>
+              {s.note && (
+                <p style={{ fontSize: 12, fontStyle: "italic", color: "var(--accent-on-surface)", margin: "6px 0 0" }}>
+                  {s.note}
+                </p>
+              )}
+              <div style={{ marginTop: 8 }}>
+                <Cards block={s.block} />
+              </div>
+            </div>
           )}
-          <div style={{ marginTop: 8 }}>
-            <Cards block={s.block} />
-          </div>
         </div>
       ))}
     </section>
   );
 }
+
+/** The whole heading is the disclosure control, so the hit target is the row. */
+const rowToggle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  flexWrap: "wrap",
+  flex: 1,
+  minWidth: 0,
+  padding: "6px 0",
+  background: "none",
+  border: "none",
+  color: "inherit",
+  textAlign: "left",
+  cursor: "pointer",
+};
 
 const toolName: React.CSSProperties = {
   fontSize: 12,
