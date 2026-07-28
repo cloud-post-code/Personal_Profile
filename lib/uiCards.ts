@@ -177,8 +177,8 @@ export async function seedStarterUiCards() {
   });
 }
 
-/** A flat placeholder image, so the gallery samples need no uploads. */
-function swatch(label: string, bg: string): string {
+/** A flat placeholder image, so sample cards need no uploads. */
+export function swatch(label: string, bg: string): string {
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="320">` +
     `<rect width="480" height="320" fill="${bg}"/>` +

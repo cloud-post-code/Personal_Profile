@@ -34,6 +34,7 @@ import {
 } from "@/lib/retrieval/origins";
 import { saveCannedAnswer, deleteCannedAnswer } from "@/lib/canned";
 import { saveUiCard, deleteUiCard } from "@/lib/uiCards";
+import { draftUiCard, type CardDraft } from "@/lib/cardBuilder";
 import { redraftAnswer } from "@/lib/answerDrafts";
 import { safeExperience, safeSocials } from "@/lib/knowledge";
 import { PERSONA_SECTIONS, writePersonaSections } from "@/lib/persona";
@@ -724,31 +725,50 @@ export async function redraftCanned(formData: FormData) {
   revalidatePath("/admin/dashboard");
 }
 
-export async function saveCard(formData: FormData) {
-  await requireAuth();
-  // Validation failures are swallowed here: a plain form action has nowhere to
-  // surface a message without converting the whole panel to useActionState,
-  // and the checks (a name, a known tool, parseable JSON) mirror what the form
-  // itself constrains. The row simply doesn't change when input is invalid.
-  await saveUiCard({
-    id: String(formData.get("id") ?? "").trim() || undefined,
-    key: String(formData.get("key") ?? ""),
-    label: String(formData.get("label") ?? ""),
-    tool: String(formData.get("tool") ?? ""),
-    description: String(formData.get("description") ?? ""),
-    reason: String(formData.get("reason") ?? ""),
-    note: String(formData.get("note") ?? ""),
-    sampleBlock: String(formData.get("sampleBlock") ?? ""),
-    order: Number(formData.get("order") ?? 0) || 0,
-  });
-  revalidatePath("/admin/dashboard");
-}
-
 export async function deleteCard(formData: FormData) {
   await requireAuth();
   const id = String(formData.get("id") ?? "").trim();
   if (id) await deleteUiCard(id);
   revalidatePath("/admin/dashboard");
+}
+
+/**
+ * The card builder page's model call: describe → draft, or draft + feedback →
+ * revised draft. Returns errors as data — the page shows them next to a retry
+ * instead of surfacing an error boundary.
+ */
+export async function draftCard(input: {
+  instructions: string;
+  current?: CardDraft;
+  feedback?: string;
+}): Promise<{ ok: true; draft: CardDraft } | { ok: false; error: string }> {
+  await requireAuth();
+  try {
+    return { ok: true, draft: await draftUiCard(input) };
+  } catch (e) {
+    return { ok: false, error: err(e) };
+  }
+}
+
+/** Persist a builder draft — same validated write path as the form. */
+export async function saveBuiltCard(input: {
+  id?: string;
+  key?: string;
+  draft: CardDraft;
+}): Promise<{ ok: boolean; error?: string }> {
+  await requireAuth();
+  const error = await saveUiCard({
+    id: input.id,
+    key: input.key ?? "",
+    label: input.draft.label,
+    tool: input.draft.tool,
+    description: input.draft.description,
+    reason: input.draft.reason,
+    note: input.draft.note,
+    sampleBlock: input.draft.sampleBlock,
+  });
+  revalidatePath("/admin/dashboard");
+  return error ? { ok: false, error } : { ok: true };
 }
 
 function err(e: unknown): string {

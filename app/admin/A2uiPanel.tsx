@@ -1,11 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { Cards } from "@/app/cards/Cards";
 import { parseSampleBlock, type UiCardRow } from "@/lib/uiCards";
-import { CARD_TOOLS } from "@/lib/canned";
-import { saveCard, deleteCard } from "./actions";
-import { panel, field, btn, btnGhost, btnDanger, SectionTitle, Label } from "./ui";
+import { deleteCard } from "./actions";
+import { panel, field, btn, btnGhost, btnDanger, SectionTitle } from "./ui";
 
 /**
  * The A2UI tab: the card catalog, one database row per card the chatbot can
@@ -15,8 +15,9 @@ import { panel, field, btn, btnGhost, btnDanger, SectionTitle, Label } from "./u
  * site's data says. The starter set is seeded once; rows are editable,
  * addable and deletable from here.
  *
- * Collapsed by default: open, eight cards — two of which mount live fetches —
- * are a long scroll; closed, the tab reads as an index.
+ * Collapsed by default, and only one card open at a time: clicking a heading
+ * draws that card and puts away whichever was open, so the tab stays the
+ * height of the list plus one preview.
  */
 
 type SortKey = "default" | "tool-asc" | "tool-desc";
@@ -32,8 +33,8 @@ const anchorId = (key: string) => `a2ui-${key}`;
 export function A2uiPanel({ rows }: { rows: UiCardRow[] }) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>("default");
-  const [open, setOpen] = useState<string[]>([]);
-  const [adding, setAdding] = useState(false);
+  // One card open at a time: opening a card closes the previous one.
+  const [openId, setOpenId] = useState<string | null>(null);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -53,16 +54,10 @@ export function A2uiPanel({ rows }: { rows: UiCardRow[] }) {
     );
   }, [rows, query, sort]);
 
-  const isOpen = (id: string) => open.includes(id);
+  const isOpen = (id: string) => openId === id;
 
   function toggle(id: string) {
-    setOpen((o) => (o.includes(id) ? o.filter((x) => x !== id) : [...o, id]));
-  }
-
-  /** Jumping to a closed card opens it — landing on a bare heading is a dud. */
-  function jumpTo(r: UiCardRow) {
-    setOpen((o) => (o.includes(r.id) ? o : [...o, r.id]));
-    document.getElementById(anchorId(r.key))?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setOpenId((o) => (o === id ? null : id));
   }
 
   return (
@@ -98,57 +93,10 @@ export function A2uiPanel({ rows }: { rows: UiCardRow[] }) {
             </option>
           ))}
         </select>
-        {open.length > 0 && (
-          <button type="button" onClick={() => setOpen([])} style={btnGhost as React.CSSProperties}>
-            Close all
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={() => setAdding((v) => !v)}
-          aria-expanded={adding}
-          style={btn as React.CSSProperties}
-        >
-          {adding ? "Cancel" : "+ Add card"}
-        </button>
+        <Link href="/admin/cards/new" style={{ ...(btn as React.CSSProperties), textDecoration: "none" }}>
+          + Build a card
+        </Link>
       </div>
-
-      {adding && (
-        <div style={{ border: "1px solid var(--primary)", borderRadius: "var(--radius-md)", padding: 14, marginBottom: 18 }}>
-          <strong style={{ fontSize: 14, display: "block", marginBottom: 10 }}>New card</strong>
-          <CardForm />
-        </div>
-      )}
-
-      {/* ── Table of contents ── */}
-      {visible.length > 0 && (
-        <nav
-          aria-label="Cards on this tab"
-          style={{
-            border: "1px solid var(--border)",
-            borderRadius: "var(--radius-md)",
-            padding: "12px 14px",
-            marginBottom: 22,
-          }}
-        >
-          <div style={{ fontSize: 12, fontStyle: "italic", color: "var(--on-surface)", marginBottom: 8 }}>
-            {visible.length} card{visible.length === 1 ? "" : "s"}
-          </div>
-          <ol style={{ display: "flex", flexWrap: "wrap", gap: 8, listStyle: "none", margin: 0, padding: 0 }}>
-            {visible.map((r) => (
-              <li key={r.id}>
-                <button
-                  type="button"
-                  onClick={() => jumpTo(r)}
-                  style={{ ...(btnGhost as React.CSSProperties), fontStyle: "normal" }}
-                >
-                  {r.label}
-                </button>
-              </li>
-            ))}
-          </ol>
-        </nav>
-      )}
 
       {visible.length === 0 && (
         <p style={{ color: "var(--on-surface)", fontStyle: "italic", fontSize: 14 }}>
@@ -197,14 +145,12 @@ export function A2uiPanel({ rows }: { rows: UiCardRow[] }) {
                 </p>
               )}
               <CardPreview raw={r.sampleBlock} />
-              <details style={{ marginTop: 12 }}>
-                <summary style={{ fontSize: 13, cursor: "pointer", color: "var(--on-surface)" }}>
-                  Edit this card
-                </summary>
-                <div style={{ marginTop: 10 }}>
-                  <CardForm row={r} />
-                </div>
-              </details>
+              <Link
+                href={`/admin/cards/${r.id}`}
+                style={{ ...(btnGhost as React.CSSProperties), display: "inline-block", marginTop: 12, textDecoration: "none" }}
+              >
+                Refine this card →
+              </Link>
             </div>
           )}
         </div>
@@ -227,65 +173,6 @@ function CardPreview({ raw }: { raw: string }) {
     <div style={{ marginTop: 8 }}>
       <Cards block={block} />
     </div>
-  );
-}
-
-/** Create (no row) or edit (row) — one server-action form either way. */
-function CardForm({ row }: { row?: UiCardRow }) {
-  return (
-    <form action={saveCard}>
-      {row && <input type="hidden" name="id" value={row.id} />}
-      {row && <input type="hidden" name="key" value={row.key} />}
-      <div style={{ display: "grid", gap: 10, gridTemplateColumns: "1fr 1fr" }}>
-        <div>
-          <Label>Name</Label>
-          <input name="label" defaultValue={row?.label ?? ""} placeholder="Gallery — carousel" style={field} />
-        </div>
-        <div>
-          <Label>Tool that draws it</Label>
-          <select name="tool" defaultValue={row?.tool ?? CARD_TOOLS[0]} style={field}>
-            {CARD_TOOLS.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-      <Label>What it renders (one line)</Label>
-      <input
-        name="description"
-        defaultValue={row?.description ?? ""}
-        placeholder="Photos one at a time, with arrows and dots."
-        style={field}
-      />
-      <Label>When the agent should show it</Label>
-      <textarea
-        name="reason"
-        defaultValue={row?.reason ?? ""}
-        rows={2}
-        placeholder="When asked to see photos, a gallery, or pictures…"
-        style={{ ...field, resize: "vertical" }}
-      />
-      <Label>Note (optional, shown on this tab)</Label>
-      <input
-        name="note"
-        defaultValue={row?.note ?? ""}
-        placeholder="Live card — reads your actual calendar."
-        style={field}
-      />
-      <Label>Sample block (JSON the preview renders)</Label>
-      <textarea
-        name="sampleBlock"
-        defaultValue={row?.sampleBlock ?? ""}
-        rows={6}
-        placeholder='{"type":"gallery","layout":"carousel","items":[…]}'
-        spellCheck={false}
-        style={{ ...field, resize: "vertical", fontFamily: "monospace", fontSize: 12 }}
-      />
-      <input type="hidden" name="order" value={row?.order ?? 0} />
-      <button style={btn as React.CSSProperties}>{row ? "Save card" : "Add card"}</button>
-    </form>
   );
 }
 
