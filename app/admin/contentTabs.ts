@@ -1,5 +1,5 @@
 /** Keys of the sub-tabs inside the combined Content section. */
-export const CONTENT_TAB_KEYS = ["projects", "links", "pdfs", "text", "photos"] as const;
+export const CONTENT_TAB_KEYS = ["projects", "links", "pdfs", "text", "photos", "persona"] as const;
 export type ContentTabKey = (typeof CONTENT_TAB_KEYS)[number];
 
 /** Knowledge used to be one Content sub-tab; it is now split by source kind. */
@@ -14,15 +14,16 @@ export const AGENT_TAB_KEYS = ["answers", "goals", "rules", "a2ui"] as const;
 export type AgentTabKey = (typeof AGENT_TAB_KEYS)[number];
 
 /** Keys of the sub-tabs inside the combined Me section. */
-export const ME_TAB_KEYS = ["profile", "persona", "theme"] as const;
+export const ME_TAB_KEYS = ["profile", "theme"] as const;
 export type MeTabKey = (typeof ME_TAB_KEYS)[number];
 
 /**
  * Deep-link resolution for the dashboard. `projects` and `knowledge` used to
- * be top-level nav keys and now live inside the Content section, `contacts`
- * now lives inside the Activity section, `answers` (shown as "Presets") now
- * lives inside the Agent Behavior section, and `persona` and `theme` now live
- * inside the Me section — so an old `?tab=` link resolves to the combined
+ * be top-level nav keys and now live inside the Content section (as does
+ * `persona`), `contacts` now lives inside the Activity section, `answers`
+ * (shown as "Presets") now lives inside the Agent Behavior section, and
+ * `theme` now lives inside the Me section — so an old `?tab=` link resolves
+ * to the combined
  * entry opened on that sub-tab; every other key passes through untouched.
  */
 export function resolveAdminTab(tab: string | undefined): {

@@ -617,7 +617,6 @@ export default async function Dashboard({
                 ariaLabel="Me sections"
                 tabs={[
                   { key: "profile", label: "Profile", content: profileTab },
-                  { key: "persona", label: "Persona", content: personaTab },
                   { key: "theme", label: "Theme", content: themeTab },
                 ]}
               />
@@ -635,6 +634,7 @@ export default async function Dashboard({
                   { key: "pdfs", label: "PDFs", content: pdfsTab },
                   { key: "text", label: "Text", content: textTab },
                   { key: "photos", label: "Photos", content: photosSection },
+                  { key: "persona", label: "Persona", content: personaTab },
                 ]}
               />
             ),
