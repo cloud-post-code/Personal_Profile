@@ -335,6 +335,18 @@ card — the card supplements the words, it doesn't replace them. Canned answers
 can name the same tools, so the "projects" starter chip still renders real cards
 while costing nothing.
 
+**Which cards exist is data, not code.** The `UiCard` table
+([`lib/uiCards.ts`](lib/uiCards.ts)), edited on the admin **Agent Behavior →
+A2UI** tab, is the card catalog: a tool is offered to the model only when a
+card row names it, and each row's "when the agent should show it" text becomes
+a line of the prompt's card instructions. Deleting a card takes it away from
+the chatbot; an empty catalog falls back to the starter set (which also
+re-seeds on the next dashboard load). The one thing a row cannot do is force a
+tool past its live gate — `show_booking` stays withheld unless booking is on
+and Google is connected, `show_booking_link` unless a link is set. Canned
+answers bypass the catalog on purpose: a card named on a preset is Blake's
+explicit per-answer choice.
+
 Ask the bot *"show me your projects"* or *"let me see some photos"* and you get
 cards, not paragraphs.
 

@@ -14,6 +14,7 @@ import {
 import { recordTurn } from "@/lib/activity";
 import { findServableCanned, recordCannedHit } from "@/lib/canned";
 import { bookingLive } from "@/lib/booking/service";
+import { cardCatalog, toolUsableNow } from "@/lib/uiCards";
 
 /**
  * The chatbot, independent of how it was reached. `answer()` is the one entry
@@ -180,14 +181,24 @@ async function* runModel(
 ): AsyncGenerator<BrainEvent> {
   // The visitor's latest question drives retrieval: the prompt carries only the
   // knowledge relevant to it, not the whole source library.
-  const [system, canBook, linkUrl] = await Promise.all([
+  const [system, canBook, linkUrl, catalog] = await Promise.all([
     buildSystemPrompt(message),
     bookingLive(),
     bookingLinkUrl(),
+    cardCatalog(),
   ]);
-  const tools = [...TOOLS];
-  if (canBook) tools.push(BOOKING_TOOL);
-  if (linkUrl) tools.push(BOOKING_LINK_TOOL);
+  // A tool is offered only when a catalog card names it AND its live gate
+  // passes. The catalog decides what exists (Blake's A2UI tab); the gate keeps
+  // the booking tools withheld while they cannot actually book — a card row
+  // can remove a tool, but it can never force one past its gate. The prompt's
+  // card instructions are filtered by the same two conditions in knowledge.ts,
+  // so the model is never told about a tool it wasn't given.
+  const catalogTools = new Set(catalog.map((c) => c.tool));
+  const tools = [...TOOLS, BOOKING_TOOL, BOOKING_LINK_TOOL].filter(
+    (t) =>
+      catalogTools.has(t.name) &&
+      toolUsableNow(t.name, { canBook, hasBookingLink: !!linkUrl }),
+  );
   const convo: Anthropic.MessageParam[] = history.map((m) => ({
     role: m.role,
     content: m.content,

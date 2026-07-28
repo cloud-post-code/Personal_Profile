@@ -30,6 +30,7 @@ import { GithubImport } from "../GithubImport";
 import { GraphPanel } from "../GraphPanel";
 import { AnswersPanel } from "../AnswersPanel";
 import { A2uiPanel } from "../A2uiPanel";
+import { seedStarterUiCards, listUiCards } from "@/lib/uiCards";
 import { PersonaPrompt } from "../PersonaPrompt";
 import { personaExtractionPrompt } from "@/lib/personaPrompt";
 import { graphStats, listEntities, listEdges, suggestedMerges } from "@/lib/retrieval/graph";
@@ -75,6 +76,7 @@ export default async function Dashboard({
     gSuggestions,
     gOverviews,
     canned,
+    uiCards,
   ] = await Promise.all([
       getProfile(),
       prisma.project.findMany({ orderBy: { order: "asc" } }),
@@ -102,6 +104,9 @@ export default async function Dashboard({
       seedStarterAnswers()
         .then(() => draftBlankAnswers().catch(() => 0))
         .then(listCannedAnswers),
+      // Same bootstrap shape as the answers: the starter cards fill an empty
+      // table once, then the rows are Blake's.
+      seedStarterUiCards().then(listUiCards),
     ]);
   const metrics = chatMetrics(chatSessions);
   const unhandled = contacts.filter((c) => !c.handled).length;
@@ -675,7 +680,7 @@ export default async function Dashboard({
                   { key: "answers", label: "Presets", content: <AnswersPanel rows={canned} /> },
                   { key: "goals", label: "Goals", content: goalsTab },
                   { key: "rules", label: "Rules", content: rulesTab },
-                  { key: "a2ui", label: "A2UI", content: <A2uiPanel /> },
+                  { key: "a2ui", label: "A2UI", content: <A2uiPanel rows={uiCards} /> },
                 ]}
               />
             ),

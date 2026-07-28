@@ -252,6 +252,34 @@ model CannedAnswer {
   updatedAt DateTime @updatedAt
 }
 
+/// One A2UI card the admin curates: what it's called, which tool draws it,
+/// when the agent should reach for it, and a stored sample payload the admin
+/// tab renders as a preview. The starter set is seeded once into an empty
+/// table; after that the rows are Blake's to edit, add to, or delete —
+/// re-seeding would resurrect deliberate deletions.
+model UiCard {
+  id          String   @id @default(cuid())
+  /// Stable slug ("gallery-carousel") — the anchor id on the admin tab.
+  key         String   @unique
+  /// Human name shown as the card's heading ("Gallery — carousel").
+  label       String
+  /// The A2UI tool that draws it: show_projects | show_project | show_gallery
+  /// | show_timeline | show_contact_form | show_booking | show_booking_link.
+  tool        String
+  /// One line on what the card renders, shown next to the tool name.
+  description String   @default("") @db.Text
+  /// When the agent should show this card — the guidance text for this tool.
+  reason      String   @default("") @db.Text
+  /// Admin-facing caveat ("live card — reads your actual calendar"), if any.
+  note        String   @default("") @db.Text
+  /// JSON UiBlock (lib/cards.ts shape) the preview renders — the card's
+  /// structure with sample content, not live site data.
+  sampleBlock String   @default("{}") @db.Text
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 /// A contact submission captured by the in-chat A2UI contact form.
 model Contact {
   id        String   @id @default(cuid())

@@ -3,6 +3,7 @@ import { personaPromptBlock } from "./persona";
 import { retrieve, formatContext } from "./retrieval/search";
 import { broadOverviews } from "./retrieval/clusters";
 import { googleConfigured } from "./google";
+import { cardCatalog, toolUsableNow, type CardGuidance } from "./uiCards";
 
 /**
  * Assembles the chatbot's system prompt: a persona core (profile, projects,
@@ -14,8 +15,9 @@ import { googleConfigured } from "./google";
  * we fall back to the legacy dump of recent source summaries so the bot is
  * never knowledge-blind.
  *
- * The prompt also tells Claude HOW to use the A2UI tools (show_projects,
- * show_project, show_gallery) so it can render rich cards in chat.
+ * The prompt also tells Claude HOW to use the A2UI tools, from the card
+ * catalog Blake edits on the admin A2UI tab (lib/uiCards.ts) — each card's
+ * "when to show it" text becomes a line of the USING RICH CARDS section.
  */
 export async function buildSystemPrompt(query?: string): Promise<string> {
   const [profile, projects, photos, corrections, chunkCount] = await Promise.all([
@@ -52,10 +54,6 @@ export async function buildSystemPrompt(query?: string): Promise<string> {
 
   const sourceBlock = await knowledgeBlock(query, chunkCount);
 
-  const photoBlock = photos.length
-    ? `${photos.length} photo(s) available. Use show_gallery to display them.`
-    : "(No photos uploaded yet.)";
-
   const correctionNotes = corrections
     .map((c) => c.note?.trim())
     .filter((n): n is string => !!n);
@@ -65,11 +63,26 @@ export async function buildSystemPrompt(query?: string): Promise<string> {
         .join("\n")}`
     : "";
 
-  // The booking tool is withheld from the model unless it can actually book, so
-  // the instructions for it are withheld on the same condition — telling Claude
-  // about a tool it hasn't been given is how you get an apology instead of a card.
+  // The booking tools are withheld from the model unless they can actually
+  // book, so the instructions for them are withheld on the same condition —
+  // telling Claude about a tool it hasn't been given is how you get an apology
+  // instead of a card. The same live gate filters the tool list in brain.ts.
   const canBook = profile.bookingEnabled && googleConfigured();
   const bookingLink = profile.bookingLink.trim();
+
+  // The card catalog Blake curates on the A2UI tab: which cards exist and when
+  // to show each. The live gate above can only remove cards, never add one.
+  const cards = (await cardCatalog()).filter((c) =>
+    toolUsableNow(c.tool, { canBook, hasBookingLink: !!bookingLink }),
+  );
+  const cardTools = new Set(cards.map((c) => c.tool));
+
+  // Photos are only worth announcing as showable if the gallery card exists.
+  const photoBlock = photos.length
+    ? `${photos.length} photo(s) available.${
+        cardTools.has("show_gallery") ? " Use show_gallery to display them." : ""
+      }`
+    : "(No photos uploaded yet.)";
 
   const personaBlock =
     personaPromptBlock(profile.personaSections) ||
@@ -98,16 +111,7 @@ KNOWLEDGE FOR THIS QUESTION (retrieved from everything Blake curates — his
 profile and experience, persona, project write-ups, photo descriptions, saved
 sources, and answers he approved. Each block is labelled with where it came
 from):
-${sourceBlock}
-
-USING RICH CARDS (A2UI):
-You have tools that render visual cards in the chat. Prefer them over plain text lists:
-- When asked about projects generally, call show_projects (renders all project cards).
-- When focused on ONE project, call show_project with its id.
-- When asked to see photos / a gallery / pictures, call show_gallery. Choose layout "carousel" for a slideshow feel, or "filmstrip" for a browsable strip with a lightbox.
-- When asked about experience, background, career, work history, a CV or resume, or where Blake has worked, call show_timeline. Speak to the arc of it in your own words; leave the roles, companies and dates to the card rather than listing them again.
-- When someone wants to connect, reach out, get in touch, hire, or collaborate, call show_contact_form so they can leave their details — then also mention the direct contact info above.${bookingBlock(canBook, bookingLink)}
-Always add a short spoken sentence alongside a card — the card supplements your words, it doesn't replace them.
+${sourceBlock}${cardRulesSection(cards)}
 
 RULES:
 - Only state facts present above. If you don't know, say so warmly and point them to how they can connect with Blake directly.
@@ -150,25 +154,24 @@ async function knowledgeBlock(query: string | undefined, chunkCount: number): Pr
 }
 
 /**
- * The booking instruction, only when there is a booking tool to instruct about.
- * Booking beats the contact form when the visitor wants a conversation: one is
- * a confirmed meeting, the other is a message in a queue.
+ * The USING RICH CARDS section, from the already-gated card list. One line per
+ * card with a written reason; a card whose reason is blank contributes its
+ * tool's existence (the PHOTOS line, the tool list in brain.ts) but no
+ * guidance line. No cards at all — every row deleted or gated off — means no
+ * section: instructing the model about cards it cannot draw is how you get an
+ * apology instead of a card.
  */
-function bookingBlock(canBook: boolean, bookingLink: string): string {
-  const lines: string[] = [];
-  if (canBook) {
-    lines.push(
-      `\n- When someone wants to meet, talk, book a call, get time on the calendar, or asks when Blake is free, call show_booking. It shows his REAL open times from his live calendar and confirms the meeting on the spot — prefer it over show_contact_form whenever a conversation is what they want. Never state specific available times yourself; you don't have them, the card does.`,
-    );
-  }
-  if (bookingLink) {
-    lines.push(
-      canBook
-        ? `\n- show_booking_link renders a card linking to Blake's external booking page. Prefer show_booking's live times; use show_booking_link only when the visitor asks for a link to schedule later or share with someone else.`
-        : `\n- When someone wants to meet, talk, book a call, or find a time, call show_booking_link — it renders a card linking to Blake's booking page, where they pick a time themselves. Prefer it over show_contact_form whenever a conversation is what they want.`,
-    );
-  }
-  return lines.join("");
+export function cardRulesSection(cards: CardGuidance[]): string {
+  const lines = cards
+    .filter((c) => c.reason.trim())
+    .map((c) => `- ${c.tool}: ${c.reason.trim()}`);
+  if (!lines.length) return "";
+  return `
+
+USING RICH CARDS (A2UI):
+You have tools that render visual cards in the chat. Prefer them over plain text lists. When to use each:
+${lines.join("\n")}
+Always add a short spoken sentence alongside a card — the card supplements your words, it doesn't replace them.`;
 }
 
 function connectBlock(p: {

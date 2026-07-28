@@ -33,6 +33,7 @@ import {
   indexApprovedAnswer,
 } from "@/lib/retrieval/origins";
 import { saveCannedAnswer, deleteCannedAnswer } from "@/lib/canned";
+import { saveUiCard, deleteUiCard } from "@/lib/uiCards";
 import { redraftAnswer } from "@/lib/answerDrafts";
 import { safeExperience, safeSocials } from "@/lib/knowledge";
 import { PERSONA_SECTIONS, writePersonaSections } from "@/lib/persona";
@@ -720,6 +721,33 @@ export async function redraftCanned(formData: FormData) {
   } catch (e) {
     console.error(`redraftCanned(${id}) failed:`, e);
   }
+  revalidatePath("/admin/dashboard");
+}
+
+export async function saveCard(formData: FormData) {
+  await requireAuth();
+  // Validation failures are swallowed here: a plain form action has nowhere to
+  // surface a message without converting the whole panel to useActionState,
+  // and the checks (a name, a known tool, parseable JSON) mirror what the form
+  // itself constrains. The row simply doesn't change when input is invalid.
+  await saveUiCard({
+    id: String(formData.get("id") ?? "").trim() || undefined,
+    key: String(formData.get("key") ?? ""),
+    label: String(formData.get("label") ?? ""),
+    tool: String(formData.get("tool") ?? ""),
+    description: String(formData.get("description") ?? ""),
+    reason: String(formData.get("reason") ?? ""),
+    note: String(formData.get("note") ?? ""),
+    sampleBlock: String(formData.get("sampleBlock") ?? ""),
+    order: Number(formData.get("order") ?? 0) || 0,
+  });
+  revalidatePath("/admin/dashboard");
+}
+
+export async function deleteCard(formData: FormData) {
+  await requireAuth();
+  const id = String(formData.get("id") ?? "").trim();
+  if (id) await deleteUiCard(id);
   revalidatePath("/admin/dashboard");
 }
 
