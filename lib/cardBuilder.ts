@@ -1,4 +1,6 @@
 import { claude, claudeModel } from "@/lib/claude";
+import { prisma, getProfile } from "@/lib/db";
+import { safeTags, safeExperience } from "@/lib/knowledge";
 import { CARD_TOOLS, type CardTool } from "@/lib/canned";
 import { parseSampleBlock, swatch } from "@/lib/uiCards";
 
@@ -60,7 +62,8 @@ Coding rules (violations fail validation or render blank):
 - "height" is the rendered height in px (40–1200): size it to the content, it does not auto-grow.
 
 DESIGN SYSTEM for coded cards — this is the site's real system; colors, edges and text MUST follow it, and validation enforces the hard rules:
-- COLORS (enforced): only the theme variables, or color-mix() blends of them for shades — raw hex/rgb()/hsl() values are rejected. Available: var(--bg), var(--bg-soft), var(--surface), var(--border), var(--text), var(--primary), var(--accent), var(--on-primary), var(--on-accent), var(--on-surface), var(--on-bg-soft), var(--accent-on-bg-soft), var(--accent-on-surface), var(--danger-on-bg-soft), var(--success-on-bg-soft). Text sitting on bg-soft uses var(--on-bg-soft); accents use the accent-on-* variant matching the surface. Shade example: color-mix(in srgb, var(--primary) 35%, transparent).
+- COLORS (enforced): only the theme variables, or color-mix() blends of them for shades — raw hex/rgb()/hsl() values are rejected. Backgrounds/fills/borders: var(--bg-soft), var(--surface), var(--primary), var(--accent), var(--border). Shade example: color-mix(in srgb, var(--primary) 35%, transparent).
+- TEXT COLOR (enforced, this one bites): the "color" property may ONLY use the readable-on tokens — var(--on-bg-soft) for normal text, var(--accent-on-bg-soft) for emphasis, var(--success-on-bg-soft)/var(--danger-on-bg-soft) for status, var(--on-primary) on a primary background, var(--on-surface) on a surface background — or color-mix() blends of those (keep the token at ≥55% so text stays legible). NEVER color text with var(--primary)/var(--accent)/var(--surface) directly: on many themes those sit close to the card background and the text becomes invisible. Vary word-cloud emphasis with font-size, font-weight and ≥55% color-mix opacity of the on-tokens, not with brand colors. The same rule applies to SVG fill/stroke on text-bearing shapes.
 - TEXT (enforced): never declare a concrete font-family — headings already use the site's heading font (h1 17px, h2 15px, h3 14px) and body text is already 14px/1.55 in the site font; font-family declarations that don't reference a var() are rejected. Secondary/caption text: 11–12px, often italic. Tags: 11px, var(--accent-on-bg-soft), "#" prefix, no background.
 - EDGES: containers use border:1px solid var(--border) with border-radius var(--radius-md); small controls var(--radius-sm); pills and dots var(--radius-pill). Don't invent other corner treatments.
 - BUTTONS: primary = background var(--primary), color var(--on-primary), no border, padding 10px 18px, radius var(--radius-sm); secondary = transparent, 1px solid var(--border), italic.
@@ -74,6 +77,7 @@ TimelineEntry = {"role":string,"company":string,"dates":string,"description":str
 
 Rules:
 - Prefer a live-data tool when the intent clearly matches site content; stock elements for simple text cards; CODED html when the layout is the point.
+- Custom and coded card content comes from the REAL SITE DATA section below — real project names, real tags, real roles. Never invent facts; where the data is silent, stay generic and say so in "note".
 - For every image field (src, imageUrl), use the exact string "placeholder" — the system swaps it for a generated placeholder image. Never use a real URL for images.
 - In a custom card, only include facts the owner actually stated. Where you need specifics they didn't give (a price, a link), keep it generic and flag it in "note" so they know to revise.
 - "reason" is the instruction the chatbot will actually receive about when to show this card. Write it as guidance, starting "When …".
@@ -81,6 +85,42 @@ Rules:
 
 Respond with ONLY a JSON object (no prose, no code fences):
 {"label":"…","tool":"show_…","description":"one line on what it renders","reason":"When …","note":"","sampleBlock":{…the block object…}}`;
+
+/**
+ * The site's actual content, given to the drafting model so custom and coded
+ * cards are built FROM real data instead of invented "typical" examples. A
+ * card listing project tags carries Blake's real tags; the model only stays
+ * generic where the data is silent. Best-effort: a DB hiccup degrades to
+ * drafting without data, not a dead builder.
+ */
+async function siteDataBrief(): Promise<string> {
+  try {
+    const [profile, projects, photoCount] = await Promise.all([
+      getProfile(),
+      prisma.project.findMany({ orderBy: { order: "asc" } }),
+      prisma.photo.count(),
+    ]);
+    const lines: string[] = ["REAL SITE DATA (build card content from this — do not invent facts):"];
+    lines.push(`Owner: ${profile.name}${profile.tagline ? ` — ${profile.tagline}` : ""}${profile.location ? `, ${profile.location}` : ""}`);
+    if (projects.length) {
+      lines.push("Projects (name | tags | blurb):");
+      for (const p of projects.slice(0, 20)) {
+        lines.push(`- ${p.name} | ${safeTags(p.tags).join(", ") || "(no tags)"} | ${p.blurb.slice(0, 140)}`);
+      }
+    } else {
+      lines.push("Projects: none added yet.");
+    }
+    const roles = safeExperience(profile.experience);
+    if (roles.length) {
+      lines.push("Experience (role @ company, dates):");
+      for (const r of roles.slice(0, 12)) lines.push(`- ${r.role} @ ${r.company}, ${r.dates}`);
+    }
+    lines.push(`Photos: ${photoCount} uploaded.`);
+    return lines.join("\n").slice(0, 3500);
+  } catch {
+    return "REAL SITE DATA: (unavailable right now — keep content generic and flag it in the note.)";
+  }
+}
 
 /** Minimal client surface, injectable for tests (same pattern as answerDrafts). */
 export type BuilderClient = {
@@ -119,6 +159,7 @@ export async function draftUiCard(
   }
 
   const client = deps.client ?? claude();
+  const system = `${BUILDER_BRIEF}\n\n${await siteDataBrief()}`;
   // Agentic self-correction: a draft that fails validation goes back to the
   // model WITH the validation error, once. The errors are written as
   // instructions ("use the theme variables…"), so the second attempt usually
@@ -129,7 +170,7 @@ export async function draftUiCard(
       model: claudeModel(),
       // Coded cards carry full HTML documents; don't truncate them mid-tag.
       max_tokens: 4000,
-      system: BUILDER_BRIEF,
+      system,
       messages: convo,
     });
     const raw = textOf(response.content);
@@ -222,6 +263,22 @@ function enforceThemedHtml(html: string): void {
       "The coded card hard-codes colors. Use only the theme variables (var(--primary), "
       + "var(--on-bg-soft), …) or color-mix() blends of them — try again.",
     );
+  }
+  // Text must use the readable-on tokens. Raw brand tokens as text color are
+  // the invisible-words bug: on themes where --primary sits near the card
+  // surface, a word cloud colored var(--primary) renders as a blank card.
+  const colorDecl = /(?:^|[;{"\s'])color\s*:\s*([^;"'}]+)/gi;
+  for (let m = colorDecl.exec(html); m; m = colorDecl.exec(html)) {
+    const value = m[1].trim();
+    if (/^(inherit|currentcolor|transparent)$/i.test(value)) continue;
+    if (!/var\(--[a-z0-9-]*on-[a-z0-9-]*\)/i.test(value)) {
+      throw new Error(
+        `The coded card colors text with "${value}", which can vanish against the card `
+        + "background on some themes. Color text ONLY with the readable-on tokens — "
+        + "var(--on-bg-soft), var(--accent-on-bg-soft), var(--success-on-bg-soft), "
+        + "var(--on-primary) on primary — or color-mix() of them — try again.",
+      );
+    }
   }
   // A font-family that names a real font drifts off-theme; one that references
   // a var() (or inherit) rides the theme. The body font needs no declaration.
