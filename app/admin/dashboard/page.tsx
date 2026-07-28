@@ -29,6 +29,7 @@ import { KnowledgePanel, isDocSource } from "../KnowledgePanel";
 import { GithubImport } from "../GithubImport";
 import { GraphPanel } from "../GraphPanel";
 import { AnswersPanel } from "../AnswersPanel";
+import { A2uiPanel } from "../A2uiPanel";
 import { PersonaPrompt } from "../PersonaPrompt";
 import { personaExtractionPrompt } from "@/lib/personaPrompt";
 import { graphStats, listEntities, listEdges, suggestedMerges } from "@/lib/retrieval/graph";
@@ -584,17 +585,6 @@ export default async function Dashboard({
     </section>
   );
 
-  const a2uiTab = (
-    <section data-fill="surface" style={panel}>
-      <SectionTitle>A2UI</SectionTitle>
-      <p style={{ color: "var(--on-surface)", fontStyle: "italic", fontSize: 13, marginBottom: 14 }}>
-        Controls for the rich cards the chatbot can show in a conversation —
-        projects, photos, contact form and booking.
-      </p>
-      <Empty>Nothing here yet. A2UI settings will appear here.</Empty>
-    </section>
-  );
-
   return (
     <main style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 20px 80px" }}>
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
@@ -685,7 +675,7 @@ export default async function Dashboard({
                   { key: "answers", label: "Presets", content: <AnswersPanel rows={canned} /> },
                   { key: "goals", label: "Goals", content: goalsTab },
                   { key: "rules", label: "Rules", content: rulesTab },
-                  { key: "a2ui", label: "A2UI", content: a2uiTab },
+                  { key: "a2ui", label: "A2UI", content: <A2uiPanel /> },
                 ]}
               />
             ),
