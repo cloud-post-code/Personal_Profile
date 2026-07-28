@@ -16,9 +16,6 @@ import {
   savePersona,
   saveTheme,
   uploadHeadshot,
-  rescanSource,
-  updateSourceSummary,
-  deleteSource,
   addProject,
   uploadPhoto,
   updatePhoto,
@@ -28,7 +25,7 @@ import {
   deleteChatSession,
   saveChatFeedback,
 } from "../actions";
-import { Extractor } from "../Extractor";
+import { KnowledgePanel, isDocSource } from "../KnowledgePanel";
 import { GithubImport } from "../GithubImport";
 import { GraphPanel } from "../GraphPanel";
 import { AnswersPanel } from "../AnswersPanel";
@@ -350,57 +347,41 @@ export default async function Dashboard({
     </section>
   );
 
-  // ── KNOWLEDGE TAB ──
-  const knowledgeTab = (
-    <section data-fill="surface" style={panel}>
-      <SectionTitle>Add knowledge — link, PDF, or text</SectionTitle>
-      <Extractor />
-      {sources.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 18 }}>
-          {sources.map((s) => (
-            <div key={s.id} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 14 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start" }}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 4, flexWrap: "wrap" }}>
-                    <TypePill t={s.type} />
-                    <StatusPill status={s.status} />
-                    <strong style={{ fontSize: 14 }}>{s.title || s.filename || s.url || "(untitled)"}</strong>
-                  </div>
-                  {s.url && (
-                    <a href={s.url} target="_blank" rel="noreferrer" style={{ fontSize: 12, wordBreak: "break-all" }}>{s.url}</a>
-                  )}
-                </div>
-                <div style={{ display: "flex", gap: 6 }}>
-                  {s.type === "link" && (
-                    <form action={rescanSource}>
-                      <input type="hidden" name="id" value={s.id} />
-                      <button style={btnGhost as React.CSSProperties}>Rescan</button>
-                    </form>
-                  )}
-                  <form action={deleteSource}>
-                    <input type="hidden" name="id" value={s.id} />
-                    <button style={btnDanger as React.CSSProperties}>Delete</button>
-                  </form>
-                </div>
-              </div>
-              {s.error && <p style={{ color: "var(--danger-on-surface)", fontSize: 12, marginTop: 6 }}>{s.error}</p>}
-              <form action={updateSourceSummary} style={{ marginTop: 10 }}>
-                <input type="hidden" name="id" value={s.id} />
-                <textarea name="summary" defaultValue={s.summary ?? ""} rows={2} placeholder="Summary the chatbot will use…" style={{ ...field, marginBottom: 8, resize: "vertical" }} />
-                {safeTags(s.tags).length > 0 && (
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
-                    {safeTags(s.tags).map((t) => (
-                      <span key={t} style={{ fontSize: 11, color: "var(--accent-on-surface)" }}>#{t}</span>
-                    ))}
-                  </div>
-                )}
-                <button style={btnGhost as React.CSSProperties}>Save summary</button>
-              </form>
-            </div>
-          ))}
-        </div>
-      )}
-    </section>
+  // ── KNOWLEDGE TABS — one per kind: links, PDFs/docs, pasted text ──
+  // Links is the catch-all so a source with an unexpected type stays visible
+  // (and deletable) rather than dropping out of the dashboard entirely.
+  const docSources = sources.filter((s) => isDocSource(s.type));
+  const textSources = sources.filter((s) => s.type === "text");
+  const linkSources = sources.filter((s) => !isDocSource(s.type) && s.type !== "text");
+
+  const linksTab = (
+    <KnowledgePanel
+      mode="link"
+      title="Links"
+      blurb="Paste a URL and it gets fetched, then Claude writes a summary + tags the chatbot can cite. LinkedIn often blocks bots — if a scan comes back thin, edit the summary below it."
+      rows={linkSources}
+      empty="No links yet. Add one above."
+    />
+  );
+
+  const pdfsTab = (
+    <KnowledgePanel
+      mode="pdf"
+      title="PDFs & documents"
+      blurb="Upload a PDF or Word document — a résumé, a deck, a writeup. The text is parsed out and Claude summarises it into knowledge the chatbot can cite."
+      rows={docSources}
+      empty="No documents yet. Upload one above."
+    />
+  );
+
+  const textTab = (
+    <KnowledgePanel
+      mode="text"
+      title="Text"
+      blurb="Paste text or markdown straight in — notes, an essay, an opinion, a bit of your story. Claude summarises it the same way it does a scanned link."
+      rows={textSources}
+      empty="No pasted text yet. Add some above."
+    />
   );
 
   // ── PHOTOS (its own tab in the Content section) ──
@@ -655,7 +636,9 @@ export default async function Dashboard({
                 initial={initialSub}
                 tabs={[
                   { key: "projects", label: "Projects", content: projectsTab },
-                  { key: "knowledge", label: "Knowledge", content: knowledgeTab },
+                  { key: "links", label: "Links", content: linksTab },
+                  { key: "pdfs", label: "PDFs", content: pdfsTab },
+                  { key: "text", label: "Text", content: textTab },
                   { key: "photos", label: "Photos", content: photosSection },
                 ]}
               />
@@ -867,25 +850,6 @@ function Stat({ label, value }: { label: string; value: number }) {
         {label}
       </div>
     </div>
-  );
-}
-
-function TypePill({ t }: { t: string }) {
-  const icon = t === "pdf" ? "PDF" : t === "text" ? "TXT" : "LINK";
-  return (
-    <span style={{ fontSize: 11, color: "var(--on-surface)", fontStyle: "italic", border: "1px solid var(--border)", borderRadius: 999, padding: "1px 7px" }}>{icon}</span>
-  );
-}
-
-function StatusPill({ status }: { status: string }) {
-  const map: Record<string, { c: string; t: string }> = {
-    scanned: { c: "var(--success-on-surface)", t: "scanned" },
-    pending: { c: "var(--accent-on-surface)", t: "pending" },
-    failed: { c: "var(--danger-on-surface)", t: "failed" },
-  };
-  const s = map[status] ?? map.pending;
-  return (
-    <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: s.c, border: `1px solid ${s.c}`, borderRadius: 999, padding: "1px 7px" }}>{s.t}</span>
   );
 }
 

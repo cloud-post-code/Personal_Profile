@@ -1,6 +1,9 @@
 /** Keys of the sub-tabs inside the combined Content section. */
-export const CONTENT_TAB_KEYS = ["projects", "knowledge", "photos"] as const;
+export const CONTENT_TAB_KEYS = ["projects", "links", "pdfs", "text", "photos"] as const;
 export type ContentTabKey = (typeof CONTENT_TAB_KEYS)[number];
+
+/** Knowledge used to be one Content sub-tab; it is now split by source kind. */
+const LEGACY_CONTENT_TABS: Record<string, ContentTabKey> = { knowledge: "links" };
 
 /** Keys of the sub-tabs inside the combined Activity section. */
 export const ACTIVITY_TAB_KEYS = ["activity", "contacts"] as const;
@@ -26,6 +29,9 @@ export function resolveAdminTab(tab: string | undefined): {
   nav: string | undefined;
   sub: ContentTabKey | ActivityTabKey | AgentTabKey | MeTabKey | undefined;
 } {
+  if (tab && LEGACY_CONTENT_TABS[tab]) {
+    return { nav: "content", sub: LEGACY_CONTENT_TABS[tab] };
+  }
   if (tab && (CONTENT_TAB_KEYS as readonly string[]).includes(tab)) {
     return { nav: "content", sub: tab as ContentTabKey };
   }
