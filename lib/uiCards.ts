@@ -89,11 +89,27 @@ export async function saveUiCard(input: {
 
   // The key anchors deep links and the starter seed; a hand-typed one is
   // normalized rather than rejected, and a blank one is derived from the label.
-  const key =
+  let key =
     (input.key.trim() || label)
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "") || "card";
+
+  // `key` is unique, and what happens on a collision depends on intent. An
+  // EDIT keeping its own key is a plain update. A NEW card whose derived key
+  // is taken gets a suffixed key instead: the builder names cards freely, and
+  // silently overwriting whichever existing card happened to share the name
+  // is how a "new" card vanishes from the list while the agent serves it.
+  const owner = await prisma.uiCard.findUnique({ where: { key } });
+  if (owner && owner.id !== input.id) {
+    for (let n = 2; ; n++) {
+      const candidate = `${key}-${n}`;
+      if (!(await prisma.uiCard.findUnique({ where: { key: candidate } }))) {
+        key = candidate;
+        break;
+      }
+    }
+  }
 
   const data = {
     key,
@@ -103,23 +119,16 @@ export async function saveUiCard(input: {
     reason: input.reason.trim(),
     note: input.note.trim(),
     sampleBlock,
-    order: input.order ?? 0,
   };
 
-  // `key` is unique. When another row already owns it, write there and drop
-  // the row being edited — the same merge-on-collision the canned answers do —
-  // instead of throwing a raw constraint error out of the form.
-  const owner = await prisma.uiCard.findUnique({ where: { key } });
-  if (owner && owner.id !== input.id) {
-    await prisma.uiCard.update({ where: { id: owner.id }, data });
-    if (input.id) await prisma.uiCard.delete({ where: { id: input.id } });
-    return null;
-  }
-
   if (input.id) {
-    await prisma.uiCard.update({ where: { id: input.id }, data });
+    await prisma.uiCard.update({ where: { id: input.id }, data: { ...data, order: input.order ?? 0 } });
   } else {
-    await prisma.uiCard.create({ data });
+    // New cards go to the end of the list, where "just added" is findable.
+    const last = await prisma.uiCard.aggregate({ _max: { order: true } });
+    await prisma.uiCard.create({
+      data: { ...data, order: input.order ?? (last._max.order ?? -1) + 1 },
+    });
   }
   return null;
 }

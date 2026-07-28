@@ -69,7 +69,11 @@ export function CardBuilder({
     setError("");
     const res = await saveBuiltCard({ id, key: cardKey, draft });
     if (res.ok) {
+      // refresh() alongside push(): the dashboard may sit in the client router
+      // cache from before the save, and the new card must be in the list the
+      // admin lands on.
       router.push("/admin/dashboard?tab=a2ui");
+      router.refresh();
       return;
     }
     setError(res.error ?? "Saving failed.");
