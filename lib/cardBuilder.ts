@@ -21,16 +21,16 @@ export type CardDraft = {
   sampleBlock: string;
 };
 
-/** The card type each tool is allowed to draw — a mismatch is a broken card. */
-const TOOL_TO_TYPE: Record<CardTool, string> = {
-  show_projects: "projects",
-  show_project: "project",
-  show_gallery: "gallery",
-  show_timeline: "timeline",
-  show_contact_form: "contact",
-  show_booking: "booking",
-  show_booking_link: "booking_link",
-  show_card: "custom",
+/** The card types each tool may draw — a mismatch is a broken card. */
+const TOOL_TO_TYPES: Record<CardTool, string[]> = {
+  show_projects: ["projects"],
+  show_project: ["project"],
+  show_gallery: ["gallery"],
+  show_timeline: ["timeline"],
+  show_contact_form: ["contact"],
+  show_booking: ["booking"],
+  show_booking_link: ["booking_link"],
+  show_card: ["custom", "html"],
 };
 
 const BUILDER_BRIEF = `You design "A2UI cards" for a personal portfolio site's chatbot. A card is a rich UI block the chatbot can draw in a conversation. Your job: turn the owner's description into ONE card definition.
@@ -46,10 +46,26 @@ There are two ways to build a card. FIRST decide which fits:
 - show_booking → {"type":"booking"} — live open times from the calendar (no other fields)
 - show_booking_link → {"type":"booking_link","url":"https://…","name":"Blake"} — external scheduler link
 
-2. A CUSTOM card (tool "show_card"), for anything else — services and prices, an FAQ, testimonials, a skills breakdown, whatever the owner describes. You design it yourself from typed elements, and the content you write IS what visitors will see (nothing is hydrated later — write it fully and well). Shape:
+2. A CUSTOM card (tool "show_card"), for simple content that fits stock elements — an FAQ, testimonials, a short list. The content you write IS what visitors will see (nothing is hydrated later — write it fully and well). Shape:
 {"type":"custom","title":"…","elements":[Element, …]}
 Element is one of:
 {"kind":"heading","text":"…"} | {"kind":"text","text":"…"} | {"kind":"list","items":["…"]} | {"kind":"badges","items":["…"]} | {"kind":"stats","items":[{"label":"…","value":"…"}]} | {"kind":"buttons","items":[{"label":"…","url":"https://…"}]} | {"kind":"image","src":"placeholder"} | {"kind":"quote","text":"…","by":"…"} | {"kind":"divider"}
+
+3. A CODED card (also tool "show_card"), whenever the design calls for a layout the stock elements can't express — a word cloud, a pricing grid, a skill meter, any bespoke visual. You are the coding agent here: write real HTML with inline CSS yourself. As with custom cards, what you write IS what visitors see. Shape:
+{"type":"html","html":"<div style=\"…\">…</div>","height":320}
+Coding rules (violations fail validation or render blank):
+- Inline CSS only: style attributes and/or one <style> tag. NO <script>, no event-handler attributes (onclick etc.), no <iframe>/<object>/<embed>/<form>/<link>/<meta> — the card runs in a sealed sandbox that refuses to execute anything, and validation rejects markup that looks executable.
+- The sandbox blocks ALL external requests: outside images, fonts and stylesheets will not load. Draw visuals with CSS and inline SVG, or data: URIs.
+- Links need target="_blank" (the sandbox cannot navigate the page it sits in).
+- "height" is the rendered height in px (40–1200): size it to the content, it does not auto-grow.
+
+DESIGN SYSTEM for coded cards — this is the site's real system; colors, edges and text MUST follow it, and validation enforces the hard rules:
+- COLORS (enforced): only the theme variables, or color-mix() blends of them for shades — raw hex/rgb()/hsl() values are rejected. Available: var(--bg), var(--bg-soft), var(--surface), var(--border), var(--text), var(--primary), var(--accent), var(--on-primary), var(--on-accent), var(--on-surface), var(--on-bg-soft), var(--accent-on-bg-soft), var(--accent-on-surface), var(--danger-on-bg-soft), var(--success-on-bg-soft). Text sitting on bg-soft uses var(--on-bg-soft); accents use the accent-on-* variant matching the surface. Shade example: color-mix(in srgb, var(--primary) 35%, transparent).
+- TEXT (enforced): never declare a concrete font-family — headings already use the site's heading font (h1 17px, h2 15px, h3 14px) and body text is already 14px/1.55 in the site font; font-family declarations that don't reference a var() are rejected. Secondary/caption text: 11–12px, often italic. Tags: 11px, var(--accent-on-bg-soft), "#" prefix, no background.
+- EDGES: containers use border:1px solid var(--border) with border-radius var(--radius-md); small controls var(--radius-sm); pills and dots var(--radius-pill). Don't invent other corner treatments.
+- BUTTONS: primary = background var(--primary), color var(--on-primary), no border, padding 10px 18px, radius var(--radius-sm); secondary = transparent, 1px solid var(--border), italic.
+- SPACING: ~16px container padding, 8–12px gaps.
+- Everything the theme does NOT specify — layout, composition, proportions, word-cloud sizing, chart shapes — is yours to design freely.
 
 Field shapes for live-data samples:
 ProjectCard = {"id":string,"name":string,"blurb":string,"detail":string|null,"githubUrl":string|null,"liveUrl":string|null,"imageUrl":string|null,"tags":[string,…]}
@@ -57,7 +73,7 @@ PhotoCard = {"id":string,"src":string,"description":string,"caption":string|null
 TimelineEntry = {"role":string,"company":string,"dates":string,"description":string}
 
 Rules:
-- Prefer a live-data tool when the intent clearly matches one; design a custom card for everything else.
+- Prefer a live-data tool when the intent clearly matches site content; stock elements for simple text cards; CODED html when the layout is the point.
 - For every image field (src, imageUrl), use the exact string "placeholder" — the system swaps it for a generated placeholder image. Never use a real URL for images.
 - In a custom card, only include facts the owner actually stated. Where you need specifics they didn't give (a price, a link), keep it generic and flag it in "note" so they know to revise.
 - "reason" is the instruction the chatbot will actually receive about when to show this card. Write it as guidance, starting "When …".
@@ -103,14 +119,36 @@ export async function draftUiCard(
   }
 
   const client = deps.client ?? claude();
-  const response = await client.messages.create({
-    model: claudeModel(),
-    max_tokens: 2000,
-    system: BUILDER_BRIEF,
-    messages,
-  });
-
-  return parseDraft(textOf(response.content));
+  // Agentic self-correction: a draft that fails validation goes back to the
+  // model WITH the validation error, once. The errors are written as
+  // instructions ("use the theme variables…"), so the second attempt usually
+  // lands; only a second failure surfaces to the admin.
+  let convo = messages;
+  for (let attempt = 0; ; attempt++) {
+    const response = await client.messages.create({
+      model: claudeModel(),
+      // Coded cards carry full HTML documents; don't truncate them mid-tag.
+      max_tokens: 4000,
+      system: BUILDER_BRIEF,
+      messages: convo,
+    });
+    const raw = textOf(response.content);
+    try {
+      return parseDraft(raw);
+    } catch (e) {
+      if (attempt >= 1) throw e;
+      convo = [
+        ...convo,
+        { role: "assistant", content: raw },
+        {
+          role: "user",
+          content:
+            `That response failed validation: ${(e as Error).message} ` +
+            "Respond again with ONLY the corrected JSON object.",
+        },
+      ];
+    }
+  }
 }
 
 function textOf(content: unknown[]): string {
@@ -153,11 +191,13 @@ export function parseDraft(raw: string): CardDraft {
   const sampleBlock = JSON.stringify(withImages);
   const block = parseSampleBlock(sampleBlock);
   if (!block) throw new Error("The draft's sample block isn't a renderable card — try again.");
-  if (block.type !== TOOL_TO_TYPE[tool as CardTool]) {
+  const allowed = TOOL_TO_TYPES[tool as CardTool];
+  if (!allowed.includes(block.type)) {
     throw new Error(
-      `The sample is a "${block.type}" block but ${tool} draws "${TOOL_TO_TYPE[tool as CardTool]}" — try again.`,
+      `The sample is a "${block.type}" block but ${tool} draws ${allowed.map((t) => `"${t}"`).join(" or ")} — try again.`,
     );
   }
+  if (block.type === "html") enforceThemedHtml(block.html);
 
   return {
     label,
@@ -167,6 +207,33 @@ export function parseDraft(raw: string): CardDraft {
     note: String(parsed.note ?? "").trim(),
     sampleBlock,
   };
+}
+
+/**
+ * The theme-fidelity gate for coded cards: colors, edges and text must come
+ * from the site's design system. Colors and fonts are checkable mechanically,
+ * so they are enforced here; layout stays the model's to design. Thrown
+ * messages are instructions — the drafting loop feeds them back to the model
+ * for a corrected attempt.
+ */
+function enforceThemedHtml(html: string): void {
+  if (/#[0-9a-fA-F]{3,8}\b|(?:rgb|hsl)a?\s*\(/.test(html)) {
+    throw new Error(
+      "The coded card hard-codes colors. Use only the theme variables (var(--primary), "
+      + "var(--on-bg-soft), …) or color-mix() blends of them — try again.",
+    );
+  }
+  // A font-family that names a real font drifts off-theme; one that references
+  // a var() (or inherit) rides the theme. The body font needs no declaration.
+  const fontDecl = /font-family\s*:\s*([^;"'}]+)/gi;
+  for (let m = fontDecl.exec(html); m; m = fontDecl.exec(html)) {
+    if (!/var\(|inherit/i.test(m[1])) {
+      throw new Error(
+        "The coded card sets a concrete font-family. Text inherits the site's fonts; "
+        + "use var(--font-heading) for headings or omit font-family — try again.",
+      );
+    }
+  }
 }
 
 /** Rotating flat colors for generated placeholder images. */

@@ -38,7 +38,23 @@ const BLOCK_TYPES = [
   "booking",
   "booking_link",
   "custom",
+  "html",
 ] as const;
+
+const MAX_HTML_LENGTH = 40_000;
+
+/**
+ * Whether a coded card's markup is storable. The sandboxed iframe it renders
+ * in refuses to execute anything anyway (no scripts, sealed CSP) — this check
+ * is defense in depth: markup that even LOOKS executable never reaches the
+ * database, so a renderer regression can't turn stored cards into an attack.
+ */
+export function safeCardHtml(html: unknown): html is string {
+  if (typeof html !== "string" || !html.trim() || html.length > MAX_HTML_LENGTH) return false;
+  return !/<\s*(script|iframe|object|embed|link|meta|base|form)\b|javascript:|\bon[a-z]+\s*=|srcdoc\s*=/i.test(
+    html,
+  );
+}
 
 /**
  * Parse a stored sample into a renderable block, or null when it isn't one.
@@ -53,7 +69,9 @@ export function parseSampleBlock(raw: string): UiBlock | null {
       typeof v === "object" &&
       (BLOCK_TYPES as readonly string[]).includes((v as { type?: string }).type ?? "")
     ) {
-      return v as UiBlock;
+      const block = v as UiBlock;
+      if (block.type === "html" && !safeCardHtml(block.html)) return null;
+      return block;
     }
     return null;
   } catch {
@@ -175,15 +193,15 @@ export async function cardCatalog(): Promise<CardGuidance[]> {
 }
 
 /**
- * A custom card's stored block, for the show_card tool at chat time. Only
- * "custom" blocks are served: pointing show_card at a built-in card would draw
- * its SAMPLE content to a visitor as if it were real.
+ * A builder-made card's stored block, for the show_card tool at chat time.
+ * Only "custom" and coded "html" blocks are served: pointing show_card at a
+ * built-in card would draw its SAMPLE content to a visitor as if it were real.
  */
 export async function customCardBlock(key: string): Promise<UiBlock | null> {
   if (!key.trim()) return null;
   const row = await prisma.uiCard.findUnique({ where: { key: key.trim() } });
   const block = row ? parseSampleBlock(row.sampleBlock) : null;
-  return block && block.type === "custom" ? block : null;
+  return block && (block.type === "custom" || block.type === "html") ? block : null;
 }
 
 /**

@@ -43,7 +43,8 @@ export type UiBlock =
   | { type: "timeline"; items: TimelineEntry[]; summary: string }
   | { type: "booking" }
   | { type: "booking_link"; url: string; name: string }
-  | { type: "custom"; title?: string; elements: CustomElement[] };
+  | { type: "custom"; title?: string; elements: CustomElement[] }
+  | { type: "html"; html: string; height?: number };
 
 export function Cards({ block }: { block: UiBlock }) {
   if (block.type === "projects") {
@@ -88,7 +89,78 @@ export function Cards({ block }: { block: UiBlock }) {
   if (block.type === "custom") {
     return <CustomCard title={block.title} elements={block.elements} />;
   }
+  if (block.type === "html") {
+    return <HtmlCard html={block.html} height={block.height} />;
+  }
   return null;
+}
+
+/**
+ * A card the builder CODED — model-written HTML with inline CSS, rendered in a
+ * sealed sandbox. Two independent walls stand between that code and the
+ * visitor: the iframe sandbox (no scripts, no same-origin — popups only, so
+ * target="_blank" links still work), and a CSP baked into the document that
+ * allows inline styles and data: images and nothing else, so it cannot phone
+ * out to any external host. Validation upstream also refuses to store markup
+ * that even looks executable; this is the belt to that suspender.
+ *
+ * The site's theme variables are resolved here and injected into the document,
+ * because a sandboxed iframe inherits nothing — without this, coded cards
+ * would go off-palette the moment the admin changes the theme.
+ */
+function HtmlCard({ html, height }: { html: string; height?: number }) {
+  const [themeCss, setThemeCss] = useState("");
+  useEffect(() => {
+    // The COMPLETE live token set, so coded cards see the same design system
+    // the rest of the site computes — including per-theme readable-on variants.
+    const root = getComputedStyle(document.documentElement);
+    const names = [
+      "--bg", "--bg-soft", "--surface", "--border", "--text",
+      "--primary", "--accent", "--on-primary", "--on-accent",
+      "--on-surface", "--on-bg-soft",
+      "--accent-on-bg", "--accent-on-bg-soft", "--accent-on-surface",
+      "--danger-on-bg-soft", "--danger-on-surface",
+      "--success-on-bg-soft", "--success-on-surface",
+      "--font-heading", "--heading-weight",
+      "--radius-sm", "--radius-md", "--radius-lg", "--radius-pill",
+    ];
+    const vars = names.map((n) => `${n}:${root.getPropertyValue(n)};`).join("");
+    const font = getComputedStyle(document.body).fontFamily;
+    // Base element styles mirroring the site's card idiom, so even markup the
+    // model leaves unstyled lands on-theme: body text 14/1.55 in the body
+    // font, headings in the heading font at the site's card sizes, links in
+    // the accent that is readable on this exact background.
+    setThemeCss(
+      `:root{${vars}}` +
+        `body{margin:0;background:transparent;color:var(--on-bg-soft);font-family:${font};font-size:14px;line-height:1.55;}` +
+        `h1,h2,h3,h4{font-family:var(--font-heading),${font};font-weight:var(--heading-weight,700);margin:0 0 8px;}` +
+        `h1{font-size:17px}h2{font-size:15px}h3,h4{font-size:14px}` +
+        `a{color:var(--accent-on-bg-soft);}`,
+    );
+  }, []);
+
+  const doc =
+    `<!doctype html><html><head>` +
+    `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:;">` +
+    `<style>${themeCss}</style></head><body>${html}</body></html>`;
+  const h = typeof height === "number" && height >= 40 && height <= 1200 ? height : 300;
+
+  return (
+    <iframe
+      sandbox="allow-popups allow-popups-to-escape-sandbox"
+      srcDoc={doc}
+      title="Custom card"
+      style={{
+        width: "100%",
+        maxWidth: 480,
+        height: h,
+        border: "1px solid var(--border)",
+        borderRadius: "var(--radius-md)",
+        background: "var(--bg-soft)",
+        display: "block",
+      }}
+    />
+  );
 }
 
 /**
@@ -174,7 +246,7 @@ function CustomEl({ el }: { el: CustomElement }) {
     case "image":
       if (!el.src) return null;
       // eslint-disable-next-line @next/next/no-img-element
-      return <img src={el.src} alt={el.alt ?? ""} style={{ width: "100%", borderRadius: 10, margin: "6px 0" }} />;
+      return <img src={el.src} alt={el.alt ?? ""} style={{ width: "100%", borderRadius: "var(--radius-sm)", margin: "6px 0" }} />;
     case "quote":
       return (
         <blockquote
@@ -686,7 +758,7 @@ function ProjectCardView({ p, big }: { p: ProjectCard; big?: boolean }) {
     <div data-fill="bg-soft" style={{ ...card, ...(big ? { maxWidth: 480 } : {}) }}>
       {p.imageUrl && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={p.imageUrl} alt={p.name} style={{ width: "100%", borderRadius: 10, marginBottom: 10 }} />
+        <img src={p.imageUrl} alt={p.name} style={{ width: "100%", borderRadius: "var(--radius-sm)", marginBottom: 10 }} />
       )}
       <h3 style={{ fontSize: 17, marginBottom: 6, fontFamily: "var(--font-heading)" }}>{p.name}</h3>
       <p style={{ color: "var(--on-bg-soft)", fontStyle: "italic", fontSize: 14, marginBottom: 10 }}>{p.blurb}</p>
@@ -737,7 +809,7 @@ function Carousel({ items }: { items: PhotoCard[] }) {
     <div data-fill="bg-soft" style={card}>
       <div style={{ position: "relative" }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={ph.src} alt={ph.description} style={{ width: "100%", borderRadius: 10, display: "block" }} />
+        <img src={ph.src} alt={ph.description} style={{ width: "100%", borderRadius: "var(--radius-sm)", display: "block" }} />
         {items.length > 1 && (
           <>
             <button style={{ ...navArrow, left: 8 }} onClick={() => go(-1)} aria-label="Previous">
@@ -787,7 +859,7 @@ function Filmstrip({ items }: { items: PhotoCard[] }) {
             <img
               src={ph.src}
               alt={ph.description}
-              style={{ height: 96, width: 96, objectFit: "cover", borderRadius: 8, border: "1px solid var(--border)" }}
+              style={{ height: 96, width: 96, objectFit: "cover", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}
             />
           </button>
         ))}
@@ -796,7 +868,7 @@ function Filmstrip({ items }: { items: PhotoCard[] }) {
         <div style={lightbox} onClick={() => setOpen(null)}>
           <div data-fill="surface" style={lightboxInner} onClick={(e) => e.stopPropagation()}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={items[open].src} alt={items[open].description} style={{ maxWidth: "100%", maxHeight: "70vh", borderRadius: 10 }} />
+            <img src={items[open].src} alt={items[open].description} style={{ maxWidth: "100%", maxHeight: "70vh", borderRadius: "var(--radius-sm)" }} />
             {items[open].description && (
               <p style={{ color: "var(--on-surface)", fontSize: 15, marginTop: 12 }}>{items[open].description}</p>
             )}
@@ -864,7 +936,7 @@ const navArrow: React.CSSProperties = {
   transform: "translateY(-50%)",
   width: 34,
   height: 34,
-  borderRadius: 999,
+  borderRadius: "var(--radius-pill)",
   border: "1px solid var(--border)",
   background: "var(--surface)",
   color: "var(--on-surface)",

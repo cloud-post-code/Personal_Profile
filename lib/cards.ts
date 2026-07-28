@@ -55,6 +55,10 @@ export type UiBlock =
   // A card designed in the admin card builder. Unlike the tool-drawn blocks
   // above, the stored content IS the card — nothing is hydrated at chat time.
   | { type: "custom"; title?: string; elements: CustomElement[] }
+  // A card the builder CODED: model-written HTML+inline CSS, rendered in a
+  // sealed sandbox (no scripts, no external requests). `height` is the
+  // iframe's px height, since a sandboxed document can't report its own.
+  | { type: "html"; html: string; height?: number }
   // Optional because older stored blocks (canned answers, A2A payloads) predate
   // the field; absent reads the same as "no link configured".
   | { type: "contact"; bookingLink?: string | null }
