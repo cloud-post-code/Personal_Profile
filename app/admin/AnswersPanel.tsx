@@ -1,6 +1,7 @@
 import { cannedStats } from "@/lib/canned";
 import { saveCanned, deleteCanned, redraftCanned } from "./actions";
 import { CardFields } from "./CardFields";
+import { PendingButton } from "./PendingButton";
 import { panel, field, btn, btnGhost, btnDanger, SectionTitle, Label } from "./ui";
 
 /**
@@ -104,17 +105,17 @@ function AnswerForm({ row }: { row?: Row }) {
           <input type="checkbox" name="enabled" defaultChecked={row?.enabled ?? true} />
           Live
         </label>
-        <button type="submit" style={btn}>
+        <PendingButton pendingLabel={isNew ? "Adding…" : "Saving…"} style={btn}>
           {isNew ? "Add" : draft ? "Save as mine" : "Save"}
-        </button>
+        </PendingButton>
         {row ? (
           <>
-            <button type="submit" formAction={redraftCanned} style={btnGhost}>
+            <PendingButton pendingLabel="Redrafting…" formAction={redraftCanned} style={btnGhost}>
               Redraft
-            </button>
-            <button type="submit" formAction={deleteCanned} style={btnDanger}>
+            </PendingButton>
+            <PendingButton pendingLabel="Deleting…" formAction={deleteCanned} style={btnDanger}>
               Delete
-            </button>
+            </PendingButton>
             <span style={{ fontSize: 12, fontStyle: "italic", marginLeft: "auto" }}>
               served {row.hits}×
             </span>

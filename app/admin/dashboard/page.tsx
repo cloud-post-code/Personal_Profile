@@ -40,6 +40,7 @@ import { ProjectRow } from "../ProjectRow";
 import { Tabs } from "../Tabs";
 import { SubTabs } from "../SubTabs";
 import { resolveAdminTab } from "../contentTabs";
+import { PendingButton } from "../PendingButton";
 import { SaveButton } from "../SaveButton";
 import { AutoUploadFile } from "../AutoUploadFile";
 import { ThemePicker } from "../ThemePicker";
@@ -148,6 +149,7 @@ export default async function Dashboard({
         <UploadToGenerate
           action={uploadResume}
           buttonLabel="Parse resume → fill everything"
+          pendingLabel="Parsing…"
           hint="Upload a PDF, Word doc, or text resume. It's split into your Bio, Experience cards, and an 'Other' section, and fills your name, location, email, and any social links found. Review and edit below."
         />
       </div>
@@ -326,7 +328,9 @@ export default async function Dashboard({
         </div>
         <Label>Cover image (optional)</Label>
         <input type="file" name="image" accept="image/*" style={field} />
-        <button style={btn}>Add project</button>
+        <PendingButton pendingLabel="Adding…" style={btn}>
+          Add project
+        </PendingButton>
         <p style={{ color: "var(--on-surface)", fontStyle: "italic", fontSize: 12, marginTop: 8 }}>
           Leave the description blank and add a GitHub or Live link — Claude writes the short
           description automatically from that page.
@@ -402,7 +406,9 @@ export default async function Dashboard({
           <option value="project">Project</option>
           <option value="profile">Profile</option>
         </select>
-        <button style={btn}>Upload</button>
+        <PendingButton pendingLabel="Uploading…" style={btn}>
+          Upload
+        </PendingButton>
       </form>
       <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12 }}>
         {photos.length === 0 && <Empty>No photos yet.</Empty>}
@@ -415,7 +421,9 @@ export default async function Dashboard({
               <textarea name="description" defaultValue={ph.description} rows={3} placeholder="One-paragraph description…" style={{ ...field, marginBottom: 6, fontSize: 13, resize: "vertical" }} />
               <input name="caption" defaultValue={ph.caption ?? ""} placeholder="Caption" style={{ ...field, marginBottom: 8, fontSize: 13 }} />
               <div style={{ display: "flex", gap: 6 }}>
-                <button style={btnGhost as React.CSSProperties}>Save</button>
+                <PendingButton pendingLabel="Saving…" style={btnGhost as React.CSSProperties}>
+                  Save
+                </PendingButton>
                 <FormDelete id={ph.id} />
               </div>
             </form>
@@ -444,11 +452,15 @@ export default async function Dashboard({
                 <form action={toggleContactHandled}>
                   <input type="hidden" name="id" value={c.id} />
                   <input type="hidden" name="handled" value={String(c.handled)} />
-                  <button style={btnGhost as React.CSSProperties}>{c.handled ? "Reopen" : "Mark handled"}</button>
+                  <PendingButton pendingLabel="Saving…" style={btnGhost as React.CSSProperties}>
+                    {c.handled ? "Reopen" : "Mark handled"}
+                  </PendingButton>
                 </form>
                 <form action={deleteContact}>
                   <input type="hidden" name="id" value={c.id} />
-                  <button style={btnDanger as React.CSSProperties}>Delete</button>
+                  <PendingButton pendingLabel="Deleting…" style={btnDanger as React.CSSProperties}>
+                    Delete
+                  </PendingButton>
                 </form>
               </div>
             </div>
@@ -551,7 +563,9 @@ export default async function Dashboard({
               </span>
               <form action={deleteChatSession}>
                 <input type="hidden" name="id" value={s.id} />
-                <button style={btnDanger as React.CSSProperties}>Delete</button>
+                <PendingButton pendingLabel="Deleting…" style={btnDanger as React.CSSProperties}>
+                  Delete
+                </PendingButton>
               </form>
             </summary>
             <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 10 }}>
@@ -600,7 +614,9 @@ export default async function Dashboard({
         <div style={{ display: "flex", gap: 10 }}>
           <Link href="/" style={btnGhost as React.CSSProperties}>View site</Link>
           <form action={logout}>
-            <button style={btnGhost as React.CSSProperties}>Log out</button>
+            <PendingButton pendingLabel="Logging out…" style={btnGhost as React.CSSProperties}>
+              Log out
+            </PendingButton>
           </form>
         </div>
       </header>
@@ -695,7 +711,9 @@ function FormDelete({ id }: { id: string }) {
   return (
     <form action={deletePhoto}>
       <input type="hidden" name="id" value={id} />
-      <button style={btnDanger as React.CSSProperties}>Delete</button>
+      <PendingButton pendingLabel="Deleting…" style={btnDanger as React.CSSProperties}>
+        Delete
+      </PendingButton>
     </form>
   );
 }
@@ -704,11 +722,13 @@ function FormDelete({ id }: { id: string }) {
 function UploadToGenerate({
   action,
   buttonLabel,
+  pendingLabel,
   hint,
   footnote,
 }: {
   action: (formData: FormData) => void | Promise<void>;
   buttonLabel: string;
+  pendingLabel: string;
   hint: string;
   footnote?: string;
 }) {
@@ -723,7 +743,9 @@ function UploadToGenerate({
           required
           style={{ ...field, marginBottom: 0, flex: 1, minWidth: 240 }}
         />
-        <button style={btn}>{buttonLabel}</button>
+        <PendingButton pendingLabel={pendingLabel} style={btn}>
+          {buttonLabel}
+        </PendingButton>
       </form>
       {footnote && (
         <p style={{ color: "var(--on-surface)", fontStyle: "italic", fontSize: 12, marginTop: 8 }}>{footnote}</p>
@@ -790,17 +812,22 @@ function FeedbackControls({
         <form action={saveChatFeedback} style={{ display: "flex", gap: 6 }}>
           <input type="hidden" name="id" value={id} />
           <input type="hidden" name="note" value={note ?? ""} />
-          <button name="rating" value="up" style={pill(rating === "up")} title="Good answer">👍</button>
-          <button name="rating" value="down" style={pill(rating === "down")} title="Bad answer">👎</button>
+          {/* Icon-width buttons: an hourglass keeps the pill from resizing mid-save. */}
+          <PendingButton pendingLabel="⏳" name="rating" value="up" style={pill(rating === "up")} title="Good answer">
+            👍
+          </PendingButton>
+          <PendingButton pendingLabel="⏳" name="rating" value="down" style={pill(rating === "down")} title="Bad answer">
+            👎
+          </PendingButton>
         </form>
         {rating && (
           <form action={saveChatFeedback}>
             <input type="hidden" name="id" value={id} />
             <input type="hidden" name="rating" value="" />
             <input type="hidden" name="note" value="" />
-            <button style={{ ...(btnGhost as React.CSSProperties), padding: "4px 10px", fontSize: 12 }} title="Clear feedback">
+            <PendingButton pendingLabel="Clearing…" style={{ ...(btnGhost as React.CSSProperties), padding: "4px 10px", fontSize: 12 }} title="Clear feedback">
               Clear
-            </button>
+            </PendingButton>
           </form>
         )}
         {rating === "up" && <span style={{ fontSize: 11, color: "var(--success-on-surface)" }}>Marked good</span>}
@@ -817,9 +844,9 @@ function FeedbackControls({
           placeholder="What should it have done instead? Saved as a correction the bot follows on future chats."
           style={{ ...field, marginBottom: 6, fontSize: 12, resize: "vertical" }}
         />
-        <button style={{ ...(btnGhost as React.CSSProperties), padding: "5px 12px", fontSize: 12 }}>
+        <PendingButton pendingLabel="Saving…" style={{ ...(btnGhost as React.CSSProperties), padding: "5px 12px", fontSize: 12 }}>
           Save correction
-        </button>
+        </PendingButton>
       </form>
     </div>
   );

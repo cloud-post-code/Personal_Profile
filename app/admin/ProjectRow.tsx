@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { updateProject, deleteProject } from "./actions";
+import { PendingButton } from "./PendingButton";
 import { field, btn, btnGhost, btnDanger, Label } from "./ui";
 
 export type ProjectRowData = {
@@ -77,7 +78,9 @@ export function ProjectRow({ project }: { project: ProjectRowData }) {
         </div>
 
         <div style={{ display: "flex", gap: 8 }}>
-          <button style={btn}>Save changes</button>
+          <PendingButton pendingLabel="Saving…" style={btn}>
+            Save changes
+          </PendingButton>
           <button type="button" onClick={() => setEditing(false)} style={btnGhost}>
             Cancel
           </button>
@@ -166,7 +169,9 @@ export function ProjectRow({ project }: { project: ProjectRowData }) {
         </button>
         <form action={deleteProject}>
           <input type="hidden" name="id" value={project.id} />
-          <button style={btnDanger as React.CSSProperties}>Delete</button>
+          <PendingButton pendingLabel="Deleting…" style={btnDanger as React.CSSProperties}>
+            Delete
+          </PendingButton>
         </form>
       </div>
     </div>

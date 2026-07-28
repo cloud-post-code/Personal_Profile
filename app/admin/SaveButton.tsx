@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useFormStatus } from "react-dom";
+import { useOwnPending } from "./PendingButton";
 import { btn } from "./ui";
 
 /**
@@ -10,28 +10,30 @@ import { btn } from "./ui";
  * lit "Saved ✓" state for a couple of seconds, then settles back to its label.
  *
  * Must be rendered INSIDE a <form action={...}> — it reads that form's submit
- * status via useFormStatus().
+ * status via useOwnPending(), so it only claims the submits it started.
  */
 export function SaveButton({ children }: { children: React.ReactNode }) {
-  const { pending } = useFormStatus();
+  const { busy, pending, press } = useOwnPending();
   const [saved, setSaved] = useState(false);
   const wasPending = useRef(false);
 
   useEffect(() => {
     // Transition from pending -> not pending means the action just finished.
-    if (wasPending.current && !pending) {
+    if (wasPending.current && !busy) {
       setSaved(true);
       const t = setTimeout(() => setSaved(false), 2000);
       return () => clearTimeout(t);
     }
-    wasPending.current = pending;
-  }, [pending]);
+    wasPending.current = busy;
+  }, [busy]);
 
-  const lit = pending || saved;
+  const lit = busy || saved;
 
   return (
     <button
       type="submit"
+      onClick={press}
+      aria-busy={busy || undefined}
       disabled={pending}
       style={{
         ...btn,
@@ -49,7 +51,7 @@ export function SaveButton({ children }: { children: React.ReactNode }) {
           <span aria-hidden style={{ fontSize: 15, lineHeight: 1 }}>✓</span>
           Saved
         </>
-      ) : pending ? (
+      ) : busy ? (
         "Saving…"
       ) : (
         children

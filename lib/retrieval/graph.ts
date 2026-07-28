@@ -16,6 +16,10 @@ import { retrieve } from "./search";
  */
 
 export type GraphStats = {
+  /// Distinct origins feeding the graph — one per profile, persona claim,
+  /// project, photo, saved source, approved answer and overview. Counts every
+  /// admin surface, not just the Knowledge tab's `Source` rows, so it reads as
+  /// the head of the same funnel as `chunks` and `entities`.
   sources: number;
   chunks: number;
   entities: number;
@@ -52,18 +56,24 @@ export type GraphEdge = {
 };
 
 export async function graphStats(): Promise<GraphStats> {
-  const [sources, chunks, entities, edges, models, originRows, orphanEntities] = await Promise.all([
-    prisma.source.count(),
+  const [chunks, entities, edges, models, originRows, orphanEntities] = await Promise.all([
     prisma.chunk.count(),
     prisma.entity.count(),
     prisma.entityEdge.count(),
     prisma.chunk.groupBy({ by: ["embedModel"], _count: { _all: true } }),
-    prisma.chunk.groupBy({ by: ["originKind"], _count: { _all: true } }),
+    prisma.chunk.groupBy({ by: ["originKind", "originId"], _count: { _all: true } }),
     prisma.entity.count({ where: { mentions: { none: {} } } }),
   ]);
 
-  const origins = originRows
-    .map((o) => ({ kind: o.originKind, count: o._count._all }))
+  // One groupBy feeds both the Sources tile and the per-origin breakdown, so
+  // the headline number can never drift from the pills that explain it.
+  const sources = originRows.length;
+  const perKind = new Map<string, number>();
+  for (const o of originRows) {
+    perKind.set(o.originKind, (perKind.get(o.originKind) ?? 0) + o._count._all);
+  }
+  const origins = [...perKind]
+    .map(([kind, count]) => ({ kind, count }))
     .sort((a, b) => b.count - a.count);
 
   let chunksWithoutEmbedding = 0;

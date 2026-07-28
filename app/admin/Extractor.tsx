@@ -1,4 +1,5 @@
 import { addSource } from "./actions";
+import { PendingButton } from "./PendingButton";
 import { field, btn } from "./ui";
 
 /**
@@ -16,7 +17,9 @@ export function Extractor({ mode }: { mode: "link" | "pdf" | "text" }) {
           placeholder="https://…  (LinkedIn post, article, GitHub, anything)"
           style={{ ...field, marginBottom: 0, flex: 1 }}
         />
-        <button style={btn}>Extract</button>
+        <PendingButton pendingLabel="Extracting…" style={btn}>
+          Extract
+        </PendingButton>
       </form>
     );
   }
@@ -32,7 +35,9 @@ export function Extractor({ mode }: { mode: "link" | "pdf" | "text" }) {
           required
           style={{ ...field, marginBottom: 0, flex: 1, minWidth: 240 }}
         />
-        <button style={btn}>Extract</button>
+        <PendingButton pendingLabel="Extracting…" style={btn}>
+          Extract
+        </PendingButton>
       </form>
     );
   }
@@ -48,7 +53,9 @@ export function Extractor({ mode }: { mode: "link" | "pdf" | "text" }) {
         required
         style={{ ...field, resize: "vertical" }}
       />
-      <button style={btn}>Extract text</button>
+      <PendingButton pendingLabel="Extracting…" style={btn}>
+        Extract text
+      </PendingButton>
     </form>
   );
 }

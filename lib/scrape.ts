@@ -67,20 +67,29 @@ function extractHtml(html: string): {
   return { title: title?.trim() || null, text, imageUrl: imageUrl || null };
 }
 
-/** Ask Claude for a summary + tags from any extracted text. */
+const EMPTY_SOURCE_SUMMARY =
+  "Could not extract meaningful content automatically (the source may be " +
+  "empty, an image-only PDF, or a login-gated page). Add a summary manually " +
+  "so the chatbot can use it.";
+
+/**
+ * Ask Claude for a summary + tags from any extracted text.
+ *
+ * `origin` decides how little content counts as a failure. A *scraped* source
+ * that comes back near-empty means the fetch or parse fell over, so we hand the
+ * admin the write-it-yourself message. *Authored* text was typed straight into
+ * the form, so there is no extraction to fail — a one-line note ("I play magic
+ * in my free time") is real content and gets summarised like anything else.
+ */
 async function summarize(
   label: string,
   title: string | null,
   text: string,
+  origin: "scraped" | "authored" = "scraped",
 ): Promise<{ summary: string; tags: string[] }> {
-  if (text.trim().length < 40) {
-    return {
-      summary:
-        "Could not extract meaningful content automatically (the source may be " +
-        "empty, an image-only PDF, or a login-gated page). Add a summary manually " +
-        "so the chatbot can use it.",
-      tags: [],
-    };
+  const clean = text.trim();
+  if (clean.length < (origin === "authored" ? 1 : 40)) {
+    return { summary: EMPTY_SOURCE_SUMMARY, tags: [] };
   }
 
   const prompt =
@@ -89,8 +98,10 @@ async function summarize(
     `work, background, and views. Return STRICT JSON with keys "summary" (2-5 ` +
     `sentences, written so the chatbot can quote it naturally in the first person ` +
     `where appropriate) and "tags" (an array of 3-6 short lowercase topic tags). ` +
+    `If the source is only a line or two, keep the summary to a single faithful ` +
+    `sentence and invent nothing that is not in the source. ` +
     `No prose outside the JSON.\n\n` +
-    `SOURCE: ${label}\nTitle: ${title ?? "(none)"}\n\nCONTENT:\n${text.slice(0, 12000)}`;
+    `SOURCE: ${label}\nTitle: ${title ?? "(none)"}\n\nCONTENT:\n${clean.slice(0, 12000)}`;
 
   const msg = await claude().messages.create({
     model: claudeModel(),
@@ -339,18 +350,23 @@ export async function writeProfileFromResume(raw: string): Promise<ResumeParse> 
   }
 }
 
-/** Extract a pasted text / markdown source. */
+/**
+ * Extract a pasted text / markdown source. The text is authored, not scraped,
+ * so it is never rejected for being short, and if the model comes back with
+ * nothing usable we fall back to the pasted text itself rather than saving a
+ * blank summary.
+ */
 export async function extractText(
   text: string,
   title: string | null,
 ): Promise<ExtractResult> {
   const clean = text.trim().slice(0, 12000);
-  const { summary, tags } = await summarize("Pasted text", title, clean);
+  const { summary, tags } = await summarize("Pasted text", title, clean, "authored");
   return {
-    title: title || summary.slice(0, 60),
+    title: title || clean.split("\n")[0].trim().slice(0, 60) || "Note",
     rawText: clean,
     imageUrl: null,
-    summary,
+    summary: summary || clean.slice(0, 700),
     tags,
     kind: "note",
   };

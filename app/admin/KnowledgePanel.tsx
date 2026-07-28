@@ -1,6 +1,7 @@
 import { safeTags } from "@/lib/knowledge";
 import { rescanSource, updateSourceSummary, deleteSource } from "./actions";
 import { Extractor } from "./Extractor";
+import { PendingButton } from "./PendingButton";
 import { panel, field, btnGhost, btnDanger, SectionTitle } from "./ui";
 
 /**
@@ -81,12 +82,16 @@ function SourceRow({ source: s }: { source: KnowledgeSource }) {
           {s.type === "link" && (
             <form action={rescanSource}>
               <input type="hidden" name="id" value={s.id} />
-              <button style={btnGhost as React.CSSProperties}>Rescan</button>
+              <PendingButton pendingLabel="Rescanning…" style={btnGhost as React.CSSProperties}>
+                Rescan
+              </PendingButton>
             </form>
           )}
           <form action={deleteSource}>
             <input type="hidden" name="id" value={s.id} />
-            <button style={btnDanger as React.CSSProperties}>Delete</button>
+            <PendingButton pendingLabel="Deleting…" style={btnDanger as React.CSSProperties}>
+              Delete
+            </PendingButton>
           </form>
         </div>
       </div>
@@ -101,7 +106,9 @@ function SourceRow({ source: s }: { source: KnowledgeSource }) {
             ))}
           </div>
         )}
-        <button style={btnGhost as React.CSSProperties}>Save summary</button>
+        <PendingButton pendingLabel="Saving…" style={btnGhost as React.CSSProperties}>
+          Save summary
+        </PendingButton>
       </form>
     </div>
   );

@@ -4,7 +4,8 @@ import { GraphCanvas } from "./GraphCanvas";
 import { Count, EntitiesPane, RelationsPane } from "./GraphView";
 import { RetrievalPlayground } from "./RetrievalPlayground";
 import { SubTabs } from "./SubTabs";
-import { rebuildOverviews } from "./actions";
+import { backfillEmbeddings, rebuildOverviews } from "./actions";
+import { PendingButton } from "./PendingButton";
 import { SectionTitle, Label, btnGhost } from "./ui";
 
 /**
@@ -149,7 +150,16 @@ function GraphTab({
       {stats.chunksWithoutEmbedding > 0 && (
         <Notice>
           {stats.chunksWithoutEmbedding} chunk(s) have no embedding, so only keyword matching can
-          find them. Re-run the reindex script to repair.
+          find them. Embedding just those chunks costs one provider call per batch — no
+          re-scanning, no Claude calls, and the entities and relations stay exactly as they are.
+          <form action={backfillEmbeddings} style={{ marginTop: 8 }}>
+            <PendingButton
+              pendingLabel="Embedding…"
+              style={{ ...btnGhost, padding: "6px 14px" }}
+            >
+              Embed {stats.chunksWithoutEmbedding} missing chunk(s)
+            </PendingButton>
+          </form>
         </Notice>
       )}
       {mixedIndex && (
@@ -207,15 +217,18 @@ function OverviewsTab({
         </div>
       )}
       <form action={rebuildOverviews}>
-        <button style={{ ...btnGhost, padding: "6px 14px" }}>Rebuild overviews</button>
+        <PendingButton pendingLabel="Rebuilding…" style={{ ...btnGhost, padding: "6px 14px" }}>
+          Rebuild overviews
+        </PendingButton>
       </form>
     </div>
   );
 }
 
+/** A `div`, not a `p` — the missing-embedding notice carries a repair form. */
 function Notice({ children }: { children: React.ReactNode }) {
   return (
-    <p
+    <div
       style={{
         fontSize: 13,
         color: "var(--danger-on-surface)",
@@ -226,7 +239,7 @@ function Notice({ children }: { children: React.ReactNode }) {
       }}
     >
       {children}
-    </p>
+    </div>
   );
 }
 

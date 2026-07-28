@@ -11,6 +11,7 @@ import {
   mergeSuggestedEntities,
   dismissSuggestedMerge,
 } from "./actions";
+import { PendingButton } from "./PendingButton";
 import { field, btn, btnGhost, btnDanger, Label } from "./ui";
 
 /**
@@ -33,7 +34,12 @@ export function EntitiesPane({
   suggestions: MergeSuggestion[];
 }) {
   const [page, setPage] = useState(0);
-  const shown = entities.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? entities.filter((e) => e.name.toLowerCase().includes(q) || e.type.toLowerCase().includes(q))
+    : entities;
+  const shown = filtered.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
 
   return (
     <div>
@@ -43,12 +49,26 @@ export function EntitiesPane({
         <p style={hint}>Nothing extracted yet. Add a source on the Knowledge tab.</p>
       ) : (
         <>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {shown.map((e) => (
-              <EntityRow key={e.id} entity={e} />
-            ))}
-          </div>
-          <Pager page={page} total={entities.length} onPage={setPage} noun="entities" />
+          <SearchBox
+            value={query}
+            onChange={(v) => {
+              setQuery(v);
+              setPage(0);
+            }}
+            placeholder="Search entities by name or type…"
+          />
+          {filtered.length === 0 ? (
+            <p style={hint}>No entities match &ldquo;{query.trim()}&rdquo;.</p>
+          ) : (
+            <>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {shown.map((e) => (
+                  <EntityRow key={e.id} entity={e} />
+                ))}
+              </div>
+              <Pager page={page} total={filtered.length} onPage={setPage} noun="entities" />
+            </>
+          )}
         </>
       )}
     </div>
@@ -84,14 +104,16 @@ function SuggestedMerges({ suggestions }: { suggestions: MergeSuggestion[] }) {
               <form action={mergeSuggestedEntities}>
                 <input type="hidden" name="fromId" value={s.fromId} />
                 <input type="hidden" name="intoId" value={s.intoId} />
-                <button style={{ ...btnGhost, padding: "3px 9px", fontSize: 12 }}>Merge</button>
+                <PendingButton pendingLabel="Merging…" style={{ ...btnGhost, padding: "3px 9px", fontSize: 12 }}>
+                  Merge
+                </PendingButton>
               </form>
               <form action={dismissSuggestedMerge}>
                 <input type="hidden" name="fromId" value={s.fromId} />
                 <input type="hidden" name="intoId" value={s.intoId} />
-                <button style={{ ...btnGhost, padding: "3px 9px", fontSize: 12 }}>
+                <PendingButton pendingLabel="Dismissing…" style={{ ...btnGhost, padding: "3px 9px", fontSize: 12 }}>
                   Don&apos;t merge
-                </button>
+                </PendingButton>
               </form>
             </div>
           </div>
@@ -119,9 +141,17 @@ function EntityRow({ entity }: { entity: GraphEntity }) {
             <option key={t} value={t}>{t}</option>
           ))}
         </select>
-        <button style={{ ...btnGhost, padding: "6px 12px" }}>Save</button>
+        <PendingButton pendingLabel="Saving…" style={{ ...btnGhost, padding: "6px 12px" }}>
+          Save
+        </PendingButton>
         {/* Shares the form's hidden id; formAction routes it to the delete action. */}
-        <button formAction={removeEntity} style={{ ...btnDanger, padding: "6px 12px" }}>Delete</button>
+        <PendingButton
+          pendingLabel="Deleting…"
+          formAction={removeEntity}
+          style={{ ...btnDanger, padding: "6px 12px" }}
+        >
+          Delete
+        </PendingButton>
       </form>
 
       <div style={{ fontSize: 11, color: "var(--on-surface)", fontStyle: "italic", marginTop: 6 }}>
@@ -145,7 +175,17 @@ function EntityRow({ entity }: { entity: GraphEntity }) {
 
 export function RelationsPane({ entities, edges }: { entities: GraphEntity[]; edges: GraphEdge[] }) {
   const [page, setPage] = useState(0);
-  const shown = edges.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? edges.filter(
+        (e) =>
+          e.fromName.toLowerCase().includes(q) ||
+          e.relation.toLowerCase().includes(q) ||
+          e.toName.toLowerCase().includes(q),
+      )
+    : edges;
+  const shown = filtered.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
 
   return (
     <div>
@@ -153,22 +193,38 @@ export function RelationsPane({ entities, edges }: { entities: GraphEntity[]; ed
         <p style={hint}>No relations extracted yet.</p>
       ) : (
         <>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {shown.map((e) => (
-              <div key={e.id} style={edgeRow}>
-                <span style={{ fontSize: 13, minWidth: 0 }}>
-                  <strong>{e.fromName}</strong>{" "}
-                  <span style={{ fontStyle: "italic", color: "var(--accent-on-surface)" }}>{e.relation}</span>{" "}
-                  → <strong>{e.toName}</strong>
-                </span>
-                <form action={removeEntityEdge}>
-                  <input type="hidden" name="id" value={e.id} />
-                  <button style={{ ...btnDanger, padding: "3px 9px", fontSize: 12 }}>Delete</button>
-                </form>
+          <SearchBox
+            value={query}
+            onChange={(v) => {
+              setQuery(v);
+              setPage(0);
+            }}
+            placeholder="Search by entity or relation…"
+          />
+          {filtered.length === 0 ? (
+            <p style={hint}>No relations match &ldquo;{query.trim()}&rdquo;.</p>
+          ) : (
+            <>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {shown.map((e) => (
+                  <div key={e.id} style={edgeRow}>
+                    <span style={{ fontSize: 13, minWidth: 0 }}>
+                      <strong>{e.fromName}</strong>{" "}
+                      <span style={{ fontStyle: "italic", color: "var(--accent-on-surface)" }}>{e.relation}</span>{" "}
+                      → <strong>{e.toName}</strong>
+                    </span>
+                    <form action={removeEntityEdge}>
+                      <input type="hidden" name="id" value={e.id} />
+                      <PendingButton pendingLabel="Deleting…" style={{ ...btnDanger, padding: "3px 9px", fontSize: 12 }}>
+                        Delete
+                      </PendingButton>
+                    </form>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          <Pager page={page} total={edges.length} onPage={setPage} noun="relations" />
+              <Pager page={page} total={filtered.length} onPage={setPage} noun="relations" />
+            </>
+          )}
         </>
       )}
 
@@ -188,7 +244,9 @@ export function RelationsPane({ entities, edges }: { entities: GraphEntity[]; ed
               <option key={e.id} value={e.id}>{e.name}</option>
             ))}
           </select>
-          <button style={btn}>Add relation</button>
+          <PendingButton pendingLabel="Adding…" style={btn}>
+            Add relation
+          </PendingButton>
         </form>
       )}
     </div>
@@ -196,6 +254,27 @@ export function RelationsPane({ entities, edges }: { entities: GraphEntity[]; ed
 }
 
 // ── Bits ────────────────────────────────────────────────────────────────────
+
+function SearchBox({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <input
+      type="search"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      aria-label={placeholder}
+      style={{ ...field, marginBottom: 12, maxWidth: 320 }}
+    />
+  );
+}
 
 function Pager({
   page,

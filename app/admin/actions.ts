@@ -13,7 +13,7 @@ import { redirect } from "next/navigation";
 import { prisma, getProfile } from "@/lib/db";
 import { checkPassword, createSession, destroySession, isAuthed } from "@/lib/auth";
 import { extractLink, extractDocument, extractText, fileToText, writeProfileFromResume } from "@/lib/scrape";
-import { indexSource } from "@/lib/retrieval/indexer";
+import { indexSource, embedMissingChunks } from "@/lib/retrieval/indexer";
 import {
   renameEntity,
   deleteEntity,
@@ -619,6 +619,18 @@ export async function rebuildOverviews() {
   await requireAuth();
   const { buildClusterOverviews } = await import("@/lib/retrieval/clusters");
   await buildClusterOverviews().catch((e) => console.error("rebuildOverviews failed:", e));
+  revalidatePath("/admin/dashboard");
+}
+
+/**
+ * Repair the chunks whose embedding failed, and only those — embedding calls
+ * only, no Claude calls, graph untouched. Best-effort like every other index
+ * write here: a provider outage leaves the chunks lexically searchable and the
+ * Graph tab still reporting the gap.
+ */
+export async function backfillEmbeddings() {
+  await requireAuth();
+  await embedMissingChunks().catch((e) => console.error("backfillEmbeddings failed:", e));
   revalidatePath("/admin/dashboard");
 }
 

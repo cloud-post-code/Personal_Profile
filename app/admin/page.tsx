@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { isAuthed } from "@/lib/auth";
 import { login } from "./actions";
+import { PendingButton } from "./PendingButton";
 
 export const dynamic = "force-dynamic";
 
@@ -61,8 +62,8 @@ export default async function AdminLogin({
             color: "var(--on-bg-soft)",
           }}
         />
-        <button
-          type="submit"
+        <PendingButton
+          pendingLabel="Signing in…"
           style={{
             width: "100%",
             padding: "12px",
@@ -74,7 +75,7 @@ export default async function AdminLogin({
           }}
         >
           Enter →
-        </button>
+        </PendingButton>
         <Link href="/" style={{ display: "block", textAlign: "center", marginTop: 16, fontSize: 13 }}>
           ← back to site
         </Link>

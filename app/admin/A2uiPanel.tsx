@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Cards } from "@/app/cards/Cards";
 import { parseSampleBlock, type UiCardRow } from "@/lib/uiCards";
 import { deleteCard } from "./actions";
+import { PendingButton } from "./PendingButton";
 import { panel, field, btn, btnGhost, btnDanger, SectionTitle } from "./ui";
 
 /**
@@ -133,9 +134,13 @@ export function A2uiPanel({ rows }: { rows: UiCardRow[] }) {
             </button>
             <form action={deleteCard} style={{ marginLeft: "auto" }}>
               <input type="hidden" name="id" value={r.id} />
-              <button aria-label={`Delete the ${r.label} card`} style={btnDanger as React.CSSProperties}>
+              <PendingButton
+                pendingLabel="Deleting…"
+                aria-label={`Delete the ${r.label} card`}
+                style={btnDanger as React.CSSProperties}
+              >
                 Delete
-              </button>
+              </PendingButton>
             </form>
           </div>
           {isOpen(r.id) && (

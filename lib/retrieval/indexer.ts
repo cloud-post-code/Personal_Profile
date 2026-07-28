@@ -1,6 +1,6 @@
 import { prisma } from "../db";
 import { chunkText } from "./chunking";
-import { embedTexts, vecToBytes } from "./embed";
+import { embedModelName, embedTexts, vecToBytes } from "./embed";
 import {
   extractEntities,
   entityKey,
@@ -175,6 +175,70 @@ export async function indexSource(sourceId: string, opts: IndexOpts = {}): Promi
     },
     opts,
   );
+}
+
+/** How many unembedded chunks go into one embedding request. */
+export const EMBED_BACKFILL_BATCH = 32;
+
+export type EmbedBackfill = {
+  /// Chunks found carrying no embedding.
+  attempted: number;
+  /// How many now have one. Short of `attempted` means the provider failed.
+  embedded: number;
+  /// Model the new vectors were written with.
+  model: string;
+};
+
+/**
+ * Embed the chunks that have no embedding, and nothing else.
+ *
+ * A provider hiccup during indexing leaves chunks unembedded on purpose (see
+ * `embed.ts`): the text, its mentions and the graph it fed are all intact and
+ * still lexically searchable — only the vector is missing, so cosine can never
+ * reach them. Repairing that needs the embedding call and nothing more, which
+ * is why this deliberately does NOT re-run `indexOrigin`: that would re-chunk
+ * unchanged text, spend a Claude extraction call per origin, and rewrite edges
+ * that were never wrong.
+ *
+ * Vectors are written with the CURRENT model — the same one `retrieve()`
+ * embeds the visitor's question with — so a repaired chunk is comparable to
+ * queries even when the rest of the index sits on an older provider. Chunks
+ * that already carry an embedding are never touched, whatever produced them:
+ * closing a gap must not become a silent migration of the whole index.
+ *
+ * Fails soft, the same way indexing does. A failed batch comes back as null
+ * vectors, those rows stay null, and the shortfall is reported in the result
+ * rather than discarding the batches that worked.
+ */
+export async function embedMissingChunks(
+  opts: { batchSize?: number; embed?: typeof embedTexts } = {},
+): Promise<EmbedBackfill> {
+  const batchSize = Math.max(1, opts.batchSize ?? EMBED_BACKFILL_BATCH);
+  const embed = opts.embed ?? embedTexts;
+
+  const pending = await prisma.chunk.findMany({
+    where: { embedding: null },
+    select: { id: true, text: true },
+  });
+
+  let embedded = 0;
+  let model = embedModelName();
+  for (let i = 0; i < pending.length; i += batchSize) {
+    const batch = pending.slice(i, i + batchSize);
+    const res = await embed(batch.map((c) => c.text));
+    model = res.model;
+    for (let j = 0; j < batch.length; j++) {
+      const v = res.vectors[j];
+      if (!v) continue; // provider failed — stays null, and the count says so
+      await prisma.chunk.update({
+        where: { id: batch[j].id },
+        data: { embedding: vecToBytes(v), embedModel: res.model },
+      });
+      embedded++;
+    }
+  }
+
+  return { attempted: pending.length, embedded, model };
 }
 
 async function persistGraph(
