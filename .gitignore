@@ -43,3 +43,6 @@ prisma/dev.db-journal
 
 # Local Claude Code tooling config
 .claude/
+
+# isolated local verification builds (NEXT_DIST_DIR)
+/.next-build/

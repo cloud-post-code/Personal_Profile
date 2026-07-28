@@ -11,6 +11,9 @@ if (typeof g.File === "undefined") g.File = NodeFile;
 if (typeof g.Blob === "undefined") g.Blob = NodeBlob;
 
 const nextConfig: NextConfig = {
+  // Local verification builds can run while a dev server holds .next; point
+  // them elsewhere with NEXT_DIST_DIR so the two never fight over one dir.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   // This project has its own lockfile; pin the tracing root to silence the
   // "multiple lockfiles" workspace-root inference warning.
   outputFileTracingRoot: path.join(__dirname),
