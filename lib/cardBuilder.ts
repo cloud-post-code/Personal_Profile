@@ -1,4 +1,4 @@
-import { claude, claudeModel } from "@/lib/claude";
+import { claude, cardBuilderModel } from "@/lib/claude";
 import { prisma, getProfile } from "@/lib/db";
 import { safeTags, safeExperience } from "@/lib/knowledge";
 import { CARD_TOOLS, type CardTool } from "@/lib/canned";
@@ -167,7 +167,7 @@ export async function draftUiCard(
   let convo = messages;
   for (let attempt = 0; ; attempt++) {
     const response = await client.messages.create({
-      model: claudeModel(),
+      model: cardBuilderModel(),
       // Coded cards carry full HTML documents; don't truncate them mid-tag.
       max_tokens: 4000,
       system,

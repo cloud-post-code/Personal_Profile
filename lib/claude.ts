@@ -21,3 +21,14 @@ export function claude(): Anthropic {
 export function claudeModel(): string {
   return process.env.CLAUDE_MODEL || "claude-haiku-4-5-20251001";
 }
+
+/**
+ * The model for the admin card builder only. Split from CLAUDE_MODEL because
+ * the two workloads want different trade-offs: the chatbot answers every
+ * visitor message (cost matters, Haiku fits), while the builder is a rare,
+ * admin-only design task where quality beats the extra cents. Falls back to
+ * the chatbot's model when unset.
+ */
+export function cardBuilderModel(): string {
+  return process.env.CARD_BUILDER_MODEL || claudeModel();
+}
