@@ -20,16 +20,11 @@ export type EntityExtractor = (
   known?: string[],
 ) => Promise<ExtractedGraph>;
 
-export const ENTITY_TYPES_LIST = [
-  "person", "org", "project", "skill", "place", "topic", "event", "other",
-] as const;
-
-const ENTITY_TYPES = new Set<string>(ENTITY_TYPES_LIST);
-
-/** Normalized lookup key for an entity name. */
-export function entityKey(name: string): string {
-  return name.toLowerCase().replace(/\s+/g, " ").trim();
-}
+// The ontology lives in entityTypes.ts so client components can import it
+// without pulling this module's Anthropic SDK dependency into the browser
+// bundle. Re-exported here so server-side callers keep their import path.
+export { ENTITY_TYPES_LIST, entityKey } from "./entityTypes";
+import { ENTITY_TYPES, entityKey } from "./entityTypes";
 
 /** Most known-entity names fed back into the prompt; bounds prompt growth. */
 export const MAX_KNOWN_IN_PROMPT = 200;

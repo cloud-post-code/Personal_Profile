@@ -12,6 +12,7 @@ import { ExperienceEditor } from "../ExperienceEditor";
 import {
   logout,
   saveProfile,
+  saveExperience,
   uploadResume,
   savePersona,
   saveTheme,
@@ -141,21 +142,9 @@ export default async function Dashboard({
         </form>
       </div>
 
-      {/* ── Upload resume — drops the resume's raw text into the Bio. ── */}
-      <div style={{ border: "1px solid var(--primary)", borderRadius: "var(--radius-md)", padding: 16, marginBottom: 20 }}>
-        <strong style={{ fontSize: 14, color: "var(--on-surface)", display: "block", marginBottom: 6 }}>
-          Upload your resume
-        </strong>
-        <UploadToGenerate
-          action={uploadResume}
-          buttonLabel="Parse resume → fill everything"
-          pendingLabel="Parsing…"
-          hint="Upload a PDF, Word doc, or text resume. It's split into your Bio, Experience cards, and an 'Other' section, and fills your name, location, email, and any social links found. Review and edit below."
-        />
-      </div>
-
-      {/* One form for the whole Profile tab — identity, bio, experience, and
-          other all save together from the single button at the bottom. */}
+      {/* One form for the Profile tab — identity, contact, socials, and bio all
+          save together from the single button at the bottom. Experience lives
+          in its own Content tab. */}
       <form action={saveProfile}>
         <div style={grid2}>
           <div>
@@ -200,19 +189,42 @@ export default async function Dashboard({
           <textarea name="bio" defaultValue={profile.bio} rows={10} style={{ ...field, resize: "vertical" }} />
         </div>
 
-        {/* ── Experience ── a summary paragraph plus the per-role cards. */}
-        <div style={{ borderTop: "1px solid var(--border)", margin: "18px 0", paddingTop: 16 }}>
-          <Label>Experience — overview paragraph</Label>
-          <textarea
-            name="experienceSummary"
-            defaultValue={profile.experienceSummary}
-            rows={5}
-            placeholder="A paragraph summarizing your work experience — this is what shows on your profile."
-            style={{ ...field, resize: "vertical" }}
-          />
-          <Label>Experience roles (add one at a time)</Label>
-          <ExperienceEditor initial={experience} />
-        </div>
+        <SaveButton>Save profile</SaveButton>
+      </form>
+    </section>
+  );
+
+  // ── EXPERIENCE TAB (Content section) — resume upload, the overview
+  // paragraph, the per-role cards, and the "other" catch-all. ──
+  const experienceTab = (
+    <section data-fill="surface" style={panel}>
+      <SectionTitle>Experience</SectionTitle>
+
+      {/* ── Upload resume — fills this tab plus the Profile bio and details. ── */}
+      <div style={{ border: "1px solid var(--primary)", borderRadius: "var(--radius-md)", padding: 16, marginBottom: 20 }}>
+        <strong style={{ fontSize: 14, color: "var(--on-surface)", display: "block", marginBottom: 6 }}>
+          Upload your resume
+        </strong>
+        <UploadToGenerate
+          action={uploadResume}
+          buttonLabel="Parse resume → fill everything"
+          pendingLabel="Parsing…"
+          hint="Upload a PDF, Word doc, or text resume. It's split into your Bio, Experience cards, and an 'Other' section, and fills your name, location, email, and any social links found. Review and edit below."
+        />
+      </div>
+
+      <form action={saveExperience}>
+        <Label>Experience — overview paragraph</Label>
+        <textarea
+          name="experienceSummary"
+          defaultValue={profile.experienceSummary}
+          rows={5}
+          placeholder="A paragraph summarizing your work experience — this is what shows on your profile."
+          style={{ ...field, resize: "vertical" }}
+        />
+
+        <Label>Experience roles (add one at a time)</Label>
+        <ExperienceEditor initial={experience} />
 
         {/* ── Other ── everything else from the resume (education, skills, etc.). */}
         <div style={{ borderTop: "1px solid var(--border)", margin: "18px 0", paddingTop: 16 }}>
@@ -220,7 +232,7 @@ export default async function Dashboard({
           <textarea name="other" defaultValue={profile.other} rows={7} style={{ ...field, resize: "vertical" }} />
         </div>
 
-        <SaveButton>Save profile</SaveButton>
+        <SaveButton>Save experience</SaveButton>
       </form>
     </section>
   );
@@ -645,6 +657,7 @@ export default async function Dashboard({
               <SubTabs
                 initial={initialSub}
                 tabs={[
+                  { key: "experience", label: "Experience", content: experienceTab },
                   { key: "projects", label: "Projects", content: projectsTab },
                   { key: "links", label: "Links", content: linksTab },
                   { key: "pdfs", label: "PDFs", content: pdfsTab },
@@ -657,7 +670,7 @@ export default async function Dashboard({
           },
           {
             key: "graph",
-            label: "Graph",
+            label: "Knowledge",
             content: <GraphPanel
                 stats={gStats}
                 entities={gEntities}

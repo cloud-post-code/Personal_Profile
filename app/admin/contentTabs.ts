@@ -1,5 +1,13 @@
 /** Keys of the sub-tabs inside the combined Content section. */
-export const CONTENT_TAB_KEYS = ["projects", "links", "pdfs", "text", "photos", "persona"] as const;
+export const CONTENT_TAB_KEYS = [
+  "experience",
+  "projects",
+  "links",
+  "pdfs",
+  "text",
+  "photos",
+  "persona",
+] as const;
 export type ContentTabKey = (typeof CONTENT_TAB_KEYS)[number];
 
 /** Knowledge used to be one Content sub-tab; it is now split by source kind. */

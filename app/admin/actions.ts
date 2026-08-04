@@ -131,9 +131,9 @@ export async function saveDetails(formData: FormData) {
 }
 
 /**
- * The whole Profile tab saves at once: identity, contact, socials, bio, the
- * experience overview paragraph, the experience cards, and "other". One form,
- * one button — so nothing is silently left unsaved in another section.
+ * The Profile tab saves at once: identity, contact, socials, and bio. The
+ * experience overview, role cards, and "other" live in their own Content tab
+ * and save through saveExperience.
  */
 export async function saveProfile(formData: FormData) {
   await requireAuth();
@@ -146,8 +146,6 @@ export async function saveProfile(formData: FormData) {
     .map((label, i) => ({ label: label.trim(), url: (urls[i] ?? "").trim() }))
     .filter((s) => s.label && s.url);
 
-  const experience = safeExperience(String(formData.get("experience") ?? "[]"));
-
   await prisma.profile.update({
     where: { id: 1 },
     data: {
@@ -158,6 +156,26 @@ export async function saveProfile(formData: FormData) {
       bookingLink: String(formData.get("bookingLink") ?? "").trim(),
       socials: JSON.stringify(socials),
       bio: String(formData.get("bio") ?? ""),
+    },
+  });
+  await reindex("profile", indexProfile);
+  revalidateAll();
+}
+
+/**
+ * The Experience tab (Content → Experience): the overview paragraph, the
+ * per-role cards, and the "other" catch-all. Saved apart from the Profile tab
+ * so neither form blanks the other's fields.
+ */
+export async function saveExperience(formData: FormData) {
+  await requireAuth();
+  await getProfile();
+
+  const experience = safeExperience(String(formData.get("experience") ?? "[]"));
+
+  await prisma.profile.update({
+    where: { id: 1 },
+    data: {
       experienceSummary: String(formData.get("experienceSummary") ?? ""),
       experience: JSON.stringify(experience),
       other: String(formData.get("other") ?? ""),
@@ -744,23 +762,9 @@ export async function deleteCard(formData: FormData) {
   revalidatePath("/admin/dashboard");
 }
 
-/**
- * The card builder page's model call: describe → draft, or draft + feedback →
- * revised draft. Returns errors as data — the page shows them next to a retry
- * instead of surfacing an error boundary.
- */
-export async function draftCard(input: {
-  instructions: string;
-  current?: CardDraft;
-  feedback?: string;
-}): Promise<{ ok: true; draft: CardDraft } | { ok: false; error: string }> {
-  await requireAuth();
-  try {
-    return { ok: true, draft: await draftUiCard(input) };
-  } catch (e) {
-    return { ok: false, error: err(e) };
-  }
-}
+// The builder's model call moved to app/api/admin/build-card/route.ts: a
+// server action returns one value, and the page needs the reasoning and
+// searches as they happen. Auth still gates it, at the route.
 
 /** Persist a builder draft — same validated write path as the form. */
 export async function saveBuiltCard(input: {

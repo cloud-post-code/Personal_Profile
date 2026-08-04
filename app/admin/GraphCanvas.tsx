@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Core, LayoutOptions, NodeSingular } from "cytoscape";
-import { ENTITY_TYPES_LIST } from "@/lib/retrieval/entities";
+import { ENTITY_TYPES_LIST } from "@/lib/retrieval/entityTypes";
 import type { GraphEntity, GraphEdge } from "@/lib/retrieval/graph";
 import { btnGhost } from "./ui";
 

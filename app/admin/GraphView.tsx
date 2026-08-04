@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ENTITY_TYPES_LIST } from "@/lib/retrieval/entities";
+import { ENTITY_TYPES_LIST } from "@/lib/retrieval/entityTypes";
 import type { GraphEntity, GraphEdge, MergeSuggestion } from "@/lib/retrieval/graph";
 import {
   saveEntity,

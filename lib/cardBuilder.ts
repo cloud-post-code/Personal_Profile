@@ -1,8 +1,10 @@
+import type Anthropic from "@anthropic-ai/sdk";
 import { claude, cardBuilderModel } from "@/lib/claude";
 import { prisma, getProfile } from "@/lib/db";
 import { safeTags, safeExperience } from "@/lib/knowledge";
 import { CARD_TOOLS, type CardTool } from "@/lib/canned";
 import { parseSampleBlock, swatch } from "@/lib/uiCards";
+import { retrieve as defaultRetrieve, formatContext } from "@/lib/retrieval/search";
 
 /**
  * The AI card builder: turns a plain-text description ("a card that shows my
@@ -34,6 +36,48 @@ const TOOL_TO_TYPES: Record<CardTool, string[]> = {
   show_booking_link: ["booking_link"],
   show_card: ["custom", "html"],
 };
+
+/**
+ * How many knowledge searches one drafting call may run. Enough for the model
+ * to research two or three angles and re-word a thin query; low enough that a
+ * confused model cannot spin. Past the budget the tool returns an instruction
+ * to draft with what it has, so the loop always converges on a card.
+ */
+const SEARCH_BUDGET = 4;
+
+/**
+ * The model's own ceiling, not one of ours. A coded card carrying a dense grid
+ * or a big inline SVG used to truncate mid-string at 4000, which surfaced to
+ * the admin as "the model's response wasn't valid JSON" — deterministic, since
+ * the retry hit the same wall. The builder is a rare admin click, so there is
+ * no reason to cap it below what the model can emit; output is billed by what
+ * it actually writes, not by this number.
+ */
+const DRAFT_MAX_TOKENS = 64000;
+
+/**
+ * Extended thinking gives the model room to plan a layout before writing 5KB
+ * of HTML, and the admin watches it happen. Current models take "adaptive"
+ * thinking with an effort level rather than a fixed token budget — they spend
+ * what the task needs.
+ *
+ * Both fields are load-bearing, verified against the live API:
+ * - display "summarized" is what returns readable thinking text. Without it
+ *   the block still arrives but carries only a signature_delta, so the panel
+ *   would sit empty.
+ * - effort "max" is what makes the model actually think on this workload. At
+ *   "high" a card request came back with no thinking block at all.
+ */
+const THINKING = { type: "adaptive", display: "summarized" } as const;
+const THINKING_EFFORT = "max" as const;
+
+/**
+ * How many times a malformed draft is fed back for correction. Every failure
+ * message is written as an instruction ("use the theme variables…"), so the
+ * model usually lands on the second try; the extra attempts cover a stubborn
+ * coded card that keeps tripping the theme gate.
+ */
+const VALIDATION_ATTEMPTS = 5;
 
 const BUILDER_BRIEF = `You design "A2UI cards" for a personal portfolio site's chatbot. A card is a rich UI block the chatbot can draw in a conversation. Your job: turn the owner's description into ONE card definition.
 
@@ -83,6 +127,8 @@ Rules:
 - "reason" is the instruction the chatbot will actually receive about when to show this card. Write it as guidance, starting "When …".
 - "note" is an optional admin-facing caveat; usually "".
 
+RESEARCH: the REAL SITE DATA below is a summary — names, tags, roles. The owner's full knowledge base (articles, talks, notes, project write-ups, photo descriptions, past answers) is searchable with the "search_knowledge" tool. Use it whenever the card needs specifics the summary doesn't carry: quotes for a testimonial card, real topics for a writing card, actual detail for a project deep-dive. Search BEFORE drafting, with the terms you'd expect in the source material; search again with different wording if the first result is thin. You have a budget of ${SEARCH_BUDGET} searches per card — spend them when content depends on facts, skip them when the summary already covers it. When a search returns nothing, say so in "note" and keep that part of the card generic rather than inventing it.
+
 Respond with ONLY a JSON object (no prose, no code fences):
 {"label":"…","tool":"show_…","description":"one line on what it renders","reason":"When …","note":"","sampleBlock":{…the block object…}}`;
 
@@ -122,6 +168,14 @@ async function siteDataBrief(): Promise<string> {
   }
 }
 
+/**
+ * A conversation turn: plain text, or the structured blocks a tool turn needs
+ * (the model's tool_use blocks replayed back, and our tool_result blocks).
+ * Typed against the SDK's block params so the real client accepts it.
+ */
+type BuilderContent = Anthropic.MessageParam["content"];
+type BuilderMessage = { role: "user" | "assistant"; content: BuilderContent };
+
 /** Minimal client surface, injectable for tests (same pattern as answerDrafts). */
 export type BuilderClient = {
   messages: {
@@ -129,12 +183,88 @@ export type BuilderClient = {
       model: string;
       max_tokens: number;
       system: string;
-      messages: { role: "user" | "assistant"; content: string }[];
-    }): Promise<{ content: unknown[] }>;
+      tools?: Anthropic.Tool[];
+      thinking?: Anthropic.ThinkingConfigParam;
+      output_config?: { effort?: "low" | "medium" | "high" | "xhigh" | "max" };
+      messages: BuilderMessage[];
+    }): Promise<{ content: unknown[]; stop_reason?: string | null }>;
   };
 };
 
-export type BuilderDeps = { client?: BuilderClient };
+/**
+ * What the admin sees while a card is being built. The builder emits these as
+ * it works so the page can show reasoning and searches instead of a dead
+ * "Designing…" — a coded card can take two minutes, and silence that long
+ * reads as a hang.
+ */
+export type BuildEvent =
+  | { t: "thinking"; v: string }
+  | { t: "search"; query: string }
+  | { t: "searched"; query: string; hits: number }
+  | { t: "status"; v: string }
+  | { t: "draft"; draft: CardDraft }
+  | { t: "error"; v: string };
+
+export type BuilderDeps = {
+  client?: BuilderClient;
+  /** Injectable for proof; defaults to the chatbot's own hybrid retrieval. */
+  retrieve?: typeof defaultRetrieve;
+  /** Called with each progress event; the streaming route forwards these. */
+  onEvent?: (e: BuildEvent) => void;
+};
+
+/** The one tool the builder gets: the same search the chatbot runs. */
+const SEARCH_TOOL = {
+  name: "search_knowledge",
+  description:
+    "Search the owner's knowledge base — articles, talks, notes, project write-ups, "
+    + "photo descriptions and past answers — for facts to build the card from. "
+    + "Returns matching excerpts plus known relationships between the things they mention.",
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      query: {
+        type: "string" as const,
+        description: "What to look for, in the words you'd expect in the source material.",
+      },
+    },
+    required: ["query"],
+  },
+};
+
+/**
+ * Run one `search_knowledge` call. Never throws: a knowledge-base problem
+ * degrades to a note the model can act on, because a dead index must not
+ * dead-end a card the model could still draft from the summary brief.
+ */
+async function runSearch(
+  input: unknown,
+  search: typeof defaultRetrieve,
+): Promise<{ text: string; query: string; hits: number }> {
+  const query = String((input as { query?: unknown })?.query ?? "").trim();
+  if (!query) {
+    return { text: "No query given — call the tool with a `query` string.", query, hits: 0 };
+  }
+  try {
+    const result = await search(query);
+    if (!result.chunks.length) {
+      return {
+        query,
+        hits: 0,
+        text: `Nothing in the knowledge base matched "${query}". Try different wording, `
+          + "or keep that part of the card generic and flag it in the note.",
+      };
+    }
+    return { text: formatContext(result), query, hits: result.chunks.length };
+  } catch {
+    return {
+      query,
+      hits: 0,
+      text: "The knowledge base could not be searched right now. Draft from the "
+        + "REAL SITE DATA summary and flag any gaps in the note.",
+    };
+  }
+}
 
 /**
  * Draft a card from a description, or revise a draft from feedback. The
@@ -148,7 +278,7 @@ export async function draftUiCard(
   const instructions = input.instructions.trim();
   if (!instructions) throw new Error("Describe the card you want first.");
 
-  const messages: { role: "user" | "assistant"; content: string }[] = [
+  const messages: BuilderMessage[] = [
     { role: "user", content: instructions },
   ];
   if (input.current && input.feedback?.trim()) {
@@ -159,37 +289,135 @@ export async function draftUiCard(
   }
 
   const client = deps.client ?? claude();
+  const search = deps.retrieve ?? defaultRetrieve;
+  const emit = deps.onEvent ?? (() => {});
   const system = `${BUILDER_BRIEF}\n\n${await siteDataBrief()}`;
-  // Agentic self-correction: a draft that fails validation goes back to the
-  // model WITH the validation error, once. The errors are written as
-  // instructions ("use the theme variables…"), so the second attempt usually
-  // lands; only a second failure surfaces to the admin.
+
+  // Two nested behaviors share one conversation:
+  //  - Research: the model may call search_knowledge to pull real facts out of
+  //    the knowledge base before it drafts, up to SEARCH_BUDGET times.
+  //  - Self-correction: a draft that fails validation goes back to the model
+  //    WITH the validation error. The errors are written as instructions ("use
+  //    the theme variables…"), so the model keeps correcting until it lands or
+  //    VALIDATION_ATTEMPTS is spent — a malformed completion costs retries,
+  //    never a saved broken card.
   let convo = messages;
-  for (let attempt = 0; ; attempt++) {
-    const response = await client.messages.create({
+  let searches = 0;
+  let attempt = 0;
+  let lastError: Error | null = null;
+  // Bounded by construction: every iteration either spends a search or a
+  // validation attempt, and both are capped.
+  for (let turn = 0; turn < SEARCH_BUDGET + VALIDATION_ATTEMPTS + 2; turn++) {
+    const response = await streamOnce(client, {
       model: cardBuilderModel(),
-      // Coded cards carry full HTML documents; don't truncate them mid-tag.
-      max_tokens: 4000,
+      max_tokens: DRAFT_MAX_TOKENS,
       system,
+      tools: [SEARCH_TOOL],
+      thinking: THINKING,
+      output_config: { effort: THINKING_EFFORT },
       messages: convo,
-    });
-    const raw = textOf(response.content);
-    try {
-      return parseDraft(raw);
-    } catch (e) {
-      if (attempt >= 1) throw e;
+    }, emit);
+
+    const toolUses = toolUsesOf(response.content);
+    if (toolUses.length) {
+      const results: Anthropic.ToolResultBlockParam[] = [];
+      for (const tu of toolUses) {
+        const over = searches >= SEARCH_BUDGET;
+        if (over) {
+          results.push({
+            type: "tool_result",
+            tool_use_id: tu.id,
+            content: `Search budget spent (${SEARCH_BUDGET} searches). Draft with what you have `
+              + "now, and flag any remaining gaps in the note.",
+          });
+          continue;
+        }
+        searches++;
+        const q = String((tu.input as { query?: unknown })?.query ?? "").trim();
+        emit({ t: "search", query: q });
+        const r = await runSearch(tu.input, search);
+        emit({ t: "searched", query: r.query, hits: r.hits });
+        results.push({ type: "tool_result", tool_use_id: tu.id, content: r.text });
+      }
       convo = [
         ...convo,
+        // Replay the model's own blocks verbatim — the tool_use ids in the
+        // results must refer to blocks the model can see in its own turn, and
+        // thinking blocks must survive the round trip for the next turn.
+        { role: "assistant", content: response.content as BuilderContent },
+        { role: "user", content: results },
+      ];
+      continue;
+    }
+
+    const raw = textOf(response.content);
+    try {
+      const draft = parseDraft(raw);
+      emit({ t: "draft", draft });
+      return draft;
+    } catch (e) {
+      lastError = e as Error;
+      attempt++;
+      if (attempt >= VALIDATION_ATTEMPTS) throw lastError;
+      emit({ t: "status", v: `Draft ${attempt} didn't validate — correcting: ${lastError.message}` });
+      convo = [
+        ...convo,
+        // Only the text is replayed on a correction turn: thinking blocks are
+        // tied to the turn that produced them, and this turn is being redone.
         { role: "assistant", content: raw },
         {
           role: "user",
           content:
-            `That response failed validation: ${(e as Error).message} ` +
+            `That response failed validation: ${lastError.message} ` +
             "Respond again with ONLY the corrected JSON object.",
         },
       ];
     }
   }
+  // Only reachable if the model spends every turn on tool calls and never
+  // drafts — surfaced as a retryable message, never a saved broken card.
+  throw lastError ?? new Error("The builder kept researching without drafting a card — try again.");
+}
+
+/**
+ * One streamed model turn. Streaming is what makes thinking visible — the
+ * deltas arrive as the model reasons, and a two-minute coded card stops
+ * looking like a hang. Returns the assembled final message, so the caller's
+ * tool/validation logic is identical to the non-streamed shape.
+ *
+ * Falls back to a plain create() for injected test clients, which implement
+ * only the non-streaming surface.
+ */
+async function streamOnce(
+  client: BuilderClient,
+  req: Parameters<BuilderClient["messages"]["create"]>[0],
+  emit: (e: BuildEvent) => void,
+): Promise<{ content: unknown[]; stop_reason?: string | null }> {
+  const streamable = (client as { messages: { stream?: unknown } }).messages.stream;
+  if (typeof streamable !== "function") return client.messages.create(req);
+
+  const stream = (client as unknown as Anthropic).messages.stream(
+    req as unknown as Anthropic.MessageStreamParams,
+  );
+  for await (const event of stream) {
+    if (event.type !== "content_block_delta") continue;
+    const delta = event.delta as { type?: string; thinking?: string };
+    if (delta.type === "thinking_delta" && delta.thinking) {
+      emit({ t: "thinking", v: delta.thinking });
+    }
+  }
+  const final = await stream.finalMessage();
+  return { content: final.content, stop_reason: final.stop_reason };
+}
+
+type ToolUse = { id: string; name: string; input: unknown };
+
+/** The tool_use blocks in a response, if the model asked to search. */
+function toolUsesOf(content: unknown[]): ToolUse[] {
+  return content.filter(
+    (b): b is ToolUse =>
+      !!b && typeof b === "object" && (b as { type?: string }).type === "tool_use",
+  );
 }
 
 function textOf(content: unknown[]): string {
