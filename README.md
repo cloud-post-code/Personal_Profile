@@ -472,7 +472,8 @@ Copy [`.env.example`](.env.example) to `.env`.
 | `A2A_API_KEY` | recommended | A dedicated bearer token for the A2A endpoint, preferred over handing out the admin password. |
 | `A2A_RATE_LIMIT` | no | Calls per IP per minute. Default `30`. `0` disables. |
 | `VOYAGE_API_KEY` | no | Upgrades embeddings to `voyage-3.5-lite`. |
-| `OPENAI_API_KEY` | no | Fallback embeddings (`text-embedding-3-small`). |
+| `OPENAI_API_KEY` | no | Fallback embeddings (`text-embedding-3-small`), and image generation for the card builder. Unset, the builder still reuses existing images — it just can't draw new ones. |
+| `OPENAI_IMAGE_MODEL` | no | Image model for the card builder. Defaults to `gpt-image-1`. |
 | `NEXT_PUBLIC_POSTHOG_KEY` / `_HOST` | no | Client analytics. Blank disables it (the provider no-ops). |
 
 With no embedding key at all, the local hashed-feature embedder runs — no

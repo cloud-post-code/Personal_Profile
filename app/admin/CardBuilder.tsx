@@ -87,6 +87,10 @@ export function CardBuilder({
             ...s,
             e.hits ? `Found ${e.hits} excerpt${e.hits === 1 ? "" : "s"}` : "Nothing matched",
           ]);
+        } else if (e.t === "image") {
+          // Generated artwork costs real money, so the step log names what was
+          // drawn rather than a bare "image created".
+          setSteps((s) => [...s, `Created an image: “${e.prompt}”`]);
         } else if (e.t === "status") setSteps((s) => [...s, e.v]);
         else if (e.t === "draft") built = e.draft;
         else if (e.t === "error") setError(e.v);

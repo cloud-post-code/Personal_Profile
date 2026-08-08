@@ -141,7 +141,11 @@ function HtmlCard({ html, height }: { html: string; height?: number }) {
 
   const doc =
     `<!doctype html><html><head>` +
-    `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:;">` +
+    // img-src also allows this origin, so a coded card can show a real photo
+    // from the owner's library or one the builder generated — both are served
+    // from /api/uploads on our own host. Everything else stays denied, so the
+    // card still cannot phone out to a third party.
+    `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data: 'self';">` +
     `<style>${themeCss}</style></head><body>${html}</body></html>`;
   const h = typeof height === "number" && height >= 40 && height <= 1200 ? height : 300;
 

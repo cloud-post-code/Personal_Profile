@@ -5,6 +5,13 @@ import { safeTags, safeExperience } from "@/lib/knowledge";
 import { CARD_TOOLS, type CardTool } from "@/lib/canned";
 import { parseSampleBlock, swatch } from "@/lib/uiCards";
 import { retrieve as defaultRetrieve, formatContext } from "@/lib/retrieval/search";
+import {
+  findLibraryImages,
+  generateCardImage,
+  imageGenEnabled,
+  IMAGE_BUDGET,
+  type ImageShape,
+} from "@/lib/imageGen";
 
 /**
  * The AI card builder: turns a plain-text description ("a card that shows my
@@ -81,7 +88,7 @@ const VALIDATION_ATTEMPTS = 5;
 
 const BUILDER_BRIEF = `You design "A2UI cards" for a personal portfolio site's chatbot. A card is a rich UI block the chatbot can draw in a conversation. Your job: turn the owner's description into ONE card definition.
 
-There are two ways to build a card. FIRST decide which fits:
+There are three ways to build a card. FIRST decide which fits, in this order:
 
 1. A LIVE-DATA card, when the owner wants the site's own content (their projects, photos, work history, contact form, booking). These hydrate from the database at chat time, so their sample is ILLUSTRATIVE ("Sample Project A" style). Tools and exact sample shapes ("type" must match the tool):
 - show_projects → {"type":"projects","items":[ProjectCard, …]} — a grid of project cards
@@ -92,27 +99,35 @@ There are two ways to build a card. FIRST decide which fits:
 - show_booking → {"type":"booking"} — live open times from the calendar (no other fields)
 - show_booking_link → {"type":"booking_link","url":"https://…","name":"Blake"} — external scheduler link
 
-2. A CUSTOM card (tool "show_card"), for simple content that fits stock elements — an FAQ, testimonials, a short list. The content you write IS what visitors will see (nothing is hydrated later — write it fully and well). Shape:
+2. A CUSTOM card (tool "show_card"), ONLY for content that is genuinely a plain vertical stack — an FAQ, a testimonial, a short list of points. Stock elements render as a single unstyled column at one text size; they cannot express layout. The content you write IS what visitors will see (nothing is hydrated later — write it fully and well). Shape:
 {"type":"custom","title":"…","elements":[Element, …]}
 Element is one of:
-{"kind":"heading","text":"…"} | {"kind":"text","text":"…"} | {"kind":"list","items":["…"]} | {"kind":"badges","items":["…"]} | {"kind":"stats","items":[{"label":"…","value":"…"}]} | {"kind":"buttons","items":[{"label":"…","url":"https://…"}]} | {"kind":"image","src":"placeholder"} | {"kind":"quote","text":"…","by":"…"} | {"kind":"divider"}
+{"kind":"heading","text":"…"} | {"kind":"text","text":"…"} | {"kind":"list","items":["…"]} | {"kind":"badges","items":["…"]} | {"kind":"stats","items":[{"label":"…","value":"…"}]} | {"kind":"buttons","items":[{"label":"…","url":"https://…"}]} | {"kind":"image","src":"/api/uploads/… or placeholder","alt":"…"} | {"kind":"quote","text":"…","by":"…"} | {"kind":"divider"}
 
-3. A CODED card (also tool "show_card"), whenever the design calls for a layout the stock elements can't express — a word cloud, a pricing grid, a skill meter, any bespoke visual. You are the coding agent here: write real HTML with inline CSS yourself. As with custom cards, what you write IS what visitors see. Shape:
+DISQUALIFYING TEST for route 2 — a custom card is only correct if ALL of these hold. If even ONE fails, the card is a CODED card (route 3), no exceptions:
+- Six or fewer elements, read top to bottom in one column.
+- At most ONE heading, and it is the card's only title. A second heading is disqualifying: both render identically, so an eyebrow/label above a title, a kicker, or section headers within the card all collapse into the same flat text.
+- At most one image, and it sits in the stack like any other element — full width, nothing beside or over it. A real image IS available here (see the image tools below), but the moment the design wants it as a hero behind a title, cropped, beside text, or one of several in a row, that is layout: code it.
+- No relationship between elements other than "one after another". Anything side by side, in a grid, overlapping, aligned to a column, or visually grouped is disqualifying.
+- No emphasis you cannot get from the element kinds themselves. If the design needs a word larger, a number set apart, a label in a different weight, a colored rule, a badge on a corner — that is layout, and it is disqualifying.
+A useful check: if you can describe the card fully as "a title, then some paragraphs and a list", it is custom. If your description contains the words above/beside/across/hero/header/grid/columns, it is coded.
+
+3. A CODED card (also tool "show_card"), the DEFAULT whenever route 2's test fails — and it usually does for anything a person would call "designed". A word cloud, a pricing grid, a skill meter, a profile header, a stat strip, a two-column feature, a timeline ribbon, any bespoke visual. You are the design and coding agent here: write real HTML with inline CSS yourself. As with custom cards, what you write IS what visitors see. Shape:
 {"type":"html","html":"<div style=\"…\">…</div>","height":320}
 Coding rules (violations fail validation or render blank):
 - Inline CSS only: style attributes and/or one <style> tag. NO <script>, no event-handler attributes (onclick etc.), no <iframe>/<object>/<embed>/<form>/<link>/<meta> — the card runs in a sealed sandbox that refuses to execute anything, and validation rejects markup that looks executable.
-- The sandbox blocks ALL external requests: outside images, fonts and stylesheets will not load. Draw visuals with CSS and inline SVG, or data: URIs.
+- The sandbox blocks external requests: outside images, fonts and stylesheets will not load. You CAN use <img src="/api/uploads/…"> for an image from find_image or generate_image — those are served from this site — plus CSS, inline SVG and data: URIs. Any other host is blocked and renders as a broken image.
 - Links need target="_blank" (the sandbox cannot navigate the page it sits in).
 - "height" is the rendered height in px (40–1200): size it to the content, it does not auto-grow.
 
-DESIGN SYSTEM for coded cards — this is the site's real system; colors, edges and text MUST follow it, and validation enforces the hard rules:
+DESIGN SYSTEM for coded cards. Read this as a palette and a type scale, not as a layout template: COLOR and FONT are fixed and mechanically enforced, everything else is yours. Compose freely — asymmetry, overlap, grids, ribbons, oversized numerals, inline SVG illustration, whatever the content deserves — and be genuinely inventive with structure, because a coded card exists precisely to do what the stock elements cannot. The constraints below are what keep your design legible on every theme the owner might switch to; they are not a house style to imitate:
 - COLORS (enforced): only the theme variables, or color-mix() blends of them for shades — raw hex/rgb()/hsl() values are rejected. Backgrounds/fills/borders: var(--bg-soft), var(--surface), var(--primary), var(--accent), var(--border). Shade example: color-mix(in srgb, var(--primary) 35%, transparent).
 - TEXT COLOR (enforced, this one bites): the "color" property may ONLY use the readable-on tokens — var(--on-bg-soft) for normal text, var(--accent-on-bg-soft) for emphasis, var(--success-on-bg-soft)/var(--danger-on-bg-soft) for status, var(--on-primary) on a primary background, var(--on-surface) on a surface background — or color-mix() blends of those (keep the token at ≥55% so text stays legible). NEVER color text with var(--primary)/var(--accent)/var(--surface) directly: on many themes those sit close to the card background and the text becomes invisible. Vary word-cloud emphasis with font-size, font-weight and ≥55% color-mix opacity of the on-tokens, not with brand colors. The same rule applies to SVG fill/stroke on text-bearing shapes.
 - TEXT (enforced): never declare a concrete font-family — headings already use the site's heading font (h1 17px, h2 15px, h3 14px) and body text is already 14px/1.55 in the site font; font-family declarations that don't reference a var() are rejected. Secondary/caption text: 11–12px, often italic. Tags: 11px, var(--accent-on-bg-soft), "#" prefix, no background.
-- EDGES: containers use border:1px solid var(--border) with border-radius var(--radius-md); small controls var(--radius-sm); pills and dots var(--radius-pill). Don't invent other corner treatments.
+- EDGES: build corners from the radius tokens — var(--radius-md) for containers, var(--radius-sm) for small controls, var(--radius-pill) for pills and dots — and borders from var(--border), so edges match the rest of the site. Which elements get an edge at all, and how you use them, is a design choice.
 - BUTTONS: primary = background var(--primary), color var(--on-primary), no border, padding 10px 18px, radius var(--radius-sm); secondary = transparent, 1px solid var(--border), italic.
-- SPACING: ~16px container padding, 8–12px gaps.
-- Everything the theme does NOT specify — layout, composition, proportions, word-cloud sizing, chart shapes — is yours to design freely.
+- SPACING: ~16px container padding and 8–12px gaps as a resting rhythm; depart from it deliberately where the composition calls for it.
+- To restate the boundary: color tokens, the type scale and the radius/border tokens are fixed. Structure, hierarchy, proportion, density, illustration and the overall idea of the card are entirely yours — a coded card should look designed, not like a stack of stock elements with better spacing.
 
 Field shapes for live-data samples:
 ProjectCard = {"id":string,"name":string,"blurb":string,"detail":string|null,"githubUrl":string|null,"liveUrl":string|null,"imageUrl":string|null,"tags":[string,…]}
@@ -120,14 +135,15 @@ PhotoCard = {"id":string,"src":string,"description":string,"caption":string|null
 TimelineEntry = {"role":string,"company":string,"dates":string,"description":string}
 
 Rules:
-- Prefer a live-data tool when the intent clearly matches site content; stock elements for simple text cards; CODED html when the layout is the point.
+- Route in order: a live-data tool when the intent clearly matches site content; otherwise run route 2's disqualifying test and take CODED html the moment any part of it fails. When a card could plausibly go either way, code it — a flat stack that wanted design is a worse outcome than a designed card that could have been flat.
 - Custom and coded card content comes from the REAL SITE DATA section below — real project names, real tags, real roles. Never invent facts; where the data is silent, stay generic and say so in "note".
-- For every image field (src, imageUrl), use the exact string "placeholder" — the system swaps it for a generated placeholder image. Never use a real URL for images.
+- IMAGES: you have two tools. "find_image" searches the images the owner already HAS (uploaded photos and their descriptions, project images, their headshot) — always try this first, because a real photo of the actual subject beats any drawing of it. "generate_image" draws new artwork when the library has nothing that fits. Both return a src path like "/api/uploads/…" — put that EXACT string in the image field and it renders for real, in stock elements and coded cards alike. Only when neither tool gives you something suitable, fall back to the exact string "placeholder", which becomes a flat colored swatch. Never write any other URL into an image field: outside images are stripped and render as a swatch.
+- Generated images cannot contain text — no titles, labels or logos inside the artwork. Put every word in the HTML around the image, where it stays readable and on-theme.
 - In a custom card, only include facts the owner actually stated. Where you need specifics they didn't give (a price, a link), keep it generic and flag it in "note" so they know to revise.
 - "reason" is the instruction the chatbot will actually receive about when to show this card. Write it as guidance, starting "When …".
 - "note" is an optional admin-facing caveat; usually "".
 
-RESEARCH: the REAL SITE DATA below is a summary — names, tags, roles. The owner's full knowledge base (articles, talks, notes, project write-ups, photo descriptions, past answers) is searchable with the "search_knowledge" tool. Use it whenever the card needs specifics the summary doesn't carry: quotes for a testimonial card, real topics for a writing card, actual detail for a project deep-dive. Search BEFORE drafting, with the terms you'd expect in the source material; search again with different wording if the first result is thin. You have a budget of ${SEARCH_BUDGET} searches per card — spend them when content depends on facts, skip them when the summary already covers it. When a search returns nothing, say so in "note" and keep that part of the card generic rather than inventing it.
+RESEARCH: the REAL SITE DATA below is a summary — names, tags, roles. The owner's full knowledge base (articles, talks, notes, project write-ups, photo descriptions, past answers) is searchable with the "search_knowledge" tool. Use it whenever the card needs specifics the summary doesn't carry: quotes for a testimonial card, real topics for a writing card, actual detail for a project deep-dive. Search BEFORE drafting, with the terms you'd expect in the source material; search again with different wording if the first result is thin. You have a budget of ${SEARCH_BUDGET} searches per card — spend them when content depends on facts, skip them when the summary already covers it. When a search returns nothing, say so in "note" and keep that part of the card generic rather than inventing it. Two more tools cover artwork: "find_image" (unlimited, always try first) and "generate_image" (${IMAGE_BUDGET} per card) — see the IMAGES rule above.
 
 Respond with ONLY a JSON object (no prose, no code fences):
 {"label":"…","tool":"show_…","description":"one line on what it renders","reason":"When …","note":"","sampleBlock":{…the block object…}}`;
@@ -201,6 +217,7 @@ export type BuildEvent =
   | { t: "thinking"; v: string }
   | { t: "search"; query: string }
   | { t: "searched"; query: string; hits: number }
+  | { t: "image"; src: string; prompt: string }
   | { t: "status"; v: string }
   | { t: "draft"; draft: CardDraft }
   | { t: "error"; v: string };
@@ -213,7 +230,62 @@ export type BuilderDeps = {
   onEvent?: (e: BuildEvent) => void;
 };
 
-/** The one tool the builder gets: the same search the chatbot runs. */
+/**
+ * Look through the images the owner already has before drawing a new one.
+ * Offered unconditionally — unlike generation, this needs no API key, and a
+ * real photo of the actual subject beats generated artwork every time.
+ */
+const FIND_IMAGE_TOOL = {
+  name: "find_image",
+  description:
+    "Search the images the owner already has — uploaded photos with their descriptions, "
+    + "project images, source article images and their headshot — for one that fits the card. "
+    + "Returns matching images with a src path you can use directly in an image field. "
+    + "ALWAYS try this before generate_image: a real photo of the actual subject is better "
+    + "than a drawing of it.",
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      query: {
+        type: "string" as const,
+        description: "What the image should show, in the words its description would use.",
+      },
+    },
+    required: ["query"],
+  },
+};
+
+/**
+ * Draw artwork a card needs and the library does not have. Offered only when
+ * an image key is configured, so an unconfigured site simply never sees the
+ * tool rather than watching the model call something that always fails.
+ */
+const GENERATE_IMAGE_TOOL = {
+  name: "generate_image",
+  description:
+    "Generate an illustration for the card and store it on the site. Use only when the card "
+    + "genuinely needs artwork that find_image did not turn up — a hero, a texture, a spot "
+    + "illustration. Returns a src path you can use directly in an image field. "
+    + `Budget: ${IMAGE_BUDGET} per card. The image cannot contain text, so never ask for words in it.`,
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      prompt: {
+        type: "string" as const,
+        description:
+          "What to draw, described concretely — subject, composition, mood. No text or logos.",
+      },
+      shape: {
+        type: "string" as const,
+        enum: ["landscape", "square", "portrait"],
+        description: "landscape for a hero or banner, square for an avatar or icon.",
+      },
+    },
+    required: ["prompt"],
+  },
+};
+
+/** The knowledge search: the same retrieval the chatbot runs. */
 const SEARCH_TOOL = {
   name: "search_knowledge",
   description:
@@ -267,6 +339,53 @@ async function runSearch(
 }
 
 /**
+ * Look up images the owner already has. Never throws: a lookup failure means
+ * the model generates or goes without artwork, not that the card dies.
+ */
+async function runFindImage(input: unknown, emit: (e: BuildEvent) => void): Promise<string> {
+  const query = String((input as { query?: unknown })?.query ?? "").trim();
+  emit({ t: "status", v: `Looking for an image of "${query}"…` });
+  try {
+    const found = await findLibraryImages(query);
+    if (!found.length) {
+      return "The owner has no images stored yet. Either generate one, or design the card "
+        + "without artwork.";
+    }
+    const lines = found.map((f) => `- src "${f.src}" (${f.origin}): ${f.description}`);
+    emit({ t: "status", v: `Found ${found.length} image${found.length === 1 ? "" : "s"}.` });
+    return (
+      `Images the owner already has (use a src EXACTLY as written, only if it genuinely fits `
+      + `the card — otherwise generate one or use none):\n${lines.join("\n")}`
+    );
+  } catch {
+    return "The image library could not be read right now. Generate an image instead, or "
+      + "design the card without artwork.";
+  }
+}
+
+/**
+ * Draw and store one image. Never throws: a generation failure comes back as
+ * an instruction, so the model finishes the card without artwork rather than
+ * losing the whole draft to a provider hiccup.
+ */
+async function runGenerateImage(input: unknown, emit: (e: BuildEvent) => void): Promise<string> {
+  const req = input as { prompt?: unknown; shape?: unknown };
+  const prompt = String(req?.prompt ?? "").trim();
+  const shape = (["landscape", "square", "portrait"] as const).includes(req?.shape as ImageShape)
+    ? (req.shape as ImageShape)
+    : "landscape";
+  emit({ t: "status", v: `Generating an image: ${prompt.slice(0, 80)}…` });
+  try {
+    const img = await generateCardImage(prompt, shape);
+    emit({ t: "image", src: img.src, prompt: img.prompt });
+    return `Image created and stored. Use this EXACT src in the card: "${img.src}"`;
+  } catch (e) {
+    return `Image generation failed: ${(e as Error).message} Design the card without artwork, `
+      + "and say so in the note.";
+  }
+}
+
+/**
  * Draft a card from a description, or revise a draft from feedback. The
  * revision call replays the description and current draft as conversation
  * turns, so feedback like "make it three photos" edits rather than restarts.
@@ -303,6 +422,7 @@ export async function draftUiCard(
   //    never a saved broken card.
   let convo = messages;
   let searches = 0;
+  let images = 0;
   let attempt = 0;
   let lastError: Error | null = null;
   // Bounded by construction: every iteration either spends a search or a
@@ -312,7 +432,11 @@ export async function draftUiCard(
       model: cardBuilderModel(),
       max_tokens: DRAFT_MAX_TOKENS,
       system,
-      tools: [SEARCH_TOOL],
+      // Generation is offered only when configured; the library lookup and the
+      // knowledge search always are.
+      tools: imageGenEnabled()
+        ? [SEARCH_TOOL, FIND_IMAGE_TOOL, GENERATE_IMAGE_TOOL]
+        : [SEARCH_TOOL, FIND_IMAGE_TOOL],
       thinking: THINKING,
       output_config: { effort: THINKING_EFFORT },
       messages: convo,
@@ -322,6 +446,32 @@ export async function draftUiCard(
     if (toolUses.length) {
       const results: Anthropic.ToolResultBlockParam[] = [];
       for (const tu of toolUses) {
+        if (tu.name === FIND_IMAGE_TOOL.name) {
+          results.push({
+            type: "tool_result",
+            tool_use_id: tu.id,
+            content: await runFindImage(tu.input, emit),
+          });
+          continue;
+        }
+        if (tu.name === GENERATE_IMAGE_TOOL.name) {
+          if (images >= IMAGE_BUDGET) {
+            results.push({
+              type: "tool_result",
+              tool_use_id: tu.id,
+              content: `Image budget spent (${IMAGE_BUDGET} per card). Build the rest of the `
+                + "card with the images you already have.",
+            });
+            continue;
+          }
+          images++;
+          results.push({
+            type: "tool_result",
+            tool_use_id: tu.id,
+            content: await runGenerateImage(tu.input, emit),
+          });
+          continue;
+        }
         const over = searches >= SEARCH_BUDGET;
         if (over) {
           results.push({
@@ -525,10 +675,21 @@ function enforceThemedHtml(html: string): void {
 const SWATCH_COLORS = ["#3b4a63", "#5a4a63", "#3f5a52", "#33415c", "#5c4433"];
 
 /**
+ * Images the builder legitimately produced: an upload the model found through
+ * find_image, or one generate_image just stored. Both are the site's own bytes
+ * on our own volume, so they survive the placeholder swap that exists to catch
+ * URLs the model invented. Anything else — a remote host, a made-up path — is
+ * still replaced with a swatch.
+ */
+function isOwnedImage(src: string): boolean {
+  return /^\/api\/uploads\/[a-f0-9-]+\.(jpg|png|webp|gif)$/i.test(src);
+}
+
+/**
  * Swap every "placeholder" image the model emitted (and any non-data URL — the
  * preview must never fetch an external image the model invented) for a
- * generated flat swatch. Walks the block structurally, so it covers items in
- * arrays as well as top-level fields.
+ * generated flat swatch. Real site uploads pass through untouched. Walks the
+ * block structurally, so it covers items in arrays as well as top-level fields.
  */
 function substitutePlaceholders(node: Record<string, unknown>, label: string): Record<string, unknown> {
   let i = 0;
@@ -538,7 +699,13 @@ function substitutePlaceholders(node: Record<string, unknown>, label: string): R
     if (v && typeof v === "object") {
       const out: Record<string, unknown> = {};
       for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
-        if ((k === "src" || k === "imageUrl") && typeof val === "string" && val && !val.startsWith("data:")) {
+        if (
+          (k === "src" || k === "imageUrl") &&
+          typeof val === "string" &&
+          val &&
+          !val.startsWith("data:") &&
+          !isOwnedImage(val)
+        ) {
           out[k] = swatch(label, next());
         } else {
           out[k] = walk(val);
