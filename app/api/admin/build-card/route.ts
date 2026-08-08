@@ -1,4 +1,5 @@
 import { draftUiCard, type BuildEvent, type CardDraft } from "@/lib/cardBuilder";
+import { IMAGE_INTENTS, type PromptImage } from "@/lib/imageGen";
 import { isAuthed } from "@/lib/auth";
 
 export const runtime = "nodejs";
@@ -23,7 +24,12 @@ export const maxDuration = 300;
 export async function POST(req: Request) {
   if (!(await isAuthed())) return new Response("Unauthorized", { status: 401 });
 
-  let body: { instructions?: string; current?: CardDraft; feedback?: string };
+  let body: {
+    instructions?: string;
+    current?: CardDraft;
+    feedback?: string;
+    attachments?: unknown;
+  };
   try {
     body = await req.json();
   } catch {
@@ -32,6 +38,21 @@ export async function POST(req: Request) {
 
   const instructions = String(body.instructions ?? "").trim();
   if (!instructions) return new Response("Describe the card you want first.", { status: 400 });
+
+  // Attachments arrive as descriptors, not bytes — the attach endpoint already
+  // stored the file. Only paths it could have produced are accepted, so a
+  // crafted body cannot point the builder at an arbitrary file.
+  const attachments: PromptImage[] = (Array.isArray(body.attachments) ? body.attachments : [])
+    .flatMap((a) => {
+      const src = String((a as { src?: unknown })?.src ?? "");
+      if (!/^\/api\/uploads\/[a-f0-9-]+\.(jpg|png|webp|gif)$/i.test(src)) return [];
+      const raw = String((a as { intent?: unknown })?.intent ?? "auto");
+      const intent = (IMAGE_INTENTS as readonly string[]).includes(raw)
+        ? (raw as PromptImage["intent"])
+        : "auto";
+      return [{ src, intent }];
+    })
+    .slice(0, 4);
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -49,7 +70,7 @@ export async function POST(req: Request) {
       };
       try {
         await draftUiCard(
-          { instructions, current: body.current, feedback: body.feedback },
+          { instructions, current: body.current, feedback: body.feedback, attachments },
           { onEvent: send },
         );
       } catch (e) {

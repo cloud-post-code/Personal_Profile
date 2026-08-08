@@ -8,9 +8,11 @@ import { retrieve as defaultRetrieve, formatContext } from "@/lib/retrieval/sear
 import {
   findLibraryImages,
   generateCardImage,
+  describePromptImage,
   imageGenEnabled,
   IMAGE_BUDGET,
   type ImageShape,
+  type PromptImage,
 } from "@/lib/imageGen";
 
 /**
@@ -137,7 +139,7 @@ TimelineEntry = {"role":string,"company":string,"dates":string,"description":str
 Rules:
 - Route in order: a live-data tool when the intent clearly matches site content; otherwise run route 2's disqualifying test and take CODED html the moment any part of it fails. When a card could plausibly go either way, code it — a flat stack that wanted design is a worse outcome than a designed card that could have been flat.
 - Custom and coded card content comes from the REAL SITE DATA section below — real project names, real tags, real roles. Never invent facts; where the data is silent, stay generic and say so in "note".
-- IMAGES: you have two tools. "find_image" searches the images the owner already HAS (uploaded photos and their descriptions, project images, their headshot) — always try this first, because a real photo of the actual subject beats any drawing of it. "generate_image" draws new artwork when the library has nothing that fits. Both return a src path like "/api/uploads/…" — put that EXACT string in the image field and it renders for real, in stock elements and coded cards alike. Only when neither tool gives you something suitable, fall back to the exact string "placeholder", which becomes a flat colored swatch. Never write any other URL into an image field: outside images are stripped and render as a swatch.
+- IMAGES: when the request carries an ATTACHED IMAGES block, those come first — the owner picked them deliberately, and each one says whether to embed it or treat it as visual direction. Beyond that you have two tools. "find_image" searches the images the owner already HAS (uploaded photos and their descriptions, project images, their headshot) — always try this first, because a real photo of the actual subject beats any drawing of it. "generate_image" draws new artwork when the library has nothing that fits. Both return a src path like "/api/uploads/…" — put that EXACT string in the image field and it renders for real, in stock elements and coded cards alike. Only when neither tool gives you something suitable, fall back to the exact string "placeholder", which becomes a flat colored swatch. Never write any other URL into an image field: outside images are stripped and render as a swatch.
 - Generated artwork defaults to flat, textless illustration on a plain background — the look that survives the visitor re-theming the card under it. Ask for something else in the prompt whenever the card wants it (photographic realism, a dense texture, a specific palette, lettering) and your prompt wins. Two things stay true regardless: generated art cannot depict the owner's actual people, places or events — use find_image for those — and words baked into pixels keep their own color when the theme changes, so put titles and labels in the HTML around the image unless the lettering itself is the design.
 - In a custom card, only include facts the owner actually stated. Where you need specifics they didn't give (a price, a link), keep it generic and flag it in "note" so they know to revise.
 - "reason" is the instruction the chatbot will actually receive about when to show this card. Write it as guidance, starting "When …".
@@ -349,6 +351,46 @@ async function runSearch(
 }
 
 /**
+ * Turn attached images into a block of the opening brief. Each one is read by
+ * vision once, here, rather than re-sent as bytes on every turn of a loop that
+ * can run ten times.
+ *
+ * The admin's intent is stated as an instruction rather than left for the model
+ * to infer: "use" and "reference" pull in opposite directions — one embeds the
+ * file, the other must NOT — and guessing wrong wastes a whole build.
+ */
+async function describeAttachments(attachments: PromptImage[]): Promise<string> {
+  if (!attachments.length) return "";
+  const described = await Promise.all(
+    attachments.map(async (a) => ({ ...a, desc: await describePromptImage(a.src) })),
+  );
+
+  const lines: string[] = ["ATTACHED IMAGES (the owner added these to this request):"];
+  for (const a of described) {
+    const what = a.desc || "(the image could not be read — rely on the description above)";
+    if (a.intent === "use") {
+      lines.push(
+        `- USE THIS IMAGE IN THE CARD. Put the exact src "${a.src}" in an image field (or an `
+        + `<img src="${a.src}"> in coded HTML), and design the card around it. What it shows: ${what}`,
+      );
+    } else if (a.intent === "reference") {
+      lines.push(
+        `- STYLE REFERENCE ONLY — do NOT put this image in the card, and never write its src `
+        + `anywhere. Take layout, structure, proportion and mood direction from it, expressed `
+        + `with the site's own theme tokens. What it shows: ${what}`,
+      );
+    } else {
+      lines.push(
+        `- The owner attached this without saying how to use it. Decide from their description: `
+        + `embed it with the exact src "${a.src}" if the card wants this actual image, or treat it `
+        + `as visual direction and leave it out. What it shows: ${what}`,
+      );
+    }
+  }
+  return lines.join("\n");
+}
+
+/**
  * Look up images the owner already has. Never throws: a lookup failure means
  * the model generates or goes without artwork, not that the card dies.
  */
@@ -401,14 +443,23 @@ async function runGenerateImage(input: unknown, emit: (e: BuildEvent) => void): 
  * turns, so feedback like "make it three photos" edits rather than restarts.
  */
 export async function draftUiCard(
-  input: { instructions: string; current?: CardDraft; feedback?: string },
+  input: {
+    instructions: string;
+    current?: CardDraft;
+    feedback?: string;
+    /** Images the admin attached to the prompt. */
+    attachments?: PromptImage[];
+  },
   deps: BuilderDeps = {},
 ): Promise<CardDraft> {
   const instructions = input.instructions.trim();
   if (!instructions) throw new Error("Describe the card you want first.");
 
+  // An attachment belongs in the FIRST user turn: it is part of the brief, not
+  // a fact discovered later, and it often decides the whole layout.
+  const attachmentBrief = await describeAttachments(input.attachments ?? []);
   const messages: BuilderMessage[] = [
-    { role: "user", content: instructions },
+    { role: "user", content: attachmentBrief ? `${instructions}\n\n${attachmentBrief}` : instructions },
   ];
   if (input.current && input.feedback?.trim()) {
     messages.push(

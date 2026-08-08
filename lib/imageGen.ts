@@ -1,5 +1,6 @@
-import { saveBytes } from "@/lib/uploads";
+import { saveBytes, readUpload } from "@/lib/uploads";
 import { prisma, getProfile } from "@/lib/db";
+import { describeImageForDesign } from "@/lib/vision";
 
 /**
  * Image generation for the card builder, via OpenAI's images API.
@@ -116,6 +117,41 @@ async function downloadImage(url: string | undefined): Promise<Buffer> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Could not download the generated image (${res.status}).`);
   return Buffer.from(await res.arrayBuffer());
+}
+
+/**
+ * An image the admin attached to the prompt. `src` is already on the upload
+ * volume (the attach endpoint put it there), so "use it" costs nothing extra —
+ * the model just writes the src into the card.
+ *
+ * `intent` is the admin's call, not the model's guess:
+ * - "use": put this image in the card.
+ * - "reference": look at it for style/layout direction, but don't embed it.
+ * - "auto": the model decides from the description.
+ */
+export type PromptImage = {
+  src: string;
+  intent: "use" | "reference" | "auto";
+};
+
+export const IMAGE_INTENTS = ["use", "reference", "auto"] as const;
+
+/**
+ * Describe an attached image so the drafting model knows what it is. The
+ * builder is a text conversation over many turns; reading the image once here
+ * and passing prose forward is far cheaper than re-sending the bytes on every
+ * turn, and it keeps the attachment useful for style direction ("match this
+ * layout") as well as for embedding.
+ *
+ * Returns "" on any failure — an unreadable attachment must not kill a build,
+ * since the admin's own words usually carry the intent anyway.
+ */
+export async function describePromptImage(src: string): Promise<string> {
+  const name = src.replace(/^\/api\/uploads\//, "");
+  const file = await readUpload(name);
+  if (!file) return "";
+  const ext = name.slice(name.lastIndexOf(".")).toLowerCase();
+  return describeImageForDesign(file.bytes, ext);
 }
 
 /**

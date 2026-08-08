@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Cards } from "@/app/cards/Cards";
 import { parseSampleBlock } from "@/lib/uiCards";
 import type { BuildEvent, CardDraft } from "@/lib/cardBuilder";
+import type { PromptImage } from "@/lib/imageGen";
 import { saveBuiltCard } from "./actions";
 import { panel, field, btn, btnGhost, SectionTitle, Label } from "./ui";
 
@@ -36,6 +37,30 @@ export function CardBuilder({
   const [error, setError] = useState("");
   const [thinking, setThinking] = useState("");
   const [steps, setSteps] = useState<string[]>([]);
+  // Images attached to the prompt. Uploaded on choose, so a revise turn resends
+  // only these small descriptors rather than the file itself.
+  const [attachments, setAttachments] = useState<PromptImage[]>([]);
+  const [uploading, setUploading] = useState(false);
+
+  async function attach(files: FileList | null) {
+    if (!files?.length || uploading) return;
+    setUploading(true);
+    setError("");
+    for (const file of Array.from(files).slice(0, 4 - attachments.length)) {
+      const form = new FormData();
+      form.append("image", file);
+      const res = await fetch("/api/admin/build-card/image", { method: "POST", body: form });
+      if (!res.ok) {
+        setError((await res.text().catch(() => "")) || "That image couldn't be uploaded.");
+        continue;
+      }
+      const { src } = (await res.json()) as { src: string };
+      // "auto" by default: most attachments are self-evident from the prompt,
+      // and the admin can pin the intent when they care.
+      setAttachments((a) => [...a, { src, intent: "auto" }]);
+    }
+    setUploading(false);
+  }
 
   /**
    * Run one build over the streaming route, feeding reasoning and searches
@@ -46,6 +71,7 @@ export function CardBuilder({
     instructions: string;
     current?: CardDraft;
     feedback?: string;
+    attachments?: PromptImage[];
   }): Promise<CardDraft | null> {
     setError("");
     setThinking("");
@@ -102,7 +128,7 @@ export function CardBuilder({
   async function generate() {
     if (busy) return;
     setBusy("draft");
-    const built = await build({ instructions });
+    const built = await build({ instructions, attachments });
     if (built) setDraft(built);
     setBusy(null);
   }
@@ -116,6 +142,9 @@ export function CardBuilder({
       instructions: instructions.trim() || `Refine this existing card: ${draft.label}`,
       current: draft,
       feedback,
+      // Attachments carry into revisions: "put the photo top-left instead"
+      // needs the photo still attached to mean anything.
+      attachments,
     });
     if (built) {
       setDraft(built);
@@ -175,6 +204,16 @@ export function CardBuilder({
             rows={3}
             placeholder="e.g. A card that shows off my photography as a slideshow visitors can flip through"
             style={{ ...field, resize: "vertical" }}
+          />
+          <AttachedImages
+            attachments={attachments}
+            uploading={uploading}
+            disabled={!!busy}
+            onAttach={attach}
+            onIntent={(src, intent) =>
+              setAttachments((a) => a.map((x) => (x.src === src ? { ...x, intent } : x)))
+            }
+            onRemove={(src) => setAttachments((a) => a.filter((x) => x.src !== src))}
           />
           <button
             onClick={generate}
@@ -252,6 +291,18 @@ export function CardBuilder({
               placeholder="e.g. Make it a filmstrip instead, and only show it when someone asks about travel"
               style={{ ...field, resize: "vertical" }}
             />
+            {/* Also here, so a photo can be added while iterating — including on
+                an existing card, where the description box isn't shown at all. */}
+            <AttachedImages
+              attachments={attachments}
+              uploading={uploading}
+              disabled={!!busy}
+              onAttach={attach}
+              onIntent={(src, intent) =>
+                setAttachments((a) => a.map((x) => (x.src === src ? { ...x, intent } : x)))
+              }
+              onRemove={(src) => setAttachments((a) => a.filter((x) => x.src !== src))}
+            />
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <button
                 onClick={revise}
@@ -299,3 +350,127 @@ const toolName: React.CSSProperties = {
   background: "var(--bg-soft)",
   color: "var(--on-bg-soft)",
 };
+
+/** What each intent means, in the admin's language rather than the model's. */
+const INTENT_LABELS: { value: PromptImage["intent"]; label: string; hint: string }[] = [
+  { value: "auto", label: "Let it decide", hint: "Reads your description to choose" },
+  { value: "use", label: "Put it in the card", hint: "Embedded and designed around" },
+  { value: "reference", label: "Reference only", hint: "Style direction, not shown" },
+];
+
+/**
+ * Attach images to the prompt. Each one is uploaded the moment it's chosen (so
+ * revisions resend only a src, not the file) and carries its own intent,
+ * because "put this in the card" and "copy this layout" are opposite
+ * instructions that the model cannot reliably tell apart on its own.
+ */
+function AttachedImages({
+  attachments,
+  uploading,
+  disabled,
+  onAttach,
+  onIntent,
+  onRemove,
+}: {
+  attachments: PromptImage[];
+  uploading: boolean;
+  disabled: boolean;
+  onAttach: (files: FileList | null) => void;
+  onIntent: (src: string, intent: PromptImage["intent"]) => void;
+  onRemove: (src: string) => void;
+}) {
+  const full = attachments.length >= 4;
+  return (
+    <div style={{ margin: "10px 0 12px" }}>
+      <Label>
+        Images (optional) — attach a photo to put in the card, or a screenshot to design from
+      </Label>
+
+      {attachments.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, margin: "8px 0" }}>
+          {attachments.map((a) => (
+            <div
+              key={a.src}
+              style={{
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-sm)",
+                padding: 8,
+                background: "var(--bg-soft)",
+                width: 168,
+              }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={a.src}
+                alt=""
+                style={{
+                  width: "100%",
+                  height: 92,
+                  objectFit: "cover",
+                  borderRadius: "var(--radius-sm)",
+                  display: "block",
+                }}
+              />
+              <select
+                value={a.intent}
+                disabled={disabled}
+                onChange={(e) => onIntent(a.src, e.target.value as PromptImage["intent"])}
+                style={{ ...field, fontSize: 11, padding: "4px 6px", margin: "8px 0 4px" }}
+              >
+                {INTENT_LABELS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+              <div
+                style={{
+                  fontSize: 10,
+                  fontStyle: "italic",
+                  color: "var(--on-bg-soft)",
+                  opacity: 0.8,
+                  lineHeight: 1.4,
+                }}
+              >
+                {INTENT_LABELS.find((o) => o.value === a.intent)?.hint}
+              </div>
+              <button
+                type="button"
+                onClick={() => onRemove(a.src)}
+                disabled={disabled}
+                style={{ ...(btnGhost as React.CSSProperties), fontSize: 11, padding: "3px 8px", marginTop: 6 }}
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!full && (
+        <input
+          type="file"
+          accept="image/*"
+          multiple
+          disabled={disabled || uploading}
+          onChange={(e) => {
+            onAttach(e.target.files);
+            // Clear the input so re-choosing the same file still fires onChange.
+            e.target.value = "";
+          }}
+          style={{ fontSize: 12, color: "var(--on-surface)" }}
+        />
+      )}
+      {uploading && (
+        <span style={{ fontSize: 12, fontStyle: "italic", color: "var(--accent-on-surface)" }}>
+          Uploading…
+        </span>
+      )}
+      {full && (
+        <span style={{ fontSize: 12, fontStyle: "italic", color: "var(--on-surface)", opacity: 0.8 }}>
+          Four images is the limit for one prompt.
+        </span>
+      )}
+    </div>
+  );
+}
