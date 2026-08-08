@@ -43,16 +43,21 @@ const SIZES: Record<ImageShape, string> = {
 };
 
 /**
- * Style guidance appended to every prompt. The model writing the card cannot
- * see the visitor's theme, and a generated image cannot use CSS variables, so
- * artwork that carries its own text or a hard background will clash the moment
- * the owner switches themes. Steering toward flat, textless, transparent-ready
- * subjects is what keeps generated images theme-agnostic.
+ * House style: where an image lands when the card doesn't ask for anything
+ * else. These are DEFAULTS, not rules — flat textless artwork is the safe
+ * choice for a card that will be re-themed under it, but a card that genuinely
+ * wants a photoreal portrait, a full-bleed texture or its own wordmark should
+ * get one. So the defaults are stated as preferences, and the closing line
+ * hands the decision to the prompt whenever the prompt actually makes one.
  */
-const STYLE_RULES =
-  "Flat modern editorial illustration. No text, letters, numbers, words, logos or watermarks anywhere in the image. " +
-  "Simple composition with generous negative space and a plain uncluttered background. " +
-  "Muted, desaturated palette that sits quietly behind interface text. No photorealism, no 3D renders, no drop shadows.";
+const STYLE_DEFAULTS =
+  "Unless the description above asks otherwise, prefer: flat modern editorial illustration; "
+  + "no text, letters, numbers or watermarks in the image; a simple composition with generous "
+  + "negative space on a plain background; a restrained palette that sits comfortably behind "
+  + "interface text; no 3D renders or drop shadows. "
+  + "Where the description above explicitly calls for something different — photographic realism, "
+  + "a dense full-bleed texture, a specific palette, lettering or a wordmark — follow the "
+  + "description instead: it was written for this particular card and overrides these defaults.";
 
 export type GeneratedImage = {
   /** Site-relative path, the same shape an uploaded photo's src takes. */
@@ -81,7 +86,7 @@ export async function generateCardImage(
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
       model: imageModel(),
-      prompt: `${cleaned}\n\n${STYLE_RULES}`,
+      prompt: `${cleaned}\n\n${STYLE_DEFAULTS}`,
       size: SIZES[shape] ?? SIZES.landscape,
       n: 1,
     }),

@@ -138,7 +138,7 @@ Rules:
 - Route in order: a live-data tool when the intent clearly matches site content; otherwise run route 2's disqualifying test and take CODED html the moment any part of it fails. When a card could plausibly go either way, code it — a flat stack that wanted design is a worse outcome than a designed card that could have been flat.
 - Custom and coded card content comes from the REAL SITE DATA section below — real project names, real tags, real roles. Never invent facts; where the data is silent, stay generic and say so in "note".
 - IMAGES: you have two tools. "find_image" searches the images the owner already HAS (uploaded photos and their descriptions, project images, their headshot) — always try this first, because a real photo of the actual subject beats any drawing of it. "generate_image" draws new artwork when the library has nothing that fits. Both return a src path like "/api/uploads/…" — put that EXACT string in the image field and it renders for real, in stock elements and coded cards alike. Only when neither tool gives you something suitable, fall back to the exact string "placeholder", which becomes a flat colored swatch. Never write any other URL into an image field: outside images are stripped and render as a swatch.
-- Generated images cannot contain text — no titles, labels or logos inside the artwork. Put every word in the HTML around the image, where it stays readable and on-theme.
+- Generated artwork defaults to flat, textless illustration on a plain background — the look that survives the visitor re-theming the card under it. Ask for something else in the prompt whenever the card wants it (photographic realism, a dense texture, a specific palette, lettering) and your prompt wins. Two things stay true regardless: generated art cannot depict the owner's actual people, places or events — use find_image for those — and words baked into pixels keep their own color when the theme changes, so put titles and labels in the HTML around the image unless the lettering itself is the design.
 - In a custom card, only include facts the owner actually stated. Where you need specifics they didn't give (a price, a link), keep it generic and flag it in "note" so they know to revise.
 - "reason" is the instruction the chatbot will actually receive about when to show this card. Write it as guidance, starting "When …".
 - "note" is an optional admin-facing caveat; usually "".
@@ -263,17 +263,27 @@ const FIND_IMAGE_TOOL = {
 const GENERATE_IMAGE_TOOL = {
   name: "generate_image",
   description:
-    "Generate an illustration for the card and store it on the site. Use only when the card "
-    + "genuinely needs artwork that find_image did not turn up — a hero, a texture, a spot "
-    + "illustration. Returns a src path you can use directly in an image field. "
-    + `Budget: ${IMAGE_BUDGET} per card. The image cannot contain text, so never ask for words in it.`,
+    "Generate artwork for the card and store it on the site. Use when the card needs an image "
+    + "that find_image did not turn up — a hero, a texture, a spot illustration, a backdrop. "
+    + "Returns a src path you can use directly in an image field. "
+    + `Budget: ${IMAGE_BUDGET} per card. `
+    + "Left unspecified, the image comes back as flat textless illustration on a plain background, "
+    + "which is the safest look under a theme the visitor can change. Say so in the prompt when the "
+    + "card wants something else — photographic realism, a dense full-bleed texture, a particular "
+    + "palette, lettering — and that wins over the default. Two things to weigh: generated art is "
+    + "strong at abstract, textural and conceptual imagery but cannot depict the owner's specific "
+    + "real people, places or events (use find_image for those), and any text baked into the pixels "
+    + "keeps its own color when the visitor switches themes, so prefer real HTML text over lettering "
+    + "in the image unless the lettering IS the design.",
   input_schema: {
     type: "object" as const,
     properties: {
       prompt: {
         type: "string" as const,
         description:
-          "What to draw, described concretely — subject, composition, mood. No text or logos.",
+          "What to draw, described concretely — subject, composition, mood, palette. State any "
+          + "departure from the house style (flat, textless, plain background) explicitly here, "
+          + "because whatever you write overrides it.",
       },
       shape: {
         type: "string" as const,
