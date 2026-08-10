@@ -5,6 +5,7 @@ import { isAuthed } from "@/lib/auth";
 import { isEditAuthed } from "@/lib/ingestionAuth";
 import { getIngestionSource, UPLOAD_METHODS, STORAGE_KINDS } from "@/lib/ingestionSources";
 import { unlockIngestionEditAction, updateIngestionSourceAction } from "../../actions";
+import { SourceBuilder } from "../../SourceBuilder";
 import { PendingButton } from "../../PendingButton";
 import { ClassificationSelect } from "../../ClassificationSelect";
 import { panel, field, btn, btnGhost, SectionTitle, Label, stamp } from "../../ui";
@@ -12,10 +13,13 @@ import { panel, field, btn, btnGhost, SectionTitle, Label, stamp } from "../../u
 export const dynamic = "force-dynamic";
 
 /**
- * Edit one ingestion source's config. Double-gated: admin login gets you to
- * the page, but the form only unlocks with the edit password held in the
- * local .env (INGESTION_EDIT_PASSWORD; the update action re-checks the
- * unlock cookie server-side, so the lock is not just UI).
+ * Edit one ingestion source the same way it was built: the builder chat and
+ * sample page, seeded with the stored config. The manual form survives below,
+ * collapsed, for direct field edits (and it alone exposes order/enabled).
+ * Double-gated: admin login gets you to the page, but editing only unlocks
+ * with the edit password held in the local .env (INGESTION_EDIT_PASSWORD;
+ * the update actions re-check the unlock cookie server-side, so the lock is
+ * not just UI).
  */
 export default async function EditIngestionSourcePage({
   params,
@@ -34,7 +38,13 @@ export default async function EditIngestionSourcePage({
   const unlocked = await isEditAuthed();
 
   return (
-    <main style={{ maxWidth: 640, margin: "0 auto", padding: "24px 20px 80px" }}>
+    <main
+      style={{
+        maxWidth: unlocked ? 1100 : 640,
+        margin: "0 auto",
+        padding: "24px 20px 80px",
+      }}
+    >
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
         <h1 style={{ fontSize: 24 }}>Edit ingestion — {row.label}</h1>
         <Link href={`/admin/dashboard?tab=${row.key}`} style={btnGhost as React.CSSProperties}>
@@ -68,59 +78,86 @@ export default async function EditIngestionSourcePage({
           </form>
         </section>
       ) : (
-        <section data-fill="surface" style={panel}>
-          <SectionTitle>Source settings</SectionTitle>
-          <form action={updateIngestionSourceAction} style={{ display: "grid", gap: 10 }}>
-            <input type="hidden" name="id" value={row.id} />
-            <input type="hidden" name="key" value={row.key} />
-            <Label>Name</Label>
-            <input name="label" defaultValue={row.label} required style={field as React.CSSProperties} />
-            <Label>Description</Label>
-            <input name="description" defaultValue={row.description} style={field as React.CSSProperties} />
-            <Label>System prompt</Label>
-            <textarea
-              name="systemPrompt"
-              rows={5}
-              defaultValue={row.systemPrompt}
-              style={field as React.CSSProperties}
-            />
-            <Label>Upload method</Label>
-            <select name="uploadMethod" defaultValue={row.uploadMethod} style={field as React.CSSProperties}>
-              {UPLOAD_METHODS.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
+        <>
+          <SourceBuilder
+            initial={{
+              id: row.id,
+              label: row.label,
+              key: row.key,
+              description: row.description,
+              systemPrompt: row.systemPrompt,
+              uploadMethod: row.uploadMethod,
+              storageKinds: row.storageKinds,
+              splitMode: row.splitMode,
+              classification: row.classification,
+              outputMethod: row.outputMethod,
+            }}
+          />
+
+          <details style={{ marginTop: 24 }}>
+            <summary style={{ cursor: "pointer", fontSize: 14, marginBottom: 10 }}>
+              Manual edit (skip the chat)
+            </summary>
+            <section data-fill="surface" style={panel}>
+              <SectionTitle>Source settings</SectionTitle>
+              <form action={updateIngestionSourceAction} style={{ display: "grid", gap: 10 }}>
+                <input type="hidden" name="id" value={row.id} />
+                <input type="hidden" name="key" value={row.key} />
+                <Label>Name</Label>
+                <input name="label" defaultValue={row.label} required style={field as React.CSSProperties} />
+                <Label>Description</Label>
+                <input name="description" defaultValue={row.description} style={field as React.CSSProperties} />
+                <Label>System prompt</Label>
+                <textarea
+                  name="systemPrompt"
+                  rows={5}
+                  defaultValue={row.systemPrompt}
+                  style={field as React.CSSProperties}
+                />
+                <Label>Upload method</Label>
+                <select name="uploadMethod" defaultValue={row.uploadMethod} style={field as React.CSSProperties}>
+                  {UPLOAD_METHODS.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+                <Label>Stores</Label>
+                <select name="storageKinds" defaultValue={row.storageKinds} style={field as React.CSSProperties}>
+                  {STORAGE_KINDS.map((k) => (
+                    <option key={k} value={k}>
+                      {k}
+                    </option>
+                  ))}
+                </select>
+            <Label>Items per upload</Label>
+            <select name="splitMode" defaultValue={row.splitMode} style={field as React.CSSProperties}>
+              <option value="split">split — one item per point (default)</option>
+              <option value="single">single — keep each upload as one item</option>
             </select>
-            <Label>Stores</Label>
-            <select name="storageKinds" defaultValue={row.storageKinds} style={field as React.CSSProperties}>
-              {STORAGE_KINDS.map((k) => (
-                <option key={k} value={k}>
-                  {k}
-                </option>
-              ))}
-            </select>
-            <Label>Output (where ingested data lands)</Label>
-            <input name="outputMethod" defaultValue={row.outputMethod} style={field as React.CSSProperties} />
-            <Label>Display order (lower comes first in the tab strip)</Label>
-            <input
-              name="order"
-              type="number"
-              defaultValue={row.order}
-              style={field as React.CSSProperties}
-            />
-            <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 14 }}>
-              <input type="checkbox" name="enabled" defaultChecked={row.enabled} />
-              Enabled (shown as a Content tab)
-            </label>
-            <div style={{ display: "flex", gap: 10, alignItems: "end", flexWrap: "wrap" }}>
-              <ClassificationSelect defaultValue={row.classification} />
-              <PendingButton pendingLabel="Saving…" style={btn as React.CSSProperties}>
-                Save changes
-              </PendingButton>
-            </div>
-          </form>
-        </section>
+                <Label>Output (where ingested data lands)</Label>
+                <input name="outputMethod" defaultValue={row.outputMethod} style={field as React.CSSProperties} />
+                <Label>Display order (lower comes first in the tab strip)</Label>
+                <input
+                  name="order"
+                  type="number"
+                  defaultValue={row.order}
+                  style={field as React.CSSProperties}
+                />
+                <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 14 }}>
+                  <input type="checkbox" name="enabled" defaultChecked={row.enabled} />
+                  Enabled (shown as a Content tab)
+                </label>
+                <div style={{ display: "flex", gap: 10, alignItems: "end", flexWrap: "wrap" }}>
+                  <ClassificationSelect defaultValue={row.classification} />
+                  <PendingButton pendingLabel="Saving…" style={btn as React.CSSProperties}>
+                    Save changes
+                  </PendingButton>
+                </div>
+              </form>
+            </section>
+          </details>
+        </>
       )}
     </main>
   );

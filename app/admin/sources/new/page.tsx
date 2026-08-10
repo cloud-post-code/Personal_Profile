@@ -81,6 +81,11 @@ export default async function NewIngestionSourcePage({
                 </option>
               ))}
             </select>
+            <Label>Items per upload</Label>
+            <select name="splitMode" defaultValue={"split"} style={field as React.CSSProperties}>
+              <option value="split">split — one item per point (default)</option>
+              <option value="single">single — keep each upload as one item</option>
+            </select>
             <Label>Output (where ingested data lands)</Label>
             <input
               name="outputMethod"

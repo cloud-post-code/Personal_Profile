@@ -2,8 +2,10 @@ import { claude, cardBuilderModel } from "@/lib/claude";
 import {
   UPLOAD_METHODS,
   STORAGE_KINDS,
+  SPLIT_MODES,
   type UploadMethod,
   type StorageKinds,
+  type SplitMode,
 } from "@/lib/ingestionSources";
 
 /**
@@ -26,6 +28,7 @@ export type SourceDraft = {
   systemPrompt: string;
   uploadMethod: UploadMethod;
   storageKinds: StorageKinds;
+  splitMode: SplitMode;
   outputMethod: string;
 };
 
@@ -58,6 +61,10 @@ a Content tab that ingests information for the site's chatbot. A source has:
   "textarea" is a paste-text form, "image" uploads photos, and "generic"
   offers paste + image together. ("resume"/"github"/"form" exist for the
   built-in tabs; avoid them for custom sources.)
+- splitMode: "split" (default — the pipeline splits every document/URL/paste
+  into one item per point) or "single" (each upload stays ONE item). Set
+  "single" only when the admin says so ("keep each upload as one entry",
+  "don't split these", "one card per document").
 - storageKinds: one of ${STORAGE_KINDS.join(", ")} — every ingested piece is
   stored as text or as an image; default "text" unless images are wanted
 - outputMethod: where the data lands; custom sources use
@@ -90,6 +97,9 @@ function validateDraft(v: unknown): SourceDraft | null {
   const storageKinds = (STORAGE_KINDS as readonly string[]).includes(str(d.storageKinds))
     ? (str(d.storageKinds) as StorageKinds)
     : "text";
+  const splitMode = (SPLIT_MODES as readonly string[]).includes(str(d.splitMode))
+    ? (str(d.splitMode) as SplitMode)
+    : "split";
   return {
     label,
     key: str(d.key),
@@ -97,6 +107,7 @@ function validateDraft(v: unknown): SourceDraft | null {
     systemPrompt: str(d.systemPrompt),
     uploadMethod,
     storageKinds,
+    splitMode,
     outputMethod:
       str(d.outputMethod) || "Source/Photo rows, read back as unified text/image items",
   };

@@ -166,6 +166,8 @@ async function splitAndReplace(
 ): Promise<boolean> {
   if (!rawText?.trim()) return false;
   const source = await getIngestionSource(sourceKey);
+  // The source said "one item per upload" — no split pass, no model call.
+  if (source?.splitMode === "single") return false;
   const items = await splitIntoItems(rawText, source?.systemPrompt ?? "", client);
   if (!items) return false;
   await writeSplitItems(sourceKey, parentLabel, items);
@@ -281,9 +283,10 @@ export async function ingestCustomUrl(
   {
     const fresh = await prisma.source.findUnique({ where: { id: src.id } });
     const source = await getIngestionSource(sourceKey);
-    const items = fresh?.rawText?.trim()
-      ? await splitIntoItems(fresh.rawText, source?.systemPrompt ?? "", splitClient)
-      : null;
+    const items =
+      source?.splitMode !== "single" && fresh?.rawText?.trim()
+        ? await splitIntoItems(fresh.rawText, source?.systemPrompt ?? "", splitClient)
+        : null;
     if (items) {
       // Exact tag only: the JSON-quoted form ("doc:<url>", closing quote
       // included) cannot prefix-match a sibling page's tag the way a raw

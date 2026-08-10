@@ -285,6 +285,14 @@
       "priority": 9,
       "status": "passing",
       "notes": "Splitting is pipeline behavior, not prompt behavior: every custom-source text ingest (file/url/paste) runs one split model call (claudeModel) that turns raw text into [{title,text}] items \u2014 the source's systemPrompt is only the LENS (default lens when empty). MAX_SPLIT_ITEMS=20, 24k input window; any failure or 0-1 items falls back to the single summarized row. Items are ingest:<key> rows tagged doc:<parent>, indexed individually; URL re-scans replace their items via exact JSON-quoted tag match with dropOrigin retraction (evaluator caught a prefix-match deletion bug + missing graph retraction; both repaired, sibling-URL regression assertion added). Builder prompt teaches describing ONE ITEM. Proof: 18 assertions red-first; live real-model check split a 3-initiative brief into 3 titled rows; evaluator FAIL\u2192repair\u2192PASS."
+    },
+    {
+      "id": "per-source-split-mode",
+      "feature_dir": "docs/features/per-source-split-mode",
+      "proof": "docs/features/per-source-split-mode/PROOF.md",
+      "priority": 10,
+      "status": "passing",
+      "notes": "Splitting became a per-source choice: IngestionSource.splitMode ('split' default | 'single'), validated in saveIngestionSource, starters omit it so the DB default rules. All three text ingest paths skip the split pass entirely for 'single' sources (proof asserts the splitter client is never called \u2014 zero model spend). Exposed in the edit page and manual create form ('Items per upload' select), forwarded by all four save/update actions, carried in the builder draft (junk coerces to 'split') with the builder prompt teaching to set 'single' only when the admin asks ('keep each upload as one entry'); the test pane shows the mode. Proof: 13 assertions red-first; evaluator PASS (re-ran proof itself). Non-blocking edge recorded: flipping split\u2192single then re-scanning a URL leaves the old scan's split items alongside the new blob row."
     }
   ]
 }

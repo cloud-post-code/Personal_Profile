@@ -103,7 +103,7 @@ async function main() {
     // 4. The panel follows the mapping.
     const base = {
       id: "x", key: KEY, label: "Proof CUM", description: "", systemPrompt: "",
-      outputMethod: "", builtin: false, enabled: true, order: 0, classification: "public",
+      outputMethod: "", builtin: false, enabled: true, order: 0, classification: "public", splitMode: "split",
       createdAt: new Date(0), updatedAt: new Date(0),
     };
     const urlHtml = renderToStaticMarkup(

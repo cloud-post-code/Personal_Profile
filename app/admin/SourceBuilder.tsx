@@ -2,8 +2,16 @@
 
 import React, { useState } from "react";
 import type { SourceDraft, BuilderTurn } from "@/lib/ingestionBuilder";
-import { ingestFormsFor } from "@/lib/ingestionSources";
-import { saveBuiltSourceAction } from "./actions";
+import {
+  ingestFormsFor,
+  UPLOAD_METHODS,
+  STORAGE_KINDS,
+  SPLIT_MODES,
+  type UploadMethod,
+  type StorageKinds,
+  type SplitMode,
+} from "@/lib/ingestionSources";
+import { saveBuiltSourceAction, updateBuiltSourceAction } from "./actions";
 import { ClassificationSelect } from "./ClassificationSelect";
 import { panel, field, btn, btnGhost, SectionTitle, Label } from "./ui";
 
@@ -14,18 +22,57 @@ import { panel, field, btn, btnGhost, SectionTitle, Label } from "./ui";
  * the real ingest actions, so playing with it can't write to the database or
  * the upload dir. Only "Save ingestion source" persists, via
  * saveBuiltSourceAction.
+ *
+ * Editing an existing source enters the same loop: `initial` seeds the draft
+ * (and the sample pane) with the stored config, the chat refines it from
+ * there, and the save goes through updateBuiltSourceAction instead of
+ * creating a new row.
  */
 
 type TestItem = { kind: "text" | "image"; title: string; text: string; imageUrl: string | null };
 
-export function SourceBuilder(_props: Record<string, never>) {
+/** Set when editing an existing source; absent on /admin/sources/new. */
+export type SourceBuilderInitial = {
+  id: string;
+  label: string;
+  key: string;
+  description: string;
+  systemPrompt: string;
+  uploadMethod: string;
+  storageKinds: string;
+  splitMode: string;
+  classification: string;
+  outputMethod: string;
+};
+
+/** DB rows hold plain strings; the draft's closed vocabularies want coercion. */
+function draftFrom(initial: SourceBuilderInitial): SourceDraft {
+  return {
+    label: initial.label,
+    key: initial.key,
+    description: initial.description,
+    systemPrompt: initial.systemPrompt,
+    uploadMethod: (UPLOAD_METHODS as readonly string[]).includes(initial.uploadMethod)
+      ? (initial.uploadMethod as UploadMethod)
+      : "generic",
+    storageKinds: (STORAGE_KINDS as readonly string[]).includes(initial.storageKinds)
+      ? (initial.storageKinds as StorageKinds)
+      : "text",
+    splitMode: (SPLIT_MODES as readonly string[]).includes(initial.splitMode)
+      ? (initial.splitMode as SplitMode)
+      : "split",
+    outputMethod: initial.outputMethod,
+  };
+}
+
+export function SourceBuilder({ initial }: { initial?: SourceBuilderInitial }) {
   const [turns, setTurns] = useState<BuilderTurn[]>([]);
-  const [draft, setDraft] = useState<SourceDraft | null>(null);
+  const [draft, setDraft] = useState<SourceDraft | null>(initial ? draftFrom(initial) : null);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-  const [classification, setClassification] = useState("public");
+  const [classification, setClassification] = useState(initial?.classification ?? "public");
   const [testItems, setTestItems] = useState<TestItem[]>([]);
   const [testTitle, setTestTitle] = useState("");
   const [testText, setTestText] = useState("");
@@ -125,11 +172,13 @@ export function SourceBuilder(_props: Record<string, never>) {
     if (!draft || saving) return;
     setSaving(true);
     setError("");
-    const result = await saveBuiltSourceAction({ ...draft, classification });
+    const result = initial
+      ? await updateBuiltSourceAction({ ...draft, classification, id: initial.id })
+      : await saveBuiltSourceAction({ ...draft, classification });
     if (result.ok) {
       // Full navigation on purpose: the dashboard re-renders the tab strip
       // from the DB, and the builder's local state is done with. Land on the
-      // new source's own tab so the saved ingestion is what you see.
+      // saved source's own tab so the saved ingestion is what you see.
       window.location.href = `/admin/dashboard?tab=${result.key ?? "content"}`;
     } else {
       setError(result.error ?? "Save failed.");
@@ -143,6 +192,10 @@ export function SourceBuilder(_props: Record<string, never>) {
     ? ingestFormsFor(draft.uploadMethod, draft.storageKinds)
     : { url: false, docFile: false, textarea: false, image: false };
   const noForms = draft && !forms.url && !forms.docFile && !forms.textarea && !forms.image;
+  const modeNote =
+    draft?.splitMode === "single"
+      ? "one item per upload — documents are kept whole"
+      : "splits each upload into one item per point";
 
   return (
     <div
@@ -224,6 +277,7 @@ export function SourceBuilder(_props: Record<string, never>) {
         ) : (
           <div style={{ marginTop: 10 }}>
             <h3 style={{ fontSize: 18, marginBottom: 4 }}>{draft.label}</h3>
+            <p style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>Mode: {modeNote}</p>
             {draft.description ? (
               <p style={{ fontSize: 13, fontStyle: "italic", marginBottom: 8 }}>{draft.description}</p>
             ) : null}
@@ -349,7 +403,7 @@ export function SourceBuilder(_props: Record<string, never>) {
             <div style={{ display: "flex", gap: 10, alignItems: "end", flexWrap: "wrap" }}>
               <ClassificationSelect value={classification} onChange={setClassification} />
               <button onClick={save} disabled={saving} style={btn as React.CSSProperties}>
-                {saving ? "Saving…" : "Save ingestion source"}
+                {saving ? "Saving…" : initial ? "Save changes" : "Save ingestion source"}
               </button>
             </div>
           </div>

@@ -119,7 +119,7 @@ async function main() {
       id: "x", key: KEY, label: "Proof CIS", description: "the-description",
       systemPrompt: "the-system-prompt", uploadMethod: "generic",
       storageKinds: "text+image", outputMethod: "unified items",
-      builtin: false, enabled: true, order: 99, classification: "public",
+      builtin: false, enabled: true, order: 99, classification: "public", splitMode: "split",
       createdAt: new Date(0), updatedAt: new Date(0),
     };
     const both = renderToStaticMarkup(h(GenericIngestPanel, { row, items: items2 }));

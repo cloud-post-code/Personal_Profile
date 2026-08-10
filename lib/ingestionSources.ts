@@ -29,6 +29,13 @@ export type UploadMethod = (typeof UPLOAD_METHODS)[number];
 export const STORAGE_KINDS = ["text", "image", "text+image"] as const;
 export type StorageKinds = (typeof STORAGE_KINDS)[number];
 
+/**
+ * Whether a text ingest splits into one item per point (the default) or
+ * each upload stays one item. Data, chosen when the source is built.
+ */
+export const SPLIT_MODES = ["split", "single"] as const;
+export type SplitMode = (typeof SPLIT_MODES)[number];
+
 /** Who a source's content is for. Stable slugs; labels are presentation. */
 export const CLASSIFICATIONS = ["public", "contact", "close-friends", "personal"] as const;
 export type Classification = (typeof CLASSIFICATIONS)[number];
@@ -53,6 +60,7 @@ export type IngestionSourceRow = {
   systemPrompt: string;
   uploadMethod: string;
   storageKinds: string;
+  splitMode: string;
   classification: string;
   outputMethod: string;
   builtin: boolean;
@@ -124,6 +132,7 @@ export async function saveIngestionSource(input: {
   systemPrompt: string;
   uploadMethod: string;
   storageKinds: string;
+  splitMode?: string;
   classification?: string;
   outputMethod: string;
   enabled?: boolean;
@@ -136,6 +145,10 @@ export async function saveIngestionSource(input: {
   }
   if (!(STORAGE_KINDS as readonly string[]).includes(input.storageKinds)) {
     return `Unknown storage kind "${input.storageKinds}". One of: ${STORAGE_KINDS.join(", ")}.`;
+  }
+  const splitMode = input.splitMode ?? "split";
+  if (!(SPLIT_MODES as readonly string[]).includes(splitMode)) {
+    return `Unknown split mode "${splitMode}". One of: ${SPLIT_MODES.join(", ")}.`;
   }
   const classification = input.classification ?? "public";
   if (!(CLASSIFICATIONS as readonly string[]).includes(classification)) {
@@ -175,6 +188,7 @@ export async function saveIngestionSource(input: {
     systemPrompt: input.systemPrompt.trim(),
     uploadMethod: input.uploadMethod,
     storageKinds: input.storageKinds,
+    splitMode,
     classification,
     outputMethod: input.outputMethod.trim(),
     enabled: input.enabled ?? true,
@@ -205,12 +219,12 @@ export async function deleteIngestionSource(id: string) {
  * (seedStarterIngestionSources); after that the rows are Blake's to edit or
  * reorder — the starters never overwrite live rows.
  */
-// Starters omit classification so the DB default ("public") stays the one
-// source of truth for what an unnamed classification means.
+// Starters omit classification and splitMode so the DB defaults ("public",
+// "split") stay the one source of truth for what an unnamed value means.
 export const STARTER_INGESTION_SOURCES: Array<
   Omit<
     IngestionSourceRow,
-    "id" | "enabled" | "builtin" | "classification" | "createdAt" | "updatedAt"
+    "id" | "enabled" | "builtin" | "classification" | "splitMode" | "createdAt" | "updatedAt"
   > & { builtin: true }
 > = [
   {

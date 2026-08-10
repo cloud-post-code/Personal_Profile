@@ -304,6 +304,9 @@ model IngestionSource {
   uploadMethod String
   /// The uniform storage rule: "text" | "image" | "text+image".
   storageKinds String   @default("text")
+  /// "split" (default): every text ingest splits into one item per point.
+  /// "single": each upload stays one item — no split model call.
+  splitMode    String   @default("split")
   /// Who this source's content is for: "public" | "contact" |
   /// "close-friends" | "personal". Only "public" is selectable today; the
   /// frontend still shows everything to everyone.

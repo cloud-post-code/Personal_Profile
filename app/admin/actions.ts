@@ -806,6 +806,7 @@ export async function createIngestionSourceAction(formData: FormData) {
     systemPrompt: String(formData.get("systemPrompt") ?? ""),
     uploadMethod: String(formData.get("uploadMethod") ?? "generic"),
     storageKinds: String(formData.get("storageKinds") ?? "text"),
+    splitMode: String(formData.get("splitMode") ?? "split"),
     classification: String(formData.get("classification") ?? "public"),
     outputMethod:
       String(formData.get("outputMethod") ?? "").trim() ||
@@ -871,6 +872,7 @@ export async function saveBuiltSourceAction(draft: {
   systemPrompt: string;
   uploadMethod: string;
   storageKinds: string;
+  splitMode?: string;
   classification?: string;
   outputMethod: string;
 }): Promise<{ ok: boolean; error?: string; key?: string }> {
@@ -882,6 +884,7 @@ export async function saveBuiltSourceAction(draft: {
     systemPrompt: draft.systemPrompt,
     uploadMethod: draft.uploadMethod,
     storageKinds: draft.storageKinds,
+    splitMode: draft.splitMode,
     classification: draft.classification,
     outputMethod: draft.outputMethod,
   });
@@ -890,6 +893,50 @@ export async function saveBuiltSourceAction(draft: {
   // The saved key may differ from the draft's (slugified, collision-suffixed);
   // the newest row is the one this save just created.
   const saved = await prisma.ingestionSource.findFirst({ orderBy: { createdAt: "desc" } });
+  return { ok: true, key: saved?.key };
+}
+
+/**
+ * Save the builder's draft over an EXISTING source. Same edit-password rule
+ * as the manual form, but returned as an error the builder can show inline —
+ * a redirect would throw away the chat that produced the draft. Enabled and
+ * order are not part of a draft; the row keeps its own.
+ */
+export async function updateBuiltSourceAction(draft: {
+  id: string;
+  label: string;
+  key: string;
+  description: string;
+  systemPrompt: string;
+  uploadMethod: string;
+  storageKinds: string;
+  splitMode?: string;
+  classification?: string;
+  outputMethod: string;
+}): Promise<{ ok: boolean; error?: string; key?: string }> {
+  await requireAuth();
+  if (!(await isEditAuthed())) {
+    return { ok: false, error: "The edit session expired — go back and unlock again." };
+  }
+  const existing = await prisma.ingestionSource.findUnique({ where: { id: draft.id } });
+  if (!existing) return { ok: false, error: "This ingestion source no longer exists." };
+  const error = await saveIngestionSource({
+    id: draft.id,
+    key: draft.key,
+    label: draft.label,
+    description: draft.description,
+    systemPrompt: draft.systemPrompt,
+    uploadMethod: draft.uploadMethod,
+    storageKinds: draft.storageKinds,
+    splitMode: draft.splitMode,
+    classification: draft.classification,
+    outputMethod: draft.outputMethod,
+    enabled: existing.enabled,
+    order: existing.order,
+  });
+  if (error) return { ok: false, error };
+  revalidateAll();
+  const saved = await prisma.ingestionSource.findUnique({ where: { id: draft.id } });
   return { ok: true, key: saved?.key };
 }
 
@@ -922,6 +969,7 @@ export async function updateIngestionSourceAction(formData: FormData) {
     systemPrompt: String(formData.get("systemPrompt") ?? ""),
     uploadMethod: String(formData.get("uploadMethod") ?? "generic"),
     storageKinds: String(formData.get("storageKinds") ?? "text"),
+    splitMode: String(formData.get("splitMode") ?? "split"),
     classification: String(formData.get("classification") ?? "public"),
     outputMethod: String(formData.get("outputMethod") ?? ""),
     enabled: formData.get("enabled") === "on",
