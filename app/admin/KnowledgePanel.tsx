@@ -2,7 +2,7 @@ import { safeTags } from "@/lib/knowledge";
 import { rescanSource, updateSourceSummary, deleteSource } from "./actions";
 import { Extractor } from "./Extractor";
 import { PendingButton } from "./PendingButton";
-import { panel, field, btnGhost, btnDanger, SectionTitle } from "./ui";
+import { panel, field, btnGhost, btnDanger, SectionTitle, Stamp } from "./ui";
 
 /**
  * One Knowledge tab of the Content section. Knowledge comes in three kinds —
@@ -23,6 +23,8 @@ export type KnowledgeSource = {
   error: string | null;
   summary: string | null;
   tags: string;
+  /** When this piece of knowledge was ingested. */
+  createdAt: Date;
 };
 
 /** PDFs and Word uploads are one kind to the reader, two types in the db. */
@@ -73,6 +75,7 @@ function SourceRow({ source: s }: { source: KnowledgeSource }) {
             <TypePill t={s.type} />
             <StatusPill status={s.status} />
             <strong style={{ fontSize: 14 }}>{s.title || s.filename || s.url || "(untitled)"}</strong>
+            <Stamp date={s.createdAt} prefix="ingested" />
           </div>
           {s.url && (
             <a href={s.url} target="_blank" rel="noreferrer" style={{ fontSize: 12, wordBreak: "break-all" }}>{s.url}</a>

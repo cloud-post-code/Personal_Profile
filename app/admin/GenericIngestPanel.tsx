@@ -1,5 +1,5 @@
 import React from "react";
-import { panel, field, btn, SectionTitle, Label } from "./ui";
+import { panel, field, btn, SectionTitle, Label, Stamp } from "./ui";
 import { PendingButton } from "./PendingButton";
 import { ingestFormsFor, type IngestionSourceRow } from "@/lib/ingestionSources";
 import type { IngestedItem } from "@/lib/ingestedItems";
@@ -154,7 +154,10 @@ export function GenericIngestPanel({
                   style={{ maxWidth: 180, maxHeight: 120, borderRadius: 6, display: "block", marginBottom: 6 }}
                 />
               ) : null}
-              <strong style={{ fontSize: 14 }}>{it.title}</strong>
+              <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
+                <strong style={{ fontSize: 14 }}>{it.title}</strong>
+                <Stamp date={it.createdAt} prefix="ingested" />
+              </div>
               {it.text ? (
                 <p style={{ fontSize: 13, whiteSpace: "pre-wrap", marginTop: 4 }}>{it.text}</p>
               ) : null}

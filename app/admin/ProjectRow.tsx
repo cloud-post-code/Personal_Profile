@@ -14,6 +14,8 @@ export type ProjectRowData = {
   githubUrl: string | null;
   liveUrl: string | null;
   order: number;
+  /** Preformatted "ingested …" stamp (client component — dates arrive as text). */
+  ingestedAt?: string;
 };
 
 /**
@@ -102,7 +104,14 @@ export function ProjectRow({ project }: { project: ProjectRowData }) {
       }}
     >
       <div style={{ minWidth: 0 }}>
-        <strong style={{ fontSize: 14 }}>{project.name}</strong>
+        <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
+          <strong style={{ fontSize: 14 }}>{project.name}</strong>
+          {project.ingestedAt && (
+            <span style={{ color: "var(--on-surface)", fontStyle: "italic", fontSize: 11 }}>
+              ingested {project.ingestedAt}
+            </span>
+          )}
+        </div>
         <p style={{ color: "var(--on-surface)", fontStyle: "italic", fontSize: 13 }}>
           {project.blurb}
         </p>

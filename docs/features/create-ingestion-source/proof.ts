@@ -117,6 +117,7 @@ async function main() {
       systemPrompt: "the-system-prompt", uploadMethod: "generic",
       storageKinds: "text+image", outputMethod: "unified items",
       builtin: false, enabled: true, order: 99, classification: "public",
+      createdAt: new Date(0), updatedAt: new Date(0),
     };
     const both = renderToStaticMarkup(h(GenericIngestPanel, { row, items: items2 }));
     check("panel with text+image shows both ingest forms",

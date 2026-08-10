@@ -7,7 +7,7 @@ import { getIngestionSource, UPLOAD_METHODS, STORAGE_KINDS } from "@/lib/ingesti
 import { unlockIngestionEditAction, updateIngestionSourceAction } from "../../actions";
 import { PendingButton } from "../../PendingButton";
 import { ClassificationSelect } from "../../ClassificationSelect";
-import { panel, field, btn, btnGhost, SectionTitle, Label } from "../../ui";
+import { panel, field, btn, btnGhost, SectionTitle, Label, stamp } from "../../ui";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +41,9 @@ export default async function EditIngestionSourcePage({
           Back
         </Link>
       </header>
+      <p style={{ color: "var(--on-surface)", fontStyle: "italic", fontSize: 12, marginBottom: 16 }}>
+        Created {stamp(row.createdAt)} · Updated {stamp(row.updatedAt)}
+      </p>
       {error ? (
         <p role="alert" style={{ color: "var(--danger, #b00020)", marginBottom: 14 }}>
           {error === "1" ? "Wrong edit password." : error}

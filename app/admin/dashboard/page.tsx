@@ -53,7 +53,7 @@ import { SaveButton } from "../SaveButton";
 import { AutoUploadFile } from "../AutoUploadFile";
 import { ThemePicker } from "../ThemePicker";
 import type { ThemeColors } from "@/lib/theme";
-import { panel, field, btn, btnGhost, btnDanger, SectionTitle, Label } from "../ui";
+import { panel, field, btn, btnGhost, btnDanger, SectionTitle, Label, Stamp, stamp } from "../ui";
 import { chatMetrics } from "@/lib/activity";
 
 export const dynamic = "force-dynamic";
@@ -372,6 +372,7 @@ export default async function Dashboard({
               githubUrl: p.githubUrl,
               liveUrl: p.liveUrl,
               order: p.order,
+              ingestedAt: stamp(p.createdAt),
             }}
           />
         ))}
@@ -443,6 +444,9 @@ export default async function Dashboard({
           <div key={ph.id} style={{ border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: 10 }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={`/api/uploads/${ph.filename}`} alt={ph.description || "photo"} style={{ width: "100%", borderRadius: "var(--radius-sm)", display: "block", marginBottom: 8 }} />
+            <div style={{ marginBottom: 6 }}>
+              <Stamp date={ph.createdAt} prefix="ingested" />
+            </div>
             <form action={updatePhoto}>
               <input type="hidden" name="id" value={ph.id} />
               <textarea name="description" defaultValue={ph.description} rows={3} placeholder="One-paragraph description…" style={{ ...field, marginBottom: 6, fontSize: 13, resize: "vertical" }} />

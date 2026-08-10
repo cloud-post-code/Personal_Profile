@@ -61,6 +61,19 @@ export function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Uniform timestamp text for ingested things: UTC, minute precision. */
+export const stamp = (d: Date) => `${d.toISOString().slice(0, 16).replace("T", " ")} UTC`;
+
+/** Small italic date line — the one way ingested rows show when they landed. */
+export function Stamp({ date, prefix }: { date: Date; prefix?: string }) {
+  return (
+    <span style={{ color: "var(--on-surface)", fontStyle: "italic", fontSize: 11 }}>
+      {prefix ? `${prefix} ` : ""}
+      {stamp(date)}
+    </span>
+  );
+}
+
 export function Label({ children }: { children: React.ReactNode }) {
   return (
     <label style={{ display: "block", fontSize: 12, color: "var(--on-surface)", fontStyle: "italic", marginBottom: 4 }}>

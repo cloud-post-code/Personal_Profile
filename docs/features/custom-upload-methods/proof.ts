@@ -103,6 +103,7 @@ async function main() {
     const base = {
       id: "x", key: KEY, label: "Proof CUM", description: "", systemPrompt: "",
       outputMethod: "", builtin: false, enabled: true, order: 0, classification: "public",
+      createdAt: new Date(0), updatedAt: new Date(0),
     };
     const urlHtml = renderToStaticMarkup(
       h(GenericIngestPanel, { row: { ...base, uploadMethod: "url", storageKinds: "text" }, items: [] }));

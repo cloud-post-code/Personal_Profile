@@ -58,6 +58,9 @@ export type IngestionSourceRow = {
   builtin: boolean;
   enabled: boolean;
   order: number;
+  /** When this source was created / last edited — every source is time-stamped. */
+  createdAt: Date;
+  updatedAt: Date;
 };
 
 /** Which ingest controls a source's config earns. */
@@ -205,7 +208,10 @@ export async function deleteIngestionSource(id: string) {
 // Starters omit classification so the DB default ("public") stays the one
 // source of truth for what an unnamed classification means.
 export const STARTER_INGESTION_SOURCES: Array<
-  Omit<IngestionSourceRow, "id" | "enabled" | "builtin" | "classification"> & { builtin: true }
+  Omit<
+    IngestionSourceRow,
+    "id" | "enabled" | "builtin" | "classification" | "createdAt" | "updatedAt"
+  > & { builtin: true }
 > = [
   {
     key: "experience",
