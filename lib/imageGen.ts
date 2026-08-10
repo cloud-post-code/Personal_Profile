@@ -182,7 +182,10 @@ const LIBRARY_LIMIT = 8;
 export async function findLibraryImages(query: string): Promise<LibraryImage[]> {
   const terms = query.toLowerCase().split(/\s+/).filter((t) => t.length > 2);
   const [photos, projects, sources, profile] = await Promise.all([
-    prisma.photo.findMany({ orderBy: { order: "asc" } }),
+    prisma.photo.findMany({
+      where: { NOT: { kind: { startsWith: "ingest:" } } },
+      orderBy: { order: "asc" },
+    }),
     prisma.project.findMany({ where: { NOT: { imageUrl: null } }, orderBy: { order: "asc" } }),
     prisma.source.findMany({ where: { NOT: { imageUrl: null } }, orderBy: { createdAt: "desc" }, take: 40 }),
     getProfile().catch(() => null),

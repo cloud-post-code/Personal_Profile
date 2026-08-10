@@ -148,7 +148,12 @@ export async function bookingLinkUrl(): Promise<string> {
 export async function galleryBlock(
   layout: "carousel" | "filmstrip",
 ): Promise<UiBlock> {
-  const photos = await prisma.photo.findMany({ orderBy: { order: "asc" } });
+  // Custom ingestion sources mark their photos `ingest:*`; the public
+  // gallery shows only Blake's curated photo kinds.
+  const photos = await prisma.photo.findMany({
+    where: { NOT: { kind: { startsWith: "ingest:" } } },
+    orderBy: { order: "asc" },
+  });
   return {
     type: "gallery",
     layout,

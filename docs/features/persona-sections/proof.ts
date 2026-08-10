@@ -84,16 +84,21 @@ async function main() {
       );
     }
 
-    // 4 ── Text written under the retired 21-section catalogue folds forward.
-    const legacy = JSON.stringify({ core_profile: LEGACY_CORE, stress_response: LEGACY_STRESS });
-    const folded = safePersonaSections(legacy).persona;
+    // 4 ── Retired-catalogue text is a MIGRATION concern now: the deploy
+    // bootstrap folds it forward once; runtime reads drop unknown keys.
+    const { foldLegacySections } = await import("../../../lib/bootstrap");
+    const folded = foldLegacySections({ core_profile: LEGACY_CORE, stress_response: LEGACY_STRESS });
     check(
-      "legacy sections fold into the single field",
+      "bootstrap fold joins legacy sections into one block",
       folded.includes(LEGACY_CORE) && folded.includes(LEGACY_STRESS),
     );
     check("folded legacy text keeps its section labels", folded.includes("Core profile"));
     check(
-      "a filled persona field wins over legacy sections",
+      "runtime reads drop legacy keys instead of folding",
+      safePersonaSections(JSON.stringify({ core_profile: LEGACY_CORE })).persona === "",
+    );
+    check(
+      "a filled persona field reads as written",
       safePersonaSections(JSON.stringify({ persona: PERSONA_TEXT, core_profile: LEGACY_CORE }))
         .persona === PERSONA_TEXT,
     );

@@ -233,11 +233,6 @@ export async function extractDocument(
   return { title, rawText: text, imageUrl: null, summary, tags, kind: "resume" };
 }
 
-/** @deprecated use extractDocument — kept for any existing callers. */
-export async function extractPdf(bytes: Buffer, filename: string): Promise<ExtractResult> {
-  return extractDocument(bytes, filename);
-}
-
 export type ResumeParse = {
   bio: string;
   experience: { role: string; company: string; dates: string; description: string }[];

@@ -217,8 +217,33 @@ knowledge-blind.
 ## The admin portal
 
 `/admin` → password → `/admin/dashboard`. Auth is a signed cookie
-([`lib/auth.ts`](lib/auth.ts)) over a single `ADMIN_PASSWORD`. Ten tabs, all
-driven by server actions in [`app/admin/actions.ts`](app/admin/actions.ts):
+([`lib/auth.ts`](lib/auth.ts)) over a single `ADMIN_PASSWORD`. All tabs are
+driven by server actions in [`app/admin/actions.ts`](app/admin/actions.ts).
+
+**The Content tabs are ingestion sources, stored as data.** Each Content tab
+(Experience, Projects, Links, PDFs, Text, Photos, Persona) is an
+`IngestionSource` row ([`lib/ingestionSources.ts`](lib/ingestionSources.ts)) —
+the same "which X exist is data, not code" principle as A2UI cards. A row
+holds the source's code (`key`), its own system prompt, its upload method,
+the uniform storage rule (`text` | `image` | `text+image` — every ingested
+piece is one of the two, read back uniformly via
+[`lib/ingestedItems.ts`](lib/ingestedItems.ts)), where output lands, and its
+display `order` (row order IS tab order). "+ New ingestion source" creates a
+custom source that renders a generic text/image ingest panel over its own
+`ingest:<key>`-marked rows; every tab's "Edit ingestion" button opens
+`/admin/sources/<key>`, double-gated by `INGESTION_EDIT_PASSWORD` from the
+local `.env` ([`lib/ingestionAuth.ts`](lib/ingestionAuth.ts)).
+
+**The database bootstraps itself on deploy.** [`instrumentation.ts`](instrumentation.ts)
+runs [`lib/bootstrap.ts`](lib/bootstrap.ts) on every server start, right
+after the start script's `prisma db push`: starter ingestion sources, A2UI
+cards, and canned answers are seeded into empty tables (never resurrecting
+deletions), and data written under retired shapes is migrated to the current
+one (the old 21-section persona catalogue folds into the single persona
+field; a leftover `Profile.linkedin` moves into `socials`). Everything is
+idempotent and best-effort, so the DB begins — and stays — in the same
+structure at every point in time, and runtime code carries no legacy-shape
+branches: old shapes live only in the bootstrap migrations.
 
 | Tab | What it does |
 |---|---|
@@ -354,7 +379,7 @@ cards, not paragraphs.
 
 ## Data model
 
-Prisma over Postgres. Fifteen models, in [`prisma/schema.prisma`](prisma/schema.prisma):
+Prisma over Postgres. Sixteen models, in [`prisma/schema.prisma`](prisma/schema.prisma):
 
 **Knowledge & retrieval**
 

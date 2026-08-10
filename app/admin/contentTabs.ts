@@ -10,9 +10,6 @@ export const CONTENT_TAB_KEYS = [
 ] as const;
 export type ContentTabKey = (typeof CONTENT_TAB_KEYS)[number];
 
-/** Knowledge used to be one Content sub-tab; it is now split by source kind. */
-const LEGACY_CONTENT_TABS: Record<string, ContentTabKey> = { knowledge: "links" };
-
 /** Keys of the sub-tabs inside the combined Activity section. */
 export const ACTIVITY_TAB_KEYS = ["activity", "contacts"] as const;
 export type ActivityTabKey = (typeof ACTIVITY_TAB_KEYS)[number];
@@ -34,15 +31,17 @@ export type MeTabKey = (typeof ME_TAB_KEYS)[number];
  * to the combined
  * entry opened on that sub-tab; every other key passes through untouched.
  */
-export function resolveAdminTab(tab: string | undefined): {
+export function resolveAdminTab(
+  tab: string | undefined,
+  // The live Content keys come from the IngestionSource table so deep links
+  // to custom sources resolve; callers without the rows get the built-ins.
+  contentKeys: readonly string[] = CONTENT_TAB_KEYS,
+): {
   nav: string | undefined;
-  sub: ContentTabKey | ActivityTabKey | AgentTabKey | MeTabKey | undefined;
+  sub: string | undefined;
 } {
-  if (tab && LEGACY_CONTENT_TABS[tab]) {
-    return { nav: "content", sub: LEGACY_CONTENT_TABS[tab] };
-  }
-  if (tab && (CONTENT_TAB_KEYS as readonly string[]).includes(tab)) {
-    return { nav: "content", sub: tab as ContentTabKey };
+  if (tab && contentKeys.includes(tab)) {
+    return { nav: "content", sub: tab };
   }
   if (tab && (ACTIVITY_TAB_KEYS as readonly string[]).includes(tab)) {
     return { nav: "activity", sub: tab as ActivityTabKey };
@@ -54,4 +53,19 @@ export function resolveAdminTab(tab: string | undefined): {
     return { nav: "profile", sub: tab as MeTabKey };
   }
   return { nav: tab, sub: undefined };
+}
+
+/**
+ * The Content tab strip, computed from IngestionSource rows: enabled rows in
+ * row order (DB order IS display order), each paired with its panel by key.
+ * Rows with no panel are dropped — a custom source must never crash the
+ * dashboard before its panel exists. Pure, so it's provable offline.
+ */
+export function contentTabsFromSources<T>(
+  rows: ReadonlyArray<{ key: string; label: string; enabled: boolean }>,
+  panels: Record<string, T>,
+): Array<{ key: string; label: string; content: T }> {
+  return rows
+    .filter((r) => r.enabled && panels[r.key] !== undefined)
+    .map((r) => ({ key: r.key, label: r.label, content: panels[r.key] }));
 }

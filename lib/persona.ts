@@ -52,50 +52,12 @@ export const PERSONA_SECTIONS: PersonaSection[] = [
 export type PersonaSections = Record<string, string>;
 
 /**
- * The 21-section catalogue this field replaced. Kept only so persona text
- * written under the old shape folds forward into the single field the first
- * time it's read, instead of silently vanishing from the admin and the
- * prompt. Safe to delete once the live Profile row has been saved again.
- */
-const LEGACY_SECTIONS: { key: string; label: string }[] = [
-  { key: "core_profile", label: "Core profile" },
-  { key: "context_identity", label: "Context & identity" },
-  { key: "cognitive_frame", label: "Cognitive frame" },
-  { key: "decision_dynamics", label: "Behavioral & decision dynamics" },
-  { key: "operating_model", label: "Operating / interaction model" },
-  { key: "evidence_triggers", label: "Evidence, beliefs, and triggers" },
-  { key: "communication_style", label: "Communication & interaction style" },
-  { key: "goals_outcomes", label: "Goals & outcomes" },
-  { key: "meta_attributes", label: "Meta attributes" },
-  { key: "daily_workflow", label: "Daily workflow" },
-  { key: "decision_making", label: "Decision making" },
-  { key: "technology_adoption", label: "Technology adoption" },
-  { key: "problem_solving", label: "Problem solving" },
-  { key: "communication_behavior", label: "Communication behavior" },
-  { key: "stress_response", label: "Stress response" },
-  { key: "purchasing_behavior", label: "Purchasing behavior" },
-  { key: "change_management", label: "Change management" },
-  { key: "scenarios", label: "Scenario behaviors" },
-  { key: "behavioral_indicators", label: "Behavioral indicators" },
-  { key: "behavioral_summary", label: "Behavioral summary" },
-  { key: "notes", label: "Notes" },
-];
-
-/** Join whatever the old catalogue held into one editable block of prose. */
-function foldLegacy(stored: Record<string, unknown>): string {
-  const parts: string[] = [];
-  for (const { key, label } of LEGACY_SECTIONS) {
-    const v = stored[key];
-    if (typeof v === "string" && v.trim()) parts.push(`${label}\n${v.trim()}`);
-  }
-  return parts.join("\n\n");
-}
-
-/**
  * Parse the stored JSON map into a complete `key -> text` map: every catalogue
  * key is present (missing ones as ""), and anything stored under a key that's
- * no longer in the catalogue is dropped. Malformed JSON reads as all-empty so
- * a bad row can never break the admin or the chat prompt.
+ * no longer in the catalogue is dropped — the deploy bootstrap
+ * (lib/bootstrap.ts) migrates retired-catalogue rows before runtime ever
+ * reads them. Malformed JSON reads as all-empty so a bad row can never break
+ * the admin or the chat prompt.
  */
 export function safePersonaSections(raw: string | null | undefined): PersonaSections {
   let parsed: unknown;
@@ -114,8 +76,6 @@ export function safePersonaSections(raw: string | null | undefined): PersonaSect
     const v = stored[s.key];
     out[s.key] = typeof v === "string" ? v : "";
   }
-  // Nothing in the new field yet — carry the old sections forward.
-  if (!out[PERSONA_KEY].trim()) out[PERSONA_KEY] = foldLegacy(stored);
   return out;
 }
 

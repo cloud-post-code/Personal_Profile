@@ -21,15 +21,16 @@ function check(name: string, ok: boolean, detail?: string) {
   }
 }
 
-// ── 1. The sub-tab keys are exactly the three sections. ──
+// ── 1. The built-in sub-tab keys are the seven ingestion sources. ──
 check(
-  "CONTENT_TAB_KEYS is projects, knowledge, photos",
-  JSON.stringify([...CONTENT_TAB_KEYS]) === JSON.stringify(["projects", "knowledge", "photos"]),
+  "CONTENT_TAB_KEYS is the seven ingestion sources",
+  JSON.stringify([...CONTENT_TAB_KEYS]) ===
+    JSON.stringify(["experience", "projects", "links", "pdfs", "text", "photos", "persona"]),
   JSON.stringify(CONTENT_TAB_KEYS),
 );
 
 // ── 2. Deep-link resolution. ──
-for (const key of ["projects", "knowledge", "photos"]) {
+for (const key of CONTENT_TAB_KEYS) {
   const r = resolveAdminTab(key);
   check(
     `resolveAdminTab("${key}") opens Content on ${key}`,
@@ -38,10 +39,11 @@ for (const key of ["projects", "knowledge", "photos"]) {
   );
 }
 {
-  const r = resolveAdminTab("persona");
+  // The legacy knowledge→links shim was pruned (deploy-db-bootstrap).
+  const r = resolveAdminTab("knowledge");
   check(
-    'resolveAdminTab("persona") passes through with no sub',
-    r.nav === "persona" && r.sub === undefined,
+    'pruned resolveAdminTab("knowledge") passes through',
+    r.nav === "knowledge" && r.sub === undefined,
     JSON.stringify(r),
   );
 }
@@ -105,14 +107,20 @@ check('dashboard has a "content" nav entry', page.includes('key: "content"'));
 check('dashboard profile entry is labeled "Me"', page.includes('label: "Me"'));
 check("dashboard resolves the initial tab via resolveAdminTab", page.includes("resolveAdminTab"));
 check(
-  "all three panels are wired as SubTabs entries",
-  ["content: projectsTab", "content: knowledgeTab", "content: photosSection"].every((s) =>
-    page.includes(s),
-  ),
+  "Content SubTabs render from the IngestionSource mapping",
+  page.includes("tabs={contentTabs}") && page.includes("contentTabsFromSources"),
 );
 check(
-  'no leftover "Profile" label or photos-inside-knowledge fragment',
-  !page.includes('label: "Profile"') && !page.includes("{knowledgeTab}"),
+  "all seven builtin panels are wired into the mapping",
+  [
+    "experience: experienceTab",
+    "projects: projectsTab",
+    "links: linksTab",
+    "pdfs: pdfsTab",
+    "text: textTab",
+    "photos: photosSection",
+    "persona: personaTab",
+  ].every((s) => page.includes(s)),
 );
 
 if (failures > 0) {

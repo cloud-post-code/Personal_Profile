@@ -23,7 +23,6 @@ async function main() {
         "Enthusiastic about building useful things, a little playful, allergic to buzzwords. " +
         "Optimistic about technology but grounded about what actually ships.",
       email: "",
-      linkedin: "",
       github: "https://github.com/cloud-post-code",
     },
   });

@@ -25,22 +25,29 @@ import {
   deleteContact,
   deleteChatSession,
   saveChatFeedback,
+  ingestCustomTextAction,
+  ingestCustomImageAction,
+  ingestCustomUrlAction,
+  ingestCustomFileAction,
 } from "../actions";
 import { KnowledgePanel, isDocSource } from "../KnowledgePanel";
 import { GithubImport } from "../GithubImport";
 import { GraphPanel } from "../GraphPanel";
 import { AnswersPanel } from "../AnswersPanel";
 import { A2uiPanel } from "../A2uiPanel";
-import { seedStarterUiCards, listUiCards } from "@/lib/uiCards";
+import { listUiCards } from "@/lib/uiCards";
 import { PersonaPrompt } from "../PersonaPrompt";
 import { personaExtractionPrompt } from "@/lib/personaPrompt";
 import { graphStats, listEntities, listEdges, suggestedMerges } from "@/lib/retrieval/graph";
-import { seedStarterAnswers, listCannedAnswers } from "@/lib/canned";
+import { listCannedAnswers } from "@/lib/canned";
 import { draftBlankAnswers } from "@/lib/answerDrafts";
 import { ProjectRow } from "../ProjectRow";
 import { Tabs } from "../Tabs";
 import { SubTabs } from "../SubTabs";
-import { resolveAdminTab } from "../contentTabs";
+import { contentTabsFromSources, resolveAdminTab } from "../contentTabs";
+import { listIngestionSources } from "@/lib/ingestionSources";
+import { listIngestedItems } from "@/lib/ingestedItems";
+import { GenericIngestPanel } from "../GenericIngestPanel";
 import { PendingButton } from "../PendingButton";
 import { SaveButton } from "../SaveButton";
 import { AutoUploadFile } from "../AutoUploadFile";
@@ -61,9 +68,6 @@ export default async function Dashboard({
 
   const query = await searchParams;
   const one = (k: string) => (Array.isArray(query[k]) ? query[k][0] : query[k]);
-  // Legacy ?tab=projects / ?tab=knowledge links open the Content section on
-  // that sub-tab; every other key still targets its own nav entry.
-  const { nav: initialNav, sub: initialSub } = resolveAdminTab(one("tab"));
 
   const [
     profile,
@@ -79,11 +83,17 @@ export default async function Dashboard({
     gOverviews,
     canned,
     uiCards,
+    ingestionSources,
   ] = await Promise.all([
       getProfile(),
       prisma.project.findMany({ orderBy: { order: "asc" } }),
       prisma.source.findMany({ orderBy: { createdAt: "desc" } }),
-      prisma.photo.findMany({ orderBy: { order: "asc" } }),
+      // Custom ingestion sources own their `ingest:*`-marked photos; the
+      // built-in Photos tab shows only its own.
+      prisma.photo.findMany({
+        where: { NOT: { kind: { startsWith: "ingest:" } } },
+        orderBy: { order: "asc" },
+      }),
       prisma.contact.findMany({ orderBy: { createdAt: "desc" } }),
       prisma.chatSession.findMany({
         orderBy: { updatedAt: "desc" },
@@ -99,26 +109,26 @@ export default async function Dashboard({
         orderBy: { originLabel: "asc" },
         select: { id: true, originLabel: true, text: true },
       }),
-      // The starter chips ask the same five questions forever, so they're
-      // pre-created — and any row still blank gets a first draft written from
-      // the knowledge base, so the tab opens on a review queue rather than a
-      // to-do list. Best-effort: a provider outage must not take down the admin.
-      seedStarterAnswers()
-        .then(() => draftBlankAnswers().catch(() => 0))
+      // Starters are seeded at server start (lib/bootstrap.ts via
+      // instrumentation.ts); the dashboard just reads. Any blank answer row
+      // still gets a first draft here — that calls the model, which belongs
+      // in an admin visit, not in boot. Best-effort: a provider outage must
+      // not take down the admin.
+      draftBlankAnswers()
+        .catch(() => 0)
         .then(listCannedAnswers),
-      // Same bootstrap shape as the answers: the starter cards fill an empty
-      // table once, then the rows are Blake's.
-      seedStarterUiCards().then(listUiCards),
+      listUiCards(),
+      listIngestionSources(),
     ]);
+  // ?tab= deep links resolve against the live source keys so custom tabs
+  // deep-link too; every non-content key targets its own nav entry.
+  const { nav: initialNav, sub: initialSub } = resolveAdminTab(
+    one("tab"),
+    ingestionSources.map((s) => s.key),
+  );
   const metrics = chatMetrics(chatSessions);
   const unhandled = contacts.filter((c) => !c.handled).length;
-  // LinkedIn is now just a social link. If a legacy linkedin value exists and
-  // isn't already in socials, surface it as a pre-filled row so it's not lost.
-  const savedSocials = safeSocials(profile.socials);
-  const socials =
-    profile.linkedin && !savedSocials.some((s) => s.url === profile.linkedin)
-      ? [{ label: "LinkedIn", url: profile.linkedin }, ...savedSocials]
-      : savedSocials;
+  const socials = safeSocials(profile.socials);
   const colors = safeJson<ThemeColors>(profile.themeColors, {});
   const experience = safeExperience(profile.experience);
   const personaSections = safePersonaSections(profile.personaSections);
@@ -372,9 +382,14 @@ export default async function Dashboard({
   // ── KNOWLEDGE TABS — one per kind: links, PDFs/docs, pasted text ──
   // Links is the catch-all so a source with an unexpected type stays visible
   // (and deletable) rather than dropping out of the dashboard entirely.
-  const docSources = sources.filter((s) => isDocSource(s.type));
-  const textSources = sources.filter((s) => s.type === "text");
-  const linkSources = sources.filter((s) => !isDocSource(s.type) && s.type !== "text");
+  // Custom sources' rows (any type) carry an `ingest:` mark and belong to
+  // their own tabs, never the built-in Knowledge ones.
+  const owned = (s: { kind: string | null }) => (s.kind ?? "").startsWith("ingest:");
+  const docSources = sources.filter((s) => isDocSource(s.type) && !owned(s));
+  const textSources = sources.filter((s) => s.type === "text" && !owned(s));
+  const linkSources = sources.filter(
+    (s) => !isDocSource(s.type) && s.type !== "text" && !owned(s),
+  );
 
   const linksTab = (
     <KnowledgePanel
@@ -616,6 +631,52 @@ export default async function Dashboard({
     </section>
   );
 
+  // Which Content tabs exist, their labels, and their order all come from the
+  // IngestionSource rows; built-in keys dispatch to their bespoke panels.
+  const builtinPanels: Record<string, React.ReactNode> = {
+    experience: experienceTab,
+    projects: projectsTab,
+    links: linksTab,
+    pdfs: pdfsTab,
+    text: textTab,
+    photos: photosSection,
+    persona: personaTab,
+  };
+  // Custom sources render the generic panel over their own marked rows.
+  const customRows = ingestionSources.filter((s) => !s.builtin && !builtinPanels[s.key]);
+  const customItems = await Promise.all(customRows.map((s) => listIngestedItems(s.key)));
+  const contentPanels: Record<string, React.ReactNode> = { ...builtinPanels };
+  customRows.forEach((s, i) => {
+    contentPanels[s.key] = (
+      <GenericIngestPanel
+        row={s}
+        items={customItems[i]}
+        textAction={ingestCustomTextAction}
+        imageAction={ingestCustomImageAction}
+        urlAction={ingestCustomUrlAction}
+        fileAction={ingestCustomFileAction}
+      />
+    );
+  });
+  // Every ingestion page gets its edit button: config lives at
+  // /admin/sources/<key>, behind the local edit password.
+  const contentTabs = contentTabsFromSources(ingestionSources, contentPanels).map((t) => ({
+    ...t,
+    content: (
+      <>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+          <Link
+            href={`/admin/sources/${t.key}`}
+            style={{ fontSize: 13, textDecoration: "underline" }}
+          >
+            Edit ingestion
+          </Link>
+        </div>
+        {t.content}
+      </>
+    ),
+  }));
+
   return (
     <main style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 20px 80px" }}>
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
@@ -654,18 +715,14 @@ export default async function Dashboard({
             key: "content",
             label: "Content",
             content: (
-              <SubTabs
-                initial={initialSub}
-                tabs={[
-                  { key: "experience", label: "Experience", content: experienceTab },
-                  { key: "projects", label: "Projects", content: projectsTab },
-                  { key: "links", label: "Links", content: linksTab },
-                  { key: "pdfs", label: "PDFs", content: pdfsTab },
-                  { key: "text", label: "Text", content: textTab },
-                  { key: "photos", label: "Photos", content: photosSection },
-                  { key: "persona", label: "Persona", content: personaTab },
-                ]}
-              />
+              <>
+                <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+                  <Link href="/admin/sources/new" style={btnGhost as React.CSSProperties}>
+                    + New ingestion source
+                  </Link>
+                </div>
+                <SubTabs initial={initialSub} tabs={contentTabs} />
+              </>
             ),
           },
           {

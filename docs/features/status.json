@@ -182,7 +182,7 @@
       "feature_dir": "docs/features/admin-content-tabs",
       "proof": "docs/features/admin-content-tabs/PROOF.md",
       "status": "done",
-      "notes": "Dashboard nav restructured: Projects and Knowledge merged into one 'Content' entry with a horizontal SubTabs strip (Projects | Knowledge | Photos) at the top of the page; Photos promoted out of the Knowledge tab; Profile entry relabeled 'Me' (key unchanged). Legacy ?tab=projects/knowledge deep links resolve into the Content section via resolveAdminTab (app/admin/contentTabs.ts). Proof: docs/features/admin-content-tabs/proof.ts (17 assertions green); gate PASS."
+      "notes": "Dashboard nav restructured: Projects and Knowledge merged into one 'Content' entry with a horizontal SubTabs strip (Projects | Knowledge | Photos) at the top of the page; Photos promoted out of the Knowledge tab; Profile entry relabeled 'Me' (key unchanged). Legacy ?tab=projects/knowledge deep links resolve into the Content section via resolveAdminTab (app/admin/contentTabs.ts). Proof: docs/features/admin-content-tabs/proof.ts (17 assertions green); gate PASS. [2026-08-08] Proof rewritten for the 7-source, DB-driven tab strip (ingestion-driven-dashboard); green again."
     },
     {
       "id": "admin-graph-tabs",
@@ -202,6 +202,81 @@
       "title": "Agentic card builder: searches the knowledge graph, and room to finish long cards",
       "status": "done",
       "notes": "The builder now gets one tool, search_knowledge, backed by the chatbot's own retrieve() (hybrid BM25+cosine with one-hop entity-graph expansion). The model decides when a card needs real facts and searches on its own, up to 4 searches per draft; past the budget the tool tells it to draft with what it has. Retrieval failure degrades to a note, never a dead builder. The fixed REAL SITE DATA summary stays as the always-present floor. max_tokens 4000 -> 16000, fixing the deterministic 'response wasn't valid JSON' truncation on large coded cards. Revision calls keep the tool; parseDraft validation and the theme gate are unchanged. Proof: docs/features/agentic-card-builder-search/proof.ts (22 assertions green); gate PASS; verified live against claude-sonnet-5 \u2014 the previously-failing 'face built with numbers' prompt now searches once, drafts a 5KB coded card, and renders."
+    },
+    {
+      "id": "ingestion-sources-table",
+      "feature_dir": "docs/features/ingestion-sources-table",
+      "proof": "docs/features/ingestion-sources-table/PROOF.md",
+      "priority": 1,
+      "status": "passing",
+      "notes": "IngestionSource model + lib/ingestionSources.ts mirroring uiCards: closed uploadMethod/storageKinds vocab, slugified keys with collision suffixing, append-at-end order, seed-into-empty-only starters for the 7 tabs. Proof: 12 assertions, verified red (module missing) then green.",
+      "next": "Feed each source's systemPrompt into the extraction pipeline (scrape.ts still uses its own prompts)."
+    },
+    {
+      "id": "ingestion-driven-dashboard",
+      "feature_dir": "docs/features/ingestion-driven-dashboard",
+      "proof": "docs/features/ingestion-driven-dashboard/PROOF.md",
+      "priority": 2,
+      "status": "passing",
+      "notes": "Content tab strip renders from IngestionSource rows via pure contentTabsFromSources (enabled rows, row order = display order, panel-less rows dropped); resolveAdminTab takes live keys. Rewrote the stale admin-content-tabs proof to the 7-source world. Proof: 17 assertions; verified live that changing a row's order reorders the rendered strip."
+    },
+    {
+      "id": "unified-ingested-items",
+      "feature_dir": "docs/features/unified-ingested-items",
+      "proof": "docs/features/unified-ingested-items/PROOF.md",
+      "priority": 3,
+      "status": "passing",
+      "notes": "lib/ingestedItems.ts: listIngestedItems(key) returns uniform {kind: text|image} items across Source/Project/Photo/Profile with the invariant kind===image iff imageUrl set; custom sources own kind='ingest:<key>' marked rows. Proof: 9 assertions against local Postgres."
+    },
+    {
+      "id": "create-ingestion-source",
+      "feature_dir": "docs/features/create-ingestion-source",
+      "proof": "docs/features/create-ingestion-source/PROOF.md",
+      "priority": 4,
+      "status": "passing",
+      "notes": "/admin/sources/new creates non-builtin rows; GenericIngestPanel renders per-storageKinds text/image ingest forms + uniform item list; lib/customIngest enforces storageKinds at the write with injectable extractor/describer (zero-model proof); ingest:* marks excluded from builtin Text/Photos tabs, public gallery card, prompt photo list, imageGen. Proof: 21 assertions.",
+      "next": "Add delete/retract for individual custom items."
+    },
+    {
+      "id": "edit-ingestion-source",
+      "feature_dir": "docs/features/edit-ingestion-source",
+      "proof": "docs/features/edit-ingestion-source/PROOF.md",
+      "priority": 5,
+      "status": "passing",
+      "notes": "Every Content tab has an Edit ingestion link to /admin/sources/<key>; edit form (label, prompt, kinds, order, enabled) double-gated by INGESTION_EDIT_PASSWORD from local .env (falls back to ADMIN_PASSWORD; both-empty locks), 1h signed cookie with its own HMAC label; update action re-checks server-side. Proof: 15 assertions.",
+      "next": "Consider a delete-source flow with dropOrigin retraction of the source's ingested rows."
+    },
+    {
+      "id": "deploy-db-bootstrap",
+      "feature_dir": "docs/features/deploy-db-bootstrap",
+      "proof": "docs/features/deploy-db-bootstrap/PROOF.md",
+      "priority": 6,
+      "status": "passing",
+      "notes": "instrumentation.ts runs lib/bootstrap.ts bootstrapDatabase() on every server start, after the start script's prisma db push: seeds starter ingestion sources / A2UI cards / canned answers into empty tables, migrates legacy personaSections (21-section catalogue folds into the single persona field) and Profile.linkedin (moved into socials, column cleared). All idempotent + best-effort. Pruned: LEGACY_CONTENT_TABS shim, persona foldLegacy/LEGACY_SECTIONS, dashboard linkedin shim and lazy seedStarter* calls, actions/knowledge/seed linkedin references, unused deprecated extractPdf. Kept deliberately: A2A LEGACY_METHODS + /.well-known/agent.json (protocol back-compat for external clients), indexer empty-originId defensive deletion. Proof: 16 assertions; boot log verified 'db bootstrap: complete'; three older proofs repointed and green.",
+      "next": "Drop the cleared Profile.linkedin column next release \u2014 but only after confirming production Profile.linkedin is '' (i.e. the bootstrap migration actually ran there), since the start script's `prisma db push --accept-data-loss` applies column drops before instrumentation runs."
+    },
+    {
+      "id": "source-builder-chat",
+      "feature_dir": "docs/features/source-builder-chat",
+      "proof": "docs/features/source-builder-chat/PROOF.md",
+      "priority": 7,
+      "status": "passing",
+      "notes": "'/admin/sources/new' is now a split builder: left a vibe-coding chat (lib/ingestionBuilder.ts, injectable client, defensive JSON parsing with vocab coercion to generic/text; POST /api/admin/build-source, auth-gated 401 before model calls, cardBuilderModel), right the draft's sample page in TEST MODE ONLY \u2014 forms handled locally (state + object URLs), never the real ingest actions; only saveBuiltSourceAction persists via saveIngestionSource. Manual form kept collapsed as fallback. Proof: 15 assertions, red-first; live verified: page renders both panes, unauthenticated POST 401s, one real builder turn returned a valid press-mentions draft."
+    },
+    {
+      "id": "custom-upload-methods",
+      "feature_dir": "docs/features/custom-upload-methods",
+      "proof": "docs/features/custom-upload-methods/PROOF.md",
+      "priority": 8,
+      "status": "passing",
+      "notes": "Found live in the builder: uploadMethod changed nothing about the rendered form. Now ingestFormsFor(uploadMethod, storageKinds) in lib/ingestionSources.ts is the single mapping (url\u2192URL scan, file/resume\u2192document upload, textarea/form\u2192paste, image\u2192image, github\u2192url, generic/unknown\u2192paste+image; storage kinds gate everything; contradictions render an explanatory note). Real write paths ingestCustomUrl (upsert by unique URL, ownership mark survives extraction) and ingestCustomFile (extractDocument) with injectable extractors; new actions wired through the dashboard; built-in Links/PDFs readers and dashboard filters exclude ingest:* rows so custom link/pdf rows can't leak. SourceBuilder's test pane uses the same mapping; builder prompt teaches per-method choice. Proof: 27 assertions red-first; UI-verified live: a chat-built 'Documents' (file) draft renders the document-upload test control."
+    },
+    {
+      "id": "ingestion-source-classification",
+      "title": "Ingestion source classification (Public / Contact / Close friends / Personal)",
+      "status": "passing",
+      "notes": "IngestionSource.classification (default 'public'); catalog + labels + ENABLED_CLASSIFICATIONS in lib/ingestionSources.ts; shared ClassificationSelect rendered next to Save on the manual create form, the builder save pane, and the edit page; all three actions forward it and saveIngestionSource rejects unknown or not-yet-enabled statuses server-side. Frontend still shows everything as public. Proof: docs/features/ingestion-source-classification/proof.ts (16 assertions green); gate PASS. Also fixed pre-existing 'import type React' in app/admin/ui.tsx + PendingButton.tsx that had broken the create-ingestion-source and custom-upload-methods proofs under tsx (both green again).",
+      "next": "Enable contact/close-friends/personal by widening ENABLED_CLASSIFICATIONS and adding frontend visibility rules."
     }
   ]
 }

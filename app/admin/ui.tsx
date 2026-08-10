@@ -1,4 +1,4 @@
-import type React from "react";
+import React from "react";
 
 /** Shared admin styling primitives so sections look consistent. */
 

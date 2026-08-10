@@ -34,6 +34,14 @@ import {
 } from "@/lib/retrieval/origins";
 import { saveCannedAnswer, deleteCannedAnswer } from "@/lib/canned";
 import { saveUiCard, deleteUiCard } from "@/lib/uiCards";
+import { saveIngestionSource } from "@/lib/ingestionSources";
+import {
+  ingestCustomText,
+  ingestCustomImage,
+  ingestCustomUrl,
+  ingestCustomFile,
+} from "@/lib/customIngest";
+import { checkEditPassword, createEditSession, isEditAuthed } from "@/lib/ingestionAuth";
 import { draftUiCard, type CardDraft } from "@/lib/cardBuilder";
 import { redraftAnswer } from "@/lib/answerDrafts";
 import { safeExperience, safeSocials } from "@/lib/knowledge";
@@ -122,7 +130,6 @@ export async function saveDetails(formData: FormData) {
       name: String(formData.get("name") ?? "Blake"),
       location: String(formData.get("location") ?? ""),
       email: String(formData.get("email") ?? ""),
-      linkedin: String(formData.get("linkedin") ?? ""),
       github: String(formData.get("github") ?? ""),
       socials: JSON.stringify(socials),
     },
@@ -785,6 +792,141 @@ export async function saveBuiltCard(input: {
   });
   revalidatePath("/admin/dashboard");
   return error ? { ok: false, error } : { ok: true };
+}
+
+// ── Ingestion sources (the Content tabs, stored as data) ──
+
+/** Create a new ingestion source from /admin/sources/new. */
+export async function createIngestionSourceAction(formData: FormData) {
+  await requireAuth();
+  const error = await saveIngestionSource({
+    key: String(formData.get("key") ?? ""),
+    label: String(formData.get("label") ?? ""),
+    description: String(formData.get("description") ?? ""),
+    systemPrompt: String(formData.get("systemPrompt") ?? ""),
+    uploadMethod: String(formData.get("uploadMethod") ?? "generic"),
+    storageKinds: String(formData.get("storageKinds") ?? "text"),
+    classification: String(formData.get("classification") ?? "public"),
+    outputMethod:
+      String(formData.get("outputMethod") ?? "").trim() ||
+      "Source/Photo rows, read back as unified text/image items",
+  });
+  if (error) redirect(`/admin/sources/new?error=${encodeURIComponent(error)}`);
+  revalidateAll();
+  redirect("/admin/dashboard?tab=content");
+}
+
+/** Ingest pasted text into a custom source's marked rows. */
+export async function ingestCustomTextAction(formData: FormData) {
+  await requireAuth();
+  await ingestCustomText(String(formData.get("sourceKey") ?? ""), {
+    title: String(formData.get("title") ?? ""),
+    text: String(formData.get("text") ?? ""),
+  });
+  revalidateAll();
+}
+
+/** Scan a URL into a custom source's marked rows. */
+export async function ingestCustomUrlAction(formData: FormData) {
+  await requireAuth();
+  await ingestCustomUrl(
+    String(formData.get("sourceKey") ?? ""),
+    String(formData.get("url") ?? ""),
+  );
+  revalidateAll();
+}
+
+/** Ingest an uploaded document into a custom source's marked rows. */
+export async function ingestCustomFileAction(formData: FormData) {
+  await requireAuth();
+  const file = formData.get("file");
+  if (!isUpload(file) || file.size === 0) return;
+  await ingestCustomFile(
+    String(formData.get("sourceKey") ?? ""),
+    Buffer.from(await file.arrayBuffer()),
+    file.name,
+  );
+  revalidateAll();
+}
+
+/** Ingest an image into a custom source's marked rows. */
+export async function ingestCustomImageAction(formData: FormData) {
+  await requireAuth();
+  const file = formData.get("file");
+  if (!isUpload(file) || file.size === 0) return;
+  await ingestCustomImage(
+    String(formData.get("sourceKey") ?? ""),
+    Buffer.from(await file.arrayBuffer()),
+    file.type,
+    String(formData.get("caption") ?? ""),
+  );
+  revalidateAll();
+}
+
+/** Persist a chat-built ingestion source draft (the builder's Save button). */
+export async function saveBuiltSourceAction(draft: {
+  label: string;
+  key: string;
+  description: string;
+  systemPrompt: string;
+  uploadMethod: string;
+  storageKinds: string;
+  classification?: string;
+  outputMethod: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  await requireAuth();
+  const error = await saveIngestionSource({
+    key: draft.key,
+    label: draft.label,
+    description: draft.description,
+    systemPrompt: draft.systemPrompt,
+    uploadMethod: draft.uploadMethod,
+    storageKinds: draft.storageKinds,
+    classification: draft.classification,
+    outputMethod: draft.outputMethod,
+  });
+  if (error) return { ok: false, error };
+  revalidateAll();
+  return { ok: true };
+}
+
+/** Editing source CONFIG needs the local edit password's cookie too. */
+async function requireEditAuth(key: string) {
+  if (!(await isEditAuthed())) redirect(`/admin/sources/${key}?locked=1`);
+}
+
+/** Check the locally-stored edit password and unlock an edit session. */
+export async function unlockIngestionEditAction(formData: FormData) {
+  await requireAuth();
+  const key = String(formData.get("key") ?? "");
+  if (!checkEditPassword(String(formData.get("password") ?? ""))) {
+    redirect(`/admin/sources/${key}?error=1`);
+  }
+  await createEditSession();
+  redirect(`/admin/sources/${key}`);
+}
+
+/** Save edits to an existing ingestion source (config, not content). */
+export async function updateIngestionSourceAction(formData: FormData) {
+  await requireAuth();
+  const key = String(formData.get("key") ?? "");
+  await requireEditAuth(key);
+  const error = await saveIngestionSource({
+    id: String(formData.get("id") ?? ""),
+    key,
+    label: String(formData.get("label") ?? ""),
+    description: String(formData.get("description") ?? ""),
+    systemPrompt: String(formData.get("systemPrompt") ?? ""),
+    uploadMethod: String(formData.get("uploadMethod") ?? "generic"),
+    storageKinds: String(formData.get("storageKinds") ?? "text"),
+    classification: String(formData.get("classification") ?? "public"),
+    outputMethod: String(formData.get("outputMethod") ?? ""),
+    enabled: formData.get("enabled") === "on",
+    order: Number(formData.get("order") ?? 0) || 0,
+  });
+  if (error) redirect(`/admin/sources/${key}?error=${encodeURIComponent(error)}`);
+  revalidateAll();
+  redirect("/admin/dashboard?tab=content");
 }
 
 function err(e: unknown): string {

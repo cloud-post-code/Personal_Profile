@@ -1,0 +1,124 @@
+import React from "react";
+import Link from "next/link";
+import { redirect, notFound } from "next/navigation";
+import { isAuthed } from "@/lib/auth";
+import { isEditAuthed } from "@/lib/ingestionAuth";
+import { getIngestionSource, UPLOAD_METHODS, STORAGE_KINDS } from "@/lib/ingestionSources";
+import { unlockIngestionEditAction, updateIngestionSourceAction } from "../../actions";
+import { PendingButton } from "../../PendingButton";
+import { ClassificationSelect } from "../../ClassificationSelect";
+import { panel, field, btn, btnGhost, SectionTitle, Label } from "../../ui";
+
+export const dynamic = "force-dynamic";
+
+/**
+ * Edit one ingestion source's config. Double-gated: admin login gets you to
+ * the page, but the form only unlocks with the edit password held in the
+ * local .env (INGESTION_EDIT_PASSWORD; the update action re-checks the
+ * unlock cookie server-side, so the lock is not just UI).
+ */
+export default async function EditIngestionSourcePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ key: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  if (!(await isAuthed())) redirect("/admin");
+  const { key } = await params;
+  const query = await searchParams;
+  const error = Array.isArray(query.error) ? query.error[0] : query.error;
+
+  const row = await getIngestionSource(key);
+  if (!row) notFound();
+  const unlocked = await isEditAuthed();
+
+  return (
+    <main style={{ maxWidth: 640, margin: "0 auto", padding: "24px 20px 80px" }}>
+      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+        <h1 style={{ fontSize: 24 }}>Edit ingestion — {row.label}</h1>
+        <Link href={`/admin/dashboard?tab=${row.key}`} style={btnGhost as React.CSSProperties}>
+          Back
+        </Link>
+      </header>
+      {error ? (
+        <p role="alert" style={{ color: "var(--danger, #b00020)", marginBottom: 14 }}>
+          {error === "1" ? "Wrong edit password." : error}
+        </p>
+      ) : null}
+
+      {!unlocked ? (
+        <section data-fill="surface" style={panel}>
+          <SectionTitle>Unlock editing</SectionTitle>
+          <p style={{ fontSize: 13, fontStyle: "italic", marginBottom: 12 }}>
+            Editing an ingestion source changes what the agent ingests and how.
+            Enter the edit password from your local .env
+            (INGESTION_EDIT_PASSWORD) to unlock this page for an hour.
+          </p>
+          <form action={unlockIngestionEditAction} style={{ display: "grid", gap: 10 }}>
+            <input type="hidden" name="key" value={row.key} />
+            <Label>Edit password</Label>
+            <input type="password" name="password" required style={field as React.CSSProperties} />
+            <PendingButton pendingLabel="Unlocking…" style={btn as React.CSSProperties}>
+              Unlock
+            </PendingButton>
+          </form>
+        </section>
+      ) : (
+        <section data-fill="surface" style={panel}>
+          <SectionTitle>Source settings</SectionTitle>
+          <form action={updateIngestionSourceAction} style={{ display: "grid", gap: 10 }}>
+            <input type="hidden" name="id" value={row.id} />
+            <input type="hidden" name="key" value={row.key} />
+            <Label>Name</Label>
+            <input name="label" defaultValue={row.label} required style={field as React.CSSProperties} />
+            <Label>Description</Label>
+            <input name="description" defaultValue={row.description} style={field as React.CSSProperties} />
+            <Label>System prompt</Label>
+            <textarea
+              name="systemPrompt"
+              rows={5}
+              defaultValue={row.systemPrompt}
+              style={field as React.CSSProperties}
+            />
+            <Label>Upload method</Label>
+            <select name="uploadMethod" defaultValue={row.uploadMethod} style={field as React.CSSProperties}>
+              {UPLOAD_METHODS.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+            <Label>Stores</Label>
+            <select name="storageKinds" defaultValue={row.storageKinds} style={field as React.CSSProperties}>
+              {STORAGE_KINDS.map((k) => (
+                <option key={k} value={k}>
+                  {k}
+                </option>
+              ))}
+            </select>
+            <Label>Output (where ingested data lands)</Label>
+            <input name="outputMethod" defaultValue={row.outputMethod} style={field as React.CSSProperties} />
+            <Label>Display order (lower comes first in the tab strip)</Label>
+            <input
+              name="order"
+              type="number"
+              defaultValue={row.order}
+              style={field as React.CSSProperties}
+            />
+            <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 14 }}>
+              <input type="checkbox" name="enabled" defaultChecked={row.enabled} />
+              Enabled (shown as a Content tab)
+            </label>
+            <div style={{ display: "flex", gap: 10, alignItems: "end", flexWrap: "wrap" }}>
+              <ClassificationSelect defaultValue={row.classification} />
+              <PendingButton pendingLabel="Saving…" style={btn as React.CSSProperties}>
+                Save changes
+              </PendingButton>
+            </div>
+          </form>
+        </section>
+      )}
+    </main>
+  );
+}

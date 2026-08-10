@@ -46,3 +46,4 @@ prisma/dev.db-journal
 
 # isolated local verification builds (NEXT_DIST_DIR)
 /.next-build/
+backups/

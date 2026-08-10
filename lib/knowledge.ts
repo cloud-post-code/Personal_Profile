@@ -23,7 +23,12 @@ export async function buildSystemPrompt(query?: string): Promise<string> {
   const [profile, projects, photos, corrections, chunkCount] = await Promise.all([
     getProfile(),
     prisma.project.findMany({ orderBy: { order: "asc" } }),
-    prisma.photo.findMany({ orderBy: { order: "asc" } }),
+    // The prompt's gallery listing is curated photos only; custom-ingested
+    // images (`ingest:*` marks) reach the model through retrieval chunks.
+    prisma.photo.findMany({
+      where: { NOT: { kind: { startsWith: "ingest:" } } },
+      orderBy: { order: "asc" },
+    }),
     // Admin corrections: bad answers Blake flagged with a note on the Activity
     // tab. These steer the bot away from repeating mistakes.
     prisma.chatMessage.findMany({
@@ -182,13 +187,11 @@ Always add a short spoken sentence alongside a card — the card supplements you
 
 function connectBlock(p: {
   email: string;
-  linkedin: string;
   github: string;
   socials: string;
 }): string {
   const lines: string[] = [];
   if (p.email) lines.push(`Email: ${p.email}`);
-  if (p.linkedin) lines.push(`LinkedIn: ${p.linkedin}`);
   if (p.github) lines.push(`GitHub: ${p.github}`);
   for (const s of safeSocials(p.socials)) lines.push(`${s.label}: ${s.url}`);
   return lines.length ? lines.join("\n") : "(No contact info added yet.)";

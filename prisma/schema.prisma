@@ -280,6 +280,45 @@ model UiCard {
   updatedAt   DateTime @updatedAt
 }
 
+/// One admin ingestion source: a Content tab the dashboard renders, stored as
+/// data the way A2UI cards are. The row holds the source's code (key), how
+/// content gets in (uploadMethod), the uniform storage rule (storageKinds:
+/// every ingested piece is text or image), where it lands (outputMethod), and
+/// its own system prompt. The seven built-in tabs are seeded once into an
+/// empty table; after that the rows are Blake's — re-seeding would resurrect
+/// deliberate deletions.
+model IngestionSource {
+  id           String   @id @default(cuid())
+  /// Stable slug ("experience") — the source's code, used for deep links
+  /// and panel dispatch.
+  key          String   @unique
+  /// Human name shown on the tab ("Experience").
+  label        String
+  /// One line on what this source ingests.
+  description  String   @default("") @db.Text
+  /// This source's own system prompt: extraction/guidance text applied to
+  /// content ingested through it.
+  systemPrompt String   @default("") @db.Text
+  /// How content gets in: resume | github | url | file | textarea | image |
+  /// form | generic.
+  uploadMethod String
+  /// The uniform storage rule: "text" | "image" | "text+image".
+  storageKinds String   @default("text")
+  /// Who this source's content is for: "public" | "contact" |
+  /// "close-friends" | "personal". Only "public" is selectable today; the
+  /// frontend still shows everything to everyone.
+  classification String @default("public")
+  /// Where ingested data lands (which model/store), recorded as data so the
+  /// dashboard can show it ("Source + Chunk rows", "Photo + upload dir", …).
+  outputMethod String   @default("") @db.Text
+  /// Seeded tabs render their bespoke panels; custom rows the generic panel.
+  builtin      Boolean  @default(true)
+  enabled      Boolean  @default(true)
+  order        Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
 /// A contact submission captured by the in-chat A2UI contact form.
 model Contact {
   id        String   @id @default(cuid())
@@ -301,6 +340,10 @@ model Profile {
   /// JSON array of {label, url} social links.
   socials   String   @default("[]")
   email     String   @default("")
+  /// Retired — LinkedIn lives in `socials` now. The deploy bootstrap
+  /// (lib/bootstrap.ts) moves any leftover value there and clears this.
+  /// Kept one release so `db push` can't drop the value before the
+  /// migration runs; safe to delete next release.
   linkedin  String   @default("")
   github    String   @default("")
 
