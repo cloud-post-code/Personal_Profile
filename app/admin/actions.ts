@@ -873,7 +873,7 @@ export async function saveBuiltSourceAction(draft: {
   storageKinds: string;
   classification?: string;
   outputMethod: string;
-}): Promise<{ ok: boolean; error?: string }> {
+}): Promise<{ ok: boolean; error?: string; key?: string }> {
   await requireAuth();
   const error = await saveIngestionSource({
     key: draft.key,
@@ -887,7 +887,10 @@ export async function saveBuiltSourceAction(draft: {
   });
   if (error) return { ok: false, error };
   revalidateAll();
-  return { ok: true };
+  // The saved key may differ from the draft's (slugified, collision-suffixed);
+  // the newest row is the one this save just created.
+  const saved = await prisma.ingestionSource.findFirst({ orderBy: { createdAt: "desc" } });
+  return { ok: true, key: saved?.key };
 }
 
 /** Editing source CONFIG needs the local edit password's cookie too. */
@@ -926,7 +929,8 @@ export async function updateIngestionSourceAction(formData: FormData) {
   });
   if (error) redirect(`/admin/sources/${key}?error=${encodeURIComponent(error)}`);
   revalidateAll();
-  redirect("/admin/dashboard?tab=content");
+  // Land back on the ingestion that was just edited, not the first tab.
+  redirect(`/admin/dashboard?tab=${key}`);
 }
 
 function err(e: unknown): string {

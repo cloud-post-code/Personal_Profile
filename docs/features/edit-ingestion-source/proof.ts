@@ -110,6 +110,10 @@ async function main() {
     "update action re-checks edit auth server-side",
     /updateIngestionSourceAction[\s\S]{0,400}requireEditAuth/.test(actions),
   );
+  check(
+    "save returns to the edited source's own tab",
+    /updateIngestionSourceAction[\s\S]{0,1200}dashboard\?tab=\$\{key\}/.test(actions),
+  );
 
   // 7. Documented for local setup.
   const envExample = readFileSync(path.join(root, ".env.example"), "utf8");

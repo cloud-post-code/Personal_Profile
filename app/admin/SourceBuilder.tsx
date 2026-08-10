@@ -128,8 +128,9 @@ export function SourceBuilder(_props: Record<string, never>) {
     const result = await saveBuiltSourceAction({ ...draft, classification });
     if (result.ok) {
       // Full navigation on purpose: the dashboard re-renders the tab strip
-      // from the DB, and the builder's local state is done with.
-      window.location.href = "/admin/dashboard?tab=content";
+      // from the DB, and the builder's local state is done with. Land on the
+      // new source's own tab so the saved ingestion is what you see.
+      window.location.href = `/admin/dashboard?tab=${result.key ?? "content"}`;
     } else {
       setError(result.error ?? "Save failed.");
       setSaving(false);

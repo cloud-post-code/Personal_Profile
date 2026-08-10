@@ -126,6 +126,10 @@ async function main() {
     "saveBuiltSourceAction wraps saveIngestionSource",
     /saveBuiltSourceAction[\s\S]{0,500}saveIngestionSource/.test(actions),
   );
+  check(
+    "builder save lands on the new source's own tab",
+    /saveBuiltSourceAction[\s\S]{0,1200}key/.test(actions) && src.includes("?tab=${"),
+  );
 
   console.log(failures ? `\n${failures} assertion(s) failed` : "\nAll assertions passed");
   process.exit(failures ? 1 : 0);
