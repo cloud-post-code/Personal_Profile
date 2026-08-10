@@ -277,6 +277,14 @@
       "status": "passing",
       "notes": "IngestionSource.classification (default 'public'); catalog + labels + ENABLED_CLASSIFICATIONS in lib/ingestionSources.ts; shared ClassificationSelect rendered next to Save on the manual create form, the builder save pane, and the edit page; all three actions forward it and saveIngestionSource rejects unknown or not-yet-enabled statuses server-side. Frontend still shows everything as public. Proof: docs/features/ingestion-source-classification/proof.ts (16 assertions green); gate PASS. Also fixed pre-existing 'import type React' in app/admin/ui.tsx + PendingButton.tsx that had broken the create-ingestion-source and custom-upload-methods proofs under tsx (both green again).",
       "next": "Enable contact/close-friends/personal by widening ENABLED_CLASSIFICATIONS and adding frontend visibility rules."
+    },
+    {
+      "id": "split-ingest-items",
+      "feature_dir": "docs/features/split-ingest-items",
+      "proof": "docs/features/split-ingest-items/PROOF.md",
+      "priority": 9,
+      "status": "passing",
+      "notes": "Splitting is pipeline behavior, not prompt behavior: every custom-source text ingest (file/url/paste) runs one split model call (claudeModel) that turns raw text into [{title,text}] items \u2014 the source's systemPrompt is only the LENS (default lens when empty). MAX_SPLIT_ITEMS=20, 24k input window; any failure or 0-1 items falls back to the single summarized row. Items are ingest:<key> rows tagged doc:<parent>, indexed individually; URL re-scans replace their items via exact JSON-quoted tag match with dropOrigin retraction (evaluator caught a prefix-match deletion bug + missing graph retraction; both repaired, sibling-URL regression assertion added). Builder prompt teaches describing ONE ITEM. Proof: 18 assertions red-first; live real-model check split a 3-initiative brief into 3 titled rows; evaluator FAIL\u2192repair\u2192PASS."
     }
   ]
 }

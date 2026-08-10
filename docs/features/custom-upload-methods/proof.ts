@@ -64,6 +64,7 @@ async function main() {
   const fakeLink = async (url: string) => ({
     title: `Linked ${url}`, rawText: "L", summary: `SUM:${url}`, tags: ["proof"],
   });
+  const noSplit = { messages: { create: async () => ({ content: [{ type: "text", text: "[]" }] }) } };
   const fakeDoc = async (_bytes: Buffer, filename: string) => ({
     title: filename, rawText: "D", summary: `DOC:${filename}`, tags: ["proof"],
   });
@@ -79,18 +80,18 @@ async function main() {
     });
 
     // 2. URL ingestion.
-    check("url into image-only refused", typeof (await ingestCustomUrl(IMGONLY, "https://example.com/proof-cum", fakeLink)) === "string");
-    const u1 = await ingestCustomUrl(KEY, "https://example.com/proof-cum", fakeLink);
+    check("url into image-only refused", typeof (await ingestCustomUrl(IMGONLY, "https://example.com/proof-cum", fakeLink, noSplit)) === "string");
+    const u1 = await ingestCustomUrl(KEY, "https://example.com/proof-cum", fakeLink, noSplit);
     check("url ingest succeeds", u1 === null, String(u1));
     const row = await prisma.source.findUnique({ where: { url: "https://example.com/proof-cum" } });
     check("url row marked and summarized", !!row && row.kind === `ingest:${KEY}` && row.summary === "SUM:https://example.com/proof-cum");
-    const u2 = await ingestCustomUrl(KEY, "https://example.com/proof-cum", fakeLink);
+    const u2 = await ingestCustomUrl(KEY, "https://example.com/proof-cum", fakeLink, noSplit);
     const count = await prisma.source.count({ where: { url: "https://example.com/proof-cum" } });
     check("re-ingesting the same URL updates, not duplicates", u2 === null && count === 1);
 
     // 3. File ingestion.
-    check("file into image-only refused", typeof (await ingestCustomFile(IMGONLY, Buffer.from("x"), "a.pdf", fakeDoc)) === "string");
-    const f1 = await ingestCustomFile(KEY, Buffer.from("pdfbytes"), "proof-cum.pdf", fakeDoc);
+    check("file into image-only refused", typeof (await ingestCustomFile(IMGONLY, Buffer.from("x"), "a.pdf", fakeDoc, noSplit)) === "string");
+    const f1 = await ingestCustomFile(KEY, Buffer.from("pdfbytes"), "proof-cum.pdf", fakeDoc, noSplit);
     check("file ingest succeeds", f1 === null, String(f1));
     const items = await listIngestedItems(KEY);
     check(

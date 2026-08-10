@@ -51,6 +51,9 @@ async function main() {
     tags: ["proof"],
   });
   const fakeDescribe = async () => "proof-cis image description";
+  // Split pass declines (split-ingest-items) → plain single-row behavior,
+  // which is exactly what this proof asserts.
+  const noSplit = { messages: { create: async () => ({ content: [{ type: "text", text: "[]" }] }) } };
 
   try {
     await saveIngestionSource({
@@ -63,7 +66,7 @@ async function main() {
     });
 
     // 1. The uniform rule is enforced at the write.
-    const e1 = await ingestCustomText(TEXTONLY, { title: "t", text: "ok" }, fakeExtract);
+    const e1 = await ingestCustomText(TEXTONLY, { title: "t", text: "ok" }, fakeExtract, noSplit);
     check("text into text-only source allowed", e1 === null, String(e1));
     const e2 = await ingestCustomImage(
       TEXTONLY, Buffer.from([1]), "image/png", "cap", fakeDescribe,
@@ -74,11 +77,11 @@ async function main() {
       key: "proof-cis-imgonly", label: "Proof CIS img", description: "", systemPrompt: "",
       uploadMethod: "generic", storageKinds: "image", outputMethod: "unified items",
     });
-    const e3 = await ingestCustomText("proof-cis-imgonly", { title: "t", text: "no" }, fakeExtract);
+    const e3 = await ingestCustomText("proof-cis-imgonly", { title: "t", text: "no" }, fakeExtract, noSplit);
     check("text into image-only source refused", typeof e3 === "string");
 
     // 2. Text write lands marked and listed.
-    const e4 = await ingestCustomText(KEY, { title: "proof-cis note", text: "hello world" }, fakeExtract);
+    const e4 = await ingestCustomText(KEY, { title: "proof-cis note", text: "hello world" }, fakeExtract, noSplit);
     check("custom text ingest succeeds", e4 === null, String(e4));
     const srcRow = await prisma.source.findFirst({ where: { kind: `ingest:${KEY}`, title: "proof-cis note" } });
     check("Source row marked ingest:<key> with extracted summary",

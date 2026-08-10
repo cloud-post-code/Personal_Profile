@@ -48,7 +48,11 @@ a Content tab that ingests information for the site's chatbot. A source has:
 - label: the tab's human name
 - key: a short kebab-case slug derived from the label
 - description: one line on what it ingests
-- systemPrompt: how ingested content should be read/extracted/summarized
+- systemPrompt: the source's extraction lens. Splitting is AUTOMATIC — the
+  pipeline splits every document/URL/paste into discrete items on its own,
+  so never write "split this up" instructions. Instead describe what ONE
+  ITEM is and which details it should carry (e.g. "one item per work
+  initiative: name, owner, timeline, status").
 - uploadMethod: one of ${UPLOAD_METHODS.join(", ")} — pick what fits how the
   content arrives: "url" scans web pages, "file" uploads PDF/Word documents,
   "textarea" is a paste-text form, "image" uploads photos, and "generic"
