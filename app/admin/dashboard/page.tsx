@@ -29,6 +29,7 @@ import {
   ingestCustomImageAction,
   ingestCustomUrlAction,
   ingestCustomFileAction,
+  deleteIngestedItemAction,
   setIngestionSourceHiddenAction,
 } from "../actions";
 import { KnowledgePanel, isDocSource } from "../KnowledgePanel";
@@ -647,6 +648,7 @@ export default async function Dashboard({
         imageAction={ingestCustomImageAction}
         urlAction={ingestCustomUrlAction}
         fileAction={ingestCustomFileAction}
+        deleteItemAction={deleteIngestedItemAction}
       />
     );
   });

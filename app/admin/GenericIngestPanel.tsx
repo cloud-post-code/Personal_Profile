@@ -22,6 +22,7 @@ export function GenericIngestPanel({
   imageAction,
   urlAction,
   fileAction,
+  deleteItemAction,
   editHref,
 }: {
   row: IngestionSourceRow;
@@ -30,6 +31,7 @@ export function GenericIngestPanel({
   imageAction?: (formData: FormData) => Promise<void>;
   urlAction?: (formData: FormData) => Promise<void>;
   fileAction?: (formData: FormData) => Promise<void>;
+  deleteItemAction?: (formData: FormData) => Promise<void>;
   editHref?: string;
 }) {
   // The upload method decides which controls appear; storage kinds gate them.
@@ -157,6 +159,24 @@ export function GenericIngestPanel({
               <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
                 <strong style={{ fontSize: 14 }}>{it.title}</strong>
                 <Stamp date={it.createdAt} prefix="ingested" />
+                <form action={deleteItemAction} style={{ marginLeft: "auto" }}>
+                  <input type="hidden" name="sourceKey" value={row.key} />
+                  <input type="hidden" name="itemId" value={it.id} />
+                  <PendingButton
+                    pendingLabel="Deleting…"
+                    style={{
+                      fontSize: 12,
+                      textDecoration: "underline",
+                      background: "none",
+                      border: "none",
+                      padding: 0,
+                      cursor: "pointer",
+                      color: "var(--danger, #b00020)",
+                    }}
+                  >
+                    Delete
+                  </PendingButton>
+                </form>
               </div>
               {it.text ? (
                 <p style={{ fontSize: 13, whiteSpace: "pre-wrap", marginTop: 4 }}>{it.text}</p>

@@ -47,6 +47,7 @@ import {
   ingestCustomImage,
   ingestCustomUrl,
   ingestCustomFile,
+  deleteIngestedItem,
 } from "@/lib/customIngest";
 import { checkEditPassword, createEditSession, isEditAuthed } from "@/lib/ingestionAuth";
 import { draftUiCard, type CardDraft } from "@/lib/cardBuilder";
@@ -877,6 +878,16 @@ export async function ingestCustomFileAction(formData: FormData) {
     String(formData.get("sourceKey") ?? ""),
     Buffer.from(await file.arrayBuffer()),
     file.name,
+  );
+  revalidateAll();
+}
+
+/** Delete one ingested item from a custom source (content, not config). */
+export async function deleteIngestedItemAction(formData: FormData) {
+  await requireAuth();
+  await deleteIngestedItem(
+    String(formData.get("sourceKey") ?? ""),
+    String(formData.get("itemId") ?? ""),
   );
   revalidateAll();
 }

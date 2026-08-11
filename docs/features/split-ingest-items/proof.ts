@@ -89,6 +89,22 @@ async function main() {
     );
   }
 
+  // 1b. A reply truncated mid-array (max_tokens cutoff) salvages the
+  // complete items instead of discarding the whole split.
+  {
+    const truncated = JSON.stringify([
+      { title: "Whole One", text: "complete item one" },
+      { title: "Whole Two", text: "complete item two" },
+    ]).slice(0, -1) + ',{"title":"Cut Off","text":"this item never fini';
+    const { client } = fakeSplitClient(truncated);
+    const salvaged = await splitIntoItems("raw", "lens", client);
+    check(
+      "truncated array salvages the complete items",
+      salvaged !== null && salvaged.length === 2 && salvaged[1].title === "Whole Two",
+      JSON.stringify(salvaged),
+    );
+  }
+
   // 2. The source prompt is the lens; empty prompt gets the default lens.
   {
     const a = fakeSplitClient(items3);

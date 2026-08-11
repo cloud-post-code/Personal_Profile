@@ -69,9 +69,63 @@ const DEFAULT_LENS =
   "fact, project, claim, or event that stands on its own.";
 
 /**
+ * Parse the model's reply into raw objects — tolerating a reply cut off by
+ * the token budget. A dense document can overrun any budget, and throwing
+ * away eighteen complete items because the nineteenth was truncated is how a
+ * split "randomly" degrades to one blob. Strategy: parse the whole array if
+ * it's valid JSON; otherwise walk the array with a depth counter and parse
+ * each complete top-level object individually, dropping only the cut tail.
+ */
+function parseItemArray(raw: string): unknown[] | null {
+  const start = raw.indexOf("[");
+  if (start < 0) return null;
+  const whole = raw.match(/\[[\s\S]*\]/)?.[0];
+  if (whole) {
+    try {
+      const parsed = JSON.parse(whole);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      // fall through to salvage
+    }
+  }
+  const out: unknown[] = [];
+  let depth = 0;
+  let objStart = -1;
+  let inString = false;
+  let escaped = false;
+  for (let i = start + 1; i < raw.length; i++) {
+    const ch = raw[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === "{") {
+      if (depth === 0) objStart = i;
+      depth++;
+    } else if (ch === "}") {
+      depth--;
+      if (depth === 0 && objStart >= 0) {
+        try {
+          out.push(JSON.parse(raw.slice(objStart, i + 1)));
+        } catch {
+          // a malformed object mid-array: skip it, keep salvaging
+        }
+        objStart = -1;
+      }
+    }
+  }
+  return out.length ? out : null;
+}
+
+/**
  * One model call: raw text in, discrete items out. Returns null on ANY
  * failure or on a 0–1 item result — the caller falls back to the plain
- * single-row ingest, so an outage can never lose an upload.
+ * single-row ingest, so an outage can never lose an upload. Failures are
+ * logged: a silent fallback is indistinguishable from "the doc really was
+ * one point", and that ambiguity is un-debuggable in production.
  */
 export async function splitIntoItems(
   rawText: string,
@@ -80,16 +134,27 @@ export async function splitIntoItems(
 ): Promise<SplitItem[] | null> {
   try {
     const { claude, claudeModel } = await import("@/lib/claude");
-    const c = client ?? (claude() as unknown as SplitClient);
+    // The SDK requires streaming for a full-budget (64K) request; stream and
+    // collect, presenting the same create() surface the fakes implement.
+    const c: SplitClient =
+      client ?? {
+        messages: {
+          create: (req) => claude().messages.stream(req).finalMessage(),
+        },
+      };
     const res = await c.messages.create({
       model: claudeModel(),
-      max_tokens: 4000,
+      // The model's full output ceiling (Haiku 4.5: 64K) — the item cap and
+      // the concise-item instruction bound real spend; the budget must never
+      // be what truncates a dense document's array.
+      max_tokens: 64000,
       system:
         "You split an ingested document into discrete knowledge items for a " +
         "retrieval system. Reply with ONLY a JSON array of objects " +
         `{"title": "...", "text": "..."} — at most ${MAX_SPLIT_ITEMS} items. ` +
-        "Every item must be understandable alone (repeat names/context rather " +
-        "than writing \"it\" or \"this project\"). What counts as one item:\n" +
+        "Keep each item's text to 2–5 sentences. Every item must be " +
+        "understandable alone (repeat names/context rather than writing " +
+        "\"it\" or \"this project\"). What counts as one item:\n" +
         (lens.trim() || DEFAULT_LENS),
       messages: [{ role: "user", content: rawText.slice(0, SPLIT_INPUT_CHARS) }],
     });
@@ -99,10 +164,11 @@ export async function splitIntoItems(
         return block?.type === "text" && typeof block.text === "string" ? block.text : "";
       })
       .join("");
-    const jsonText = raw.match(/\[[\s\S]*\]/)?.[0];
-    if (!jsonText) return null;
-    const parsed = JSON.parse(jsonText);
-    if (!Array.isArray(parsed)) return null;
+    const parsed = parseItemArray(raw);
+    if (!parsed) {
+      console.error(`split: unparseable reply (${raw.length} chars), falling back to one row`);
+      return null;
+    }
     const items = parsed
       .map((v) => {
         const d = v as { title?: unknown; text?: unknown };
@@ -113,8 +179,13 @@ export async function splitIntoItems(
       .filter((v): v is SplitItem => v !== null)
       .slice(0, MAX_SPLIT_ITEMS);
     // One point isn't a split — the plain row already says it.
-    return items.length >= 2 ? items : null;
-  } catch {
+    if (items.length < 2) {
+      console.error(`split: ${items.length} usable item(s), falling back to one row`);
+      return null;
+    }
+    return items;
+  } catch (e) {
+    console.error("split: model call failed, falling back to one row:", e);
     return null;
   }
 }
@@ -373,6 +444,47 @@ export async function ingestCustomFile(
     console.error(`index custom source ${src.id} failed:`, e);
   }
   return null;
+}
+
+/**
+ * Delete ONE ingested item from a custom source. Ownership is enforced: the
+ * id must name a row marked `ingest:<sourceKey>`, so a forged or
+ * cross-source id — including ids of built-in tab rows — is refused rather
+ * than deleted. Chunks cascade with the row; dropOrigin retracts the
+ * entities and relations extracted from it (same rule as deleteSource /
+ * deletePhoto), so the agent genuinely forgets the item.
+ */
+export async function deleteIngestedItem(
+  sourceKey: string,
+  itemId: string,
+): Promise<string | null> {
+  const mark = ingestMark(sourceKey);
+  const [model, id] = itemId.split(":", 2);
+  if (!id) return `Not a deletable item id: "${itemId}".`;
+
+  if (model === "source") {
+    const row = await prisma.source.findUnique({ where: { id } });
+    if (!row || row.kind !== mark) return "That item doesn't belong to this source.";
+    await prisma.source.delete({ where: { id } }).catch(() => {});
+    try {
+      await dropOrigin("source", id);
+    } catch (e) {
+      console.error(`dropOrigin(source ${id}) failed:`, e);
+    }
+    return null;
+  }
+  if (model === "photo") {
+    const row = await prisma.photo.findUnique({ where: { id } });
+    if (!row || row.kind !== mark) return "That item doesn't belong to this source.";
+    await prisma.photo.delete({ where: { id } }).catch(() => {});
+    try {
+      await dropOrigin("photo", id);
+    } catch (e) {
+      console.error(`dropOrigin(photo ${id}) failed:`, e);
+    }
+    return null;
+  }
+  return `Not a deletable item id: "${itemId}".`;
 }
 
 /** Ingest an image into a custom source. Returns an error string or null. */

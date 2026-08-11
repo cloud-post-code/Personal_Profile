@@ -284,7 +284,7 @@
       "proof": "docs/features/split-ingest-items/PROOF.md",
       "priority": 9,
       "status": "passing",
-      "notes": "Splitting is pipeline behavior, not prompt behavior: every custom-source text ingest (file/url/paste) runs one split model call (claudeModel) that turns raw text into [{title,text}] items \u2014 the source's systemPrompt is only the LENS (default lens when empty). MAX_SPLIT_ITEMS=20, 24k input window; any failure or 0-1 items falls back to the single summarized row. Items are ingest:<key> rows tagged doc:<parent>, indexed individually; URL re-scans replace their items via exact JSON-quoted tag match with dropOrigin retraction (evaluator caught a prefix-match deletion bug + missing graph retraction; both repaired, sibling-URL regression assertion added). Builder prompt teaches describing ONE ITEM. Proof: 18 assertions red-first; live real-model check split a 3-initiative brief into 3 titled rows; evaluator FAIL\u2192repair\u2192PASS."
+      "notes": "Splitting is pipeline behavior, not prompt behavior: every custom-source text ingest (file/url/paste) runs one split model call (claudeModel) that turns raw text into [{title,text}] items \u2014 the source's systemPrompt is only the LENS (default lens when empty). MAX_SPLIT_ITEMS=20, 24k input window; any failure or 0-1 items falls back to the single summarized row. Items are ingest:<key> rows tagged doc:<parent>, indexed individually; URL re-scans replace their items via exact JSON-quoted tag match with dropOrigin retraction (evaluator caught a prefix-match deletion bug + missing graph retraction; both repaired, sibling-URL regression assertion added). Builder prompt teaches describing ONE ITEM. Proof: 18 assertions red-first; live real-model check split a 3-initiative brief into 3 titled rows; evaluator FAIL\u2192repair\u2192PASS. POST-SHIP FIX (user-reported: 16-page docx fell back to one blob): replies truncated by the token budget now SALVAGE their complete items (depth-counter array walk); the split budget is the model's full 64K ceiling via a streaming adapter (SDK requires streaming at that size; model stays Haiku); split failures are logged instead of silent. Proof grew to 19 assertions incl. truncated-array salvage; live dense-doc check splits into 6 items; evaluator PASS."
     },
     {
       "id": "per-source-split-mode",
@@ -305,6 +305,14 @@
       "title": "Agent Behavior: Goals and Rules pages feed the chatbot system prompt",
       "status": "done",
       "notes": "AgentDirective table (kind goal|rule), lib/directives.ts CRUD + prompt renderers, shared DirectivesPanel on the Goals/Rules tabs, GOALS section + RULES bullets in buildSystemPrompt. Proof: docs/features/agent-goals-rules/proof.ts (green). Verified live in browser."
+    },
+    {
+      "id": "delete-ingested-items",
+      "feature_dir": "docs/features/delete-ingested-items",
+      "proof": "docs/features/delete-ingested-items/PROOF.md",
+      "priority": 11,
+      "status": "passing",
+      "notes": "Every item on a custom source's tab has a Delete button. deleteIngestedItem enforces ownership (id must name a row marked ingest:<sourceKey> \u2014 forged/cross-source/builtin/unknown ids refused), deletes the Source/Photo row (chunks cascade) and retracts graph claims via dropOrigin, matching deleteSource/deletePhoto semantics. Admin-auth action; panel prop keeps proofs offline. Proof: 16 assertions red-first; evaluator PASS (re-ran proof)."
     }
   ]
 }
