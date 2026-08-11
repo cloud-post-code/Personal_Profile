@@ -9,6 +9,7 @@ import {
   unlockIngestionEditAction,
   updateIngestionSourceAction,
   deleteIngestionSourceAction,
+  setIngestionSourceHiddenAction,
 } from "../../actions";
 import { SourceBuilder } from "../../SourceBuilder";
 import { PendingButton } from "../../PendingButton";
@@ -166,6 +167,25 @@ export default async function EditIngestionSourcePage({
             </section>
           </details>
 
+          <section data-fill="surface" style={{ ...panel, marginTop: 24 }}>
+            <SectionTitle>Visibility</SectionTitle>
+            <p style={{ fontSize: 13, marginBottom: 12 }}>
+              {row.enabled
+                ? "Shown as a Content tab. Hiding takes it off the tab strip without touching anything it has ingested — hidden sources stay listed above the Content tabs with a Show button, so this is always reversible."
+                : "Hidden — not on the tab strip right now. Everything it ingested is untouched, and it stays listed above the Content tabs."}
+            </p>
+            <form action={setIngestionSourceHiddenAction}>
+              <input type="hidden" name="id" value={row.id} />
+              <input type="hidden" name="hidden" value={row.enabled ? "1" : ""} />
+              <PendingButton
+                pendingLabel={row.enabled ? "Hiding…" : "Showing…"}
+                style={btnGhost as React.CSSProperties}
+              >
+                {row.enabled ? "Hide from tab strip" : "Show on tab strip"}
+              </PendingButton>
+            </form>
+          </section>
+
           <section
             data-fill="surface"
             style={{
@@ -180,8 +200,8 @@ export default async function EditIngestionSourcePage({
               ingestion source <em>and everything it has ingested</em> —{" "}
               {itemCount} item{itemCount === 1 ? "" : "s"}, plus their knowledge
               chunks and graph claims. The agent forgets all of it. This cannot
-              be undone. If you just want it off the tab strip, hide it from the
-              dashboard instead.
+              be undone. If you just want it off the tab strip, use Visibility
+              above instead.
             </p>
             <form action={deleteIngestionSourceAction} style={{ display: "grid", gap: 10 }}>
               <input type="hidden" name="id" value={row.id} />

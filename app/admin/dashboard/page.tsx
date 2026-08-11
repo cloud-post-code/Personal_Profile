@@ -650,10 +650,8 @@ export default async function Dashboard({
       />
     );
   });
-  // Every ingestion page gets its edit button (config lives at
-  // /admin/sources/<key>, behind the local edit password) and a Hide button —
-  // hiding drops the tab from the strip without touching ingested data.
-  const sourceByKey = new Map(ingestionSources.map((s) => [s.key, s]));
+  // Every ingestion page gets its edit button — config (including hiding the
+  // tab) lives at /admin/sources/<key>, behind the local edit password.
   const contentTabs = contentTabsFromSources(ingestionSources, contentPanels).map((t) => ({
     ...t,
     content: (
@@ -667,24 +665,6 @@ export default async function Dashboard({
             marginBottom: 8,
           }}
         >
-          <form action={setIngestionSourceHiddenAction}>
-            <input type="hidden" name="id" value={sourceByKey.get(t.key)?.id ?? ""} />
-            <input type="hidden" name="hidden" value="1" />
-            <PendingButton
-              pendingLabel="Hiding…"
-              style={{
-                fontSize: 13,
-                textDecoration: "underline",
-                background: "none",
-                border: "none",
-                padding: 0,
-                cursor: "pointer",
-                color: "inherit",
-              }}
-            >
-              Hide
-            </PendingButton>
-          </form>
           <Link
             href={`/admin/sources/${t.key}`}
             style={{ fontSize: 13, textDecoration: "underline" }}
@@ -752,7 +732,9 @@ export default async function Dashboard({
                       color: "var(--on-surface)",
                     }}
                   >
-                    <span style={{ fontStyle: "italic" }}>Hidden:</span>
+                    <span style={{ fontStyle: "italic" }}>
+                      Hidden sources ({hiddenSources.length}):
+                    </span>
                     {hiddenSources.map((s) => (
                       <form
                         key={s.id}
