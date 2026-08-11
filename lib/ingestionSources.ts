@@ -214,6 +214,13 @@ export async function deleteIngestionSource(id: string) {
   await prisma.ingestionSource.delete({ where: { id } });
 }
 
+/** Hide (or show) a source's Content tab. Config and ingested data untouched. */
+export async function setIngestionSourceHidden(id: string, hidden: boolean): Promise<void> {
+  await prisma.ingestionSource
+    .update({ where: { id }, data: { enabled: !hidden } })
+    .catch(() => {});
+}
+
 /**
  * The seven built-in tabs, in display order. Seeded once into an empty table
  * (seedStarterIngestionSources); after that the rows are Blake's to edit or

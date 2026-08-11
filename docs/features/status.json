@@ -293,6 +293,18 @@
       "priority": 10,
       "status": "passing",
       "notes": "Splitting became a per-source choice: IngestionSource.splitMode ('split' default | 'single'), validated in saveIngestionSource, starters omit it so the DB default rules. All three text ingest paths skip the split pass entirely for 'single' sources (proof asserts the splitter client is never called \u2014 zero model spend). Exposed in the edit page and manual create form ('Items per upload' select), forwarded by all four save/update actions, carried in the builder draft (junk coerces to 'split') with the builder prompt teaching to set 'single' only when the admin asks ('keep each upload as one entry'); the test pane shows the mode. Proof: 13 assertions red-first; evaluator PASS (re-ran proof itself). Non-blocking edge recorded: flipping split\u2192single then re-scanning a URL leaves the old scan's split items alongside the new blob row."
+    },
+    {
+      "id": "delete-hide-ingestion-sources",
+      "title": "Delete an ingestion source (warning + full data purge) and hide/show sources",
+      "status": "done",
+      "notes": "Danger zone on /admin/sources/[key] behind the edit password: warning with live item count + required confirm checkbox; deleteIngestionSourceAndData purges the row and everything it ingested (Source/Photo/Project/Profile fields per ownership, chunks, graph claims via dropOrigin). Hide buttons on each Content tab + hidden-sources Show row on the dashboard toggle IngestionSource.enabled without touching data. Proof: docs/features/delete-hide-ingestion-sources/proof.ts (green); gate PASS; evaluator PASS."
+    },
+    {
+      "id": "agent-goals-rules",
+      "title": "Agent Behavior: Goals and Rules pages feed the chatbot system prompt",
+      "status": "done",
+      "notes": "AgentDirective table (kind goal|rule), lib/directives.ts CRUD + prompt renderers, shared DirectivesPanel on the Goals/Rules tabs, GOALS section + RULES bullets in buildSystemPrompt. Proof: docs/features/agent-goals-rules/proof.ts (green). Verified live in browser."
     }
   ]
 }

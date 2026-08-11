@@ -252,6 +252,25 @@ model CannedAnswer {
   updatedAt DateTime @updatedAt
 }
 
+/// One behavioral directive for the chatbot, written on the admin Agent
+/// Behavior tabs. `kind` is "goal" (an outcome to steer conversations toward)
+/// or "rule" (a hard constraint the bot must follow). Enabled rows are
+/// rendered into the system prompt by lib/directives.ts; disabled rows keep
+/// their text but are invisible to the prompt.
+model AgentDirective {
+  id        String   @id @default(cuid())
+  /// "goal" | "rule" — which Agent Behavior tab owns the row.
+  kind      String
+  text      String   @db.Text
+  /// Off without losing the text.
+  enabled   Boolean  @default(true)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([kind])
+}
+
 /// One A2UI card the admin curates: what it's called, which tool draws it,
 /// when the agent should reach for it, and a stored sample payload the admin
 /// tab renders as a preview. The starter set is seeded once into an empty

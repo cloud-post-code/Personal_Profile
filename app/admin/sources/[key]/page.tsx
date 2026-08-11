@@ -4,7 +4,12 @@ import { redirect, notFound } from "next/navigation";
 import { isAuthed } from "@/lib/auth";
 import { isEditAuthed } from "@/lib/ingestionAuth";
 import { getIngestionSource, UPLOAD_METHODS, STORAGE_KINDS } from "@/lib/ingestionSources";
-import { unlockIngestionEditAction, updateIngestionSourceAction } from "../../actions";
+import { listIngestedItems } from "@/lib/ingestedItems";
+import {
+  unlockIngestionEditAction,
+  updateIngestionSourceAction,
+  deleteIngestionSourceAction,
+} from "../../actions";
 import { SourceBuilder } from "../../SourceBuilder";
 import { PendingButton } from "../../PendingButton";
 import { ClassificationSelect } from "../../ClassificationSelect";
@@ -36,6 +41,9 @@ export default async function EditIngestionSourcePage({
   const row = await getIngestionSource(key);
   if (!row) notFound();
   const unlocked = await isEditAuthed();
+  // How much the Danger zone's delete would destroy — counted lazily so a
+  // locked page never pays for it.
+  const itemCount = unlocked ? (await listIngestedItems(row.key)).length : 0;
 
   return (
     <main
@@ -157,6 +165,46 @@ export default async function EditIngestionSourcePage({
               </form>
             </section>
           </details>
+
+          <section
+            data-fill="surface"
+            style={{
+              ...panel,
+              marginTop: 24,
+              border: "1px solid var(--danger, #b00020)",
+            }}
+          >
+            <SectionTitle>Danger zone</SectionTitle>
+            <p style={{ fontSize: 13, marginBottom: 12 }}>
+              <strong>Warning:</strong> deleting “{row.label}” permanently removes this
+              ingestion source <em>and everything it has ingested</em> —{" "}
+              {itemCount} item{itemCount === 1 ? "" : "s"}, plus their knowledge
+              chunks and graph claims. The agent forgets all of it. This cannot
+              be undone. If you just want it off the tab strip, hide it from the
+              dashboard instead.
+            </p>
+            <form action={deleteIngestionSourceAction} style={{ display: "grid", gap: 10 }}>
+              <input type="hidden" name="id" value={row.id} />
+              <input type="hidden" name="key" value={row.key} />
+              <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>
+                <input type="checkbox" name="confirm" required />
+                I understand this deletes the source and all {itemCount} ingested
+                item{itemCount === 1 ? "" : "s"}, permanently.
+              </label>
+              <PendingButton
+                pendingLabel="Deleting…"
+                style={{
+                  ...(btn as React.CSSProperties),
+                  background: "var(--danger, #b00020)",
+                  borderColor: "var(--danger, #b00020)",
+                  color: "#fff",
+                  justifySelf: "start",
+                }}
+              >
+                Delete source and all its data
+              </PendingButton>
+            </form>
+          </section>
         </>
       )}
     </main>

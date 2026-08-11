@@ -1,5 +1,6 @@
 import { prisma, getProfile } from "./db";
 import { personaPromptBlock } from "./persona";
+import { goalsPromptSection, rulesPromptLines } from "./directives";
 import { retrieve, formatContext } from "./retrieval/search";
 import { broadOverviews } from "./retrieval/clusters";
 import { googleConfigured } from "./google";
@@ -20,7 +21,7 @@ import { cardCatalog, toolUsableNow, type CardGuidance } from "./uiCards";
  * "when to show it" text becomes a line of the USING RICH CARDS section.
  */
 export async function buildSystemPrompt(query?: string): Promise<string> {
-  const [profile, projects, photos, corrections, chunkCount] = await Promise.all([
+  const [profile, projects, photos, corrections, chunkCount, directives] = await Promise.all([
     getProfile(),
     prisma.project.findMany({ orderBy: { order: "asc" } }),
     // The prompt's gallery listing is curated photos only; custom-ingested
@@ -38,6 +39,12 @@ export async function buildSystemPrompt(query?: string): Promise<string> {
       select: { note: true },
     }),
     prisma.chunk.count(),
+    // Goals and rules from the Agent Behavior tabs. One fetch for both kinds;
+    // the renderers below split them.
+    prisma.agentDirective.findMany({
+      where: { enabled: true },
+      orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+    }),
   ]);
 
   // Just the index — id, name and links. Every project's blurb and write-up is
@@ -116,13 +123,13 @@ KNOWLEDGE FOR THIS QUESTION (retrieved from everything Blake curates — his
 profile and experience, persona, project write-ups, photo descriptions, saved
 sources, and answers he approved. Each block is labelled with where it came
 from):
-${sourceBlock}${cardRulesSection(cards)}
+${sourceBlock}${cardRulesSection(cards)}${goalsPromptSection(directives)}
 
 RULES:
 - Only state facts present above. If you don't know, say so warmly and point them to how they can connect with Blake directly.
 - For questions about Blake's history, background, or opinions, synthesize naturally from the KNOWLEDGE section — that's where his bio, experience and detail live now.
 - Keep answers concise and conversational.
-- Never invent projects, jobs, dates, or credentials.${correctionBlock}`;
+- Never invent projects, jobs, dates, or credentials.${rulesPromptLines(directives)}${correctionBlock}`;
 }
 
 /**

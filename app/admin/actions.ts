@@ -33,8 +33,15 @@ import {
   indexApprovedAnswer,
 } from "@/lib/retrieval/origins";
 import { saveCannedAnswer, deleteCannedAnswer } from "@/lib/canned";
+import {
+  saveDirective,
+  deleteDirective,
+  DIRECTIVE_KINDS,
+  type DirectiveKind,
+} from "@/lib/directives";
 import { saveUiCard, deleteUiCard } from "@/lib/uiCards";
-import { saveIngestionSource } from "@/lib/ingestionSources";
+import { saveIngestionSource, setIngestionSourceHidden } from "@/lib/ingestionSources";
+import { deleteIngestionSourceAndData } from "@/lib/ingestedItems";
 import {
   ingestCustomText,
   ingestCustomImage,
@@ -745,6 +752,30 @@ export async function deleteCanned(formData: FormData) {
   revalidatePath("/admin/dashboard");
 }
 
+// ── Agent directives (Goals / Rules tabs) ───────────────────────────────────
+// Thin auth wrappers; the logic lives in lib/directives.ts so it stays testable.
+
+export async function saveDirectiveAction(formData: FormData) {
+  await requireAuth();
+  const kind = String(formData.get("kind") ?? "");
+  if (!DIRECTIVE_KINDS.includes(kind as DirectiveKind)) return;
+  await saveDirective({
+    id: String(formData.get("id") ?? "").trim() || undefined,
+    kind: kind as DirectiveKind,
+    text: String(formData.get("text") ?? ""),
+    enabled: formData.get("enabled") === "on",
+    order: Number(formData.get("order") ?? 0) || 0,
+  });
+  revalidatePath("/admin/dashboard");
+}
+
+export async function deleteDirectiveAction(formData: FormData) {
+  await requireAuth();
+  const id = String(formData.get("id") ?? "").trim();
+  if (id) await deleteDirective(id);
+  revalidatePath("/admin/dashboard");
+}
+
 /**
  * Throw away a row's text and write a fresh draft. Best-effort like the
  * indexing wrappers above: a provider failure leaves the existing text in place
@@ -954,6 +985,34 @@ export async function unlockIngestionEditAction(formData: FormData) {
   }
   await createEditSession();
   redirect(`/admin/sources/${key}`);
+}
+
+/**
+ * Delete an ingestion source AND everything it ingested. Destructive, so it
+ * keeps the edit-password gate on top of admin auth; the edit page's Danger
+ * zone is the only caller and requires an explicit confirmation checkbox.
+ */
+export async function deleteIngestionSourceAction(formData: FormData) {
+  await requireAuth();
+  const key = String(formData.get("key") ?? "");
+  await requireEditAuth(key);
+  // The checkbox is `required` client-side; re-check server-side so a raw
+  // POST can't skip the confirmation.
+  if (formData.get("confirm") !== "on") {
+    redirect(`/admin/sources/${key}?error=${encodeURIComponent("Tick the confirmation box to delete this source.")}`);
+  }
+  const id = String(formData.get("id") ?? "");
+  if (id) await deleteIngestionSourceAndData(id);
+  revalidateAll();
+  redirect("/admin/dashboard?tab=content");
+}
+
+/** Hide or show a source's Content tab. Reversible, so admin auth suffices. */
+export async function setIngestionSourceHiddenAction(formData: FormData) {
+  await requireAuth();
+  const id = String(formData.get("id") ?? "");
+  if (id) await setIngestionSourceHidden(id, formData.get("hidden") === "1");
+  revalidateAll();
 }
 
 /** Save edits to an existing ingestion source (config, not content). */

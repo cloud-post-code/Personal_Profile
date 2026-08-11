@@ -29,12 +29,15 @@ import {
   ingestCustomImageAction,
   ingestCustomUrlAction,
   ingestCustomFileAction,
+  setIngestionSourceHiddenAction,
 } from "../actions";
 import { KnowledgePanel, isDocSource } from "../KnowledgePanel";
 import { GithubImport } from "../GithubImport";
 import { GraphPanel } from "../GraphPanel";
 import { AnswersPanel } from "../AnswersPanel";
 import { A2uiPanel } from "../A2uiPanel";
+import { DirectivesPanel } from "../DirectivesPanel";
+import { listDirectives } from "@/lib/directives";
 import { listUiCards } from "@/lib/uiCards";
 import { PersonaPrompt } from "../PersonaPrompt";
 import { personaExtractionPrompt } from "@/lib/personaPrompt";
@@ -84,6 +87,8 @@ export default async function Dashboard({
     canned,
     uiCards,
     ingestionSources,
+    goalRows,
+    ruleRows,
   ] = await Promise.all([
       getProfile(),
       prisma.project.findMany({ orderBy: { order: "asc" } }),
@@ -119,6 +124,8 @@ export default async function Dashboard({
         .then(listCannedAnswers),
       listUiCards(),
       listIngestionSources(),
+      listDirectives("goal"),
+      listDirectives("rule"),
     ]);
   // ?tab= deep links resolve against the live source keys so custom tabs
   // deep-link too; every non-content key targets its own nav entry.
@@ -613,27 +620,8 @@ export default async function Dashboard({
   );
 
   // ── AGENT BEHAVIOR TAB — how the chatbot answers and acts ──
-  const goalsTab = (
-    <section data-fill="surface" style={panel}>
-      <SectionTitle>Goals</SectionTitle>
-      <p style={{ color: "var(--on-surface)", fontStyle: "italic", fontSize: 13, marginBottom: 14 }}>
-        What the chatbot should steer conversations toward — the outcomes you
-        want from a visitor chat.
-      </p>
-      <Empty>Nothing here yet. Goals you add will appear here.</Empty>
-    </section>
-  );
-
-  const rulesTab = (
-    <section data-fill="surface" style={panel}>
-      <SectionTitle>Rules</SectionTitle>
-      <p style={{ color: "var(--on-surface)", fontStyle: "italic", fontSize: 13, marginBottom: 14 }}>
-        Hard rules the chatbot must follow — things it should always or never do,
-        regardless of what a visitor asks.
-      </p>
-      <Empty>Nothing here yet. Rules you add will appear here.</Empty>
-    </section>
-  );
+  const goalsTab = <DirectivesPanel kind="goal" rows={goalRows} />;
+  const rulesTab = <DirectivesPanel kind="rule" rows={ruleRows} />;
 
   // Which Content tabs exist, their labels, and their order all come from the
   // IngestionSource rows; built-in keys dispatch to their bespoke panels.
@@ -662,13 +650,41 @@ export default async function Dashboard({
       />
     );
   });
-  // Every ingestion page gets its edit button: config lives at
-  // /admin/sources/<key>, behind the local edit password.
+  // Every ingestion page gets its edit button (config lives at
+  // /admin/sources/<key>, behind the local edit password) and a Hide button —
+  // hiding drops the tab from the strip without touching ingested data.
+  const sourceByKey = new Map(ingestionSources.map((s) => [s.key, s]));
   const contentTabs = contentTabsFromSources(ingestionSources, contentPanels).map((t) => ({
     ...t,
     content: (
       <>
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            alignItems: "center",
+            gap: 14,
+            marginBottom: 8,
+          }}
+        >
+          <form action={setIngestionSourceHiddenAction}>
+            <input type="hidden" name="id" value={sourceByKey.get(t.key)?.id ?? ""} />
+            <input type="hidden" name="hidden" value="1" />
+            <PendingButton
+              pendingLabel="Hiding…"
+              style={{
+                fontSize: 13,
+                textDecoration: "underline",
+                background: "none",
+                border: "none",
+                padding: 0,
+                cursor: "pointer",
+                color: "inherit",
+              }}
+            >
+              Hide
+            </PendingButton>
+          </form>
           <Link
             href={`/admin/sources/${t.key}`}
             style={{ fontSize: 13, textDecoration: "underline" }}
@@ -680,6 +696,10 @@ export default async function Dashboard({
       </>
     ),
   }));
+
+  // Hidden sources stay reachable: listed above the tab strip with a Show
+  // button each, so hiding is always reversible from the dashboard.
+  const hiddenSources = ingestionSources.filter((s) => !s.enabled);
 
   return (
     <main style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 20px 80px" }}>
@@ -720,12 +740,55 @@ export default async function Dashboard({
             label: "Content",
             content: (
               <>
-                <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-                  <Link href="/admin/sources/new" style={btnGhost as React.CSSProperties}>
-                    + New ingestion source
-                  </Link>
-                </div>
-                <SubTabs initial={initialSub} tabs={contentTabs} />
+                {hiddenSources.length > 0 ? (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      flexWrap: "wrap",
+                      gap: 10,
+                      marginBottom: 10,
+                      fontSize: 13,
+                      color: "var(--on-surface)",
+                    }}
+                  >
+                    <span style={{ fontStyle: "italic" }}>Hidden:</span>
+                    {hiddenSources.map((s) => (
+                      <form
+                        key={s.id}
+                        action={setIngestionSourceHiddenAction}
+                        style={{ display: "flex", alignItems: "center", gap: 4 }}
+                      >
+                        <input type="hidden" name="id" value={s.id} />
+                        <input type="hidden" name="hidden" value="" />
+                        <span>{s.label}</span>
+                        <PendingButton
+                          pendingLabel="…"
+                          style={{
+                            fontSize: 13,
+                            textDecoration: "underline",
+                            background: "none",
+                            border: "none",
+                            padding: 0,
+                            cursor: "pointer",
+                            color: "inherit",
+                          }}
+                        >
+                          (show)
+                        </PendingButton>
+                      </form>
+                    ))}
+                  </div>
+                ) : null}
+                <SubTabs
+                  initial={initialSub}
+                  tabs={contentTabs}
+                  trailing={
+                    <Link href="/admin/sources/new" style={btnGhost as React.CSSProperties}>
+                      + New ingestion source
+                    </Link>
+                  }
+                />
               </>
             ),
           },

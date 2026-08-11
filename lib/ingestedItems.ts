@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/db";
+import { dropOrigin } from "@/lib/retrieval/indexer";
+import { indexProfile, indexPersona } from "@/lib/retrieval/origins";
 
 /**
  * The one uniform read path over everything the ingestion sources have
@@ -81,6 +83,116 @@ function sourceRows(rows: Array<{ id: string; title: string | null; url: string 
       s.createdAt,
     ),
   );
+}
+
+/**
+ * Delete a source AND everything it ingested (rows, chunks, graph claims) —
+ * the destructive path behind the edit page's Danger zone. Missing id is a
+ * no-op so a double-submit can't crash. Data first, row last: if the purge
+ * dies partway the tab survives to show what's left and be retried.
+ *
+ * Lives here, not in lib/ingestionSources.ts — that module is imported by
+ * client components, and this one pulls in the retrieval stack (Node-only).
+ */
+export async function deleteIngestionSourceAndData(id: string): Promise<void> {
+  const row = await prisma.ingestionSource.findUnique({ where: { id } });
+  if (!row) return;
+  await deleteIngestedData(row.key);
+  await prisma.ingestionSource.delete({ where: { id } }).catch(() => {});
+}
+
+/**
+ * Delete everything a source has ingested — the destructive mirror of
+ * `listIngestedItems`, keyed by the same ownership rules. Rows are deleted
+ * first (the retraction the admin asked for must not be lost to an indexing
+ * hiccup); chunk/graph retraction via dropOrigin is best-effort, like every
+ * other admin save's indexing.
+ *
+ * Deliberately does NOT delete uploaded files from the upload volume —
+ * `deletePhoto` keeps files too; rows and index entries are what retrieval
+ * and the admin read.
+ */
+export async function deleteIngestedData(sourceKey: string): Promise<void> {
+  const drop = async (kind: string, id: string) => {
+    try {
+      await dropOrigin(kind, id);
+    } catch (e) {
+      console.error(`drop ${kind} ${id} failed:`, e);
+    }
+  };
+  const reindex = async (label: string, run: () => Promise<void>) => {
+    try {
+      await run();
+    } catch (e) {
+      console.error(`reindex ${label} failed:`, e);
+    }
+  };
+
+  switch (sourceKey) {
+    case "experience": {
+      await prisma.profile.updateMany({
+        where: { id: 1 },
+        data: { experience: "[]", experienceSummary: "" },
+      });
+      // Re-index what's left of the profile (bio etc.); an empty profile
+      // retracts its origin entirely inside indexOrigin.
+      await reindex("profile", () => indexProfile());
+      return;
+    }
+    case "persona": {
+      await prisma.profile.updateMany({ where: { id: 1 }, data: { personaSections: "{}" } });
+      // The persona sweep drops every origin the (now empty) persona no
+      // longer asserts.
+      await reindex("persona", () => indexPersona());
+      return;
+    }
+    case "projects": {
+      const projects = await prisma.project.findMany({ select: { id: true } });
+      await prisma.project.deleteMany({});
+      for (const p of projects) await drop("project", p.id);
+      return;
+    }
+    case "photos": {
+      const photos = await prisma.photo.findMany({
+        where: { NOT: { kind: { startsWith: "ingest:" } } },
+        select: { id: true },
+      });
+      await prisma.photo.deleteMany({
+        where: { id: { in: photos.map((p) => p.id) } },
+      });
+      for (const p of photos) await drop("photo", p.id);
+      return;
+    }
+    case "links":
+    case "pdfs":
+    case "text": {
+      const typeFilter =
+        sourceKey === "links"
+          ? { type: "link" }
+          : sourceKey === "text"
+            ? { type: "text" }
+            : { type: { in: ["pdf", "doc"] } };
+      const where = { ...typeFilter, NOT: { kind: { startsWith: "ingest:" } } };
+      const rows = await prisma.source.findMany({ where, select: { id: true } });
+      // Chunks cascade with the Source rows; dropOrigin retracts graph claims.
+      await prisma.source.deleteMany({ where: { id: { in: rows.map((r) => r.id) } } });
+      for (const r of rows) await drop("source", r.id);
+      return;
+    }
+    default: {
+      // Custom sources own exactly the rows they marked.
+      const mark = ingestMark(sourceKey);
+      const [texts, photos] = await Promise.all([
+        prisma.source.findMany({ where: { kind: mark }, select: { id: true } }),
+        prisma.photo.findMany({ where: { kind: mark }, select: { id: true } }),
+      ]);
+      await prisma.source.deleteMany({ where: { kind: mark } });
+      await prisma.photo.deleteMany({ where: { kind: mark } });
+      for (const t of texts) await drop("source", t.id);
+      for (const p of photos) await drop("photo", p.id);
+      return;
+    }
+  }
 }
 
 /** Everything a source has ingested, as uniform text/image items. */
