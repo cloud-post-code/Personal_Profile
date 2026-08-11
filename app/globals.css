@@ -291,3 +291,50 @@ select {
     border-color: var(--border);
   }
 }
+
+/* ── Blog ── long-form post body, rendered by app/blog/BlogMarkdown.tsx. */
+.blog-body {
+  line-height: 1.7;
+  font-size: 17px;
+}
+.blog-body p {
+  margin: 0 0 18px;
+}
+.blog-body h2 {
+  margin: 36px 0 14px;
+  font-size: 26px;
+}
+.blog-body h3 {
+  margin: 28px 0 12px;
+  font-size: 21px;
+}
+.blog-body h4 {
+  margin: 22px 0 10px;
+  font-size: 18px;
+}
+.blog-body ul,
+.blog-body ol {
+  margin: 0 0 18px;
+  padding-left: 26px;
+}
+.blog-body li {
+  margin-bottom: 8px;
+}
+.blog-body blockquote {
+  margin: 0 0 18px;
+  padding: 12px 18px;
+  border-left: 3px solid var(--primary);
+  background: var(--bg-soft);
+  border-radius: var(--radius-sm);
+}
+.blog-code {
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+  font-size: 0.92em;
+}
+.blog-link {
+  color: var(--accent-on-bg);
+  text-decoration: underline;
+}
