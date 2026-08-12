@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { safeCardHtml } from "@/lib/uiCards";
 
 /**
  * The ingestion-source catalog: one row per Content tab, holding the source's
@@ -61,6 +62,7 @@ export type IngestionSourceRow = {
   uploadMethod: string;
   storageKinds: string;
   splitMode: string;
+  panelHtml: string;
   classification: string;
   outputMethod: string;
   builtin: boolean;
@@ -133,6 +135,7 @@ export async function saveIngestionSource(input: {
   uploadMethod: string;
   storageKinds: string;
   splitMode?: string;
+  panelHtml?: string;
   classification?: string;
   outputMethod: string;
   enabled?: boolean;
@@ -149,6 +152,13 @@ export async function saveIngestionSource(input: {
   const splitMode = input.splitMode ?? "split";
   if (!(SPLIT_MODES as readonly string[]).includes(splitMode)) {
     return `Unknown split mode "${splitMode}". One of: ${SPLIT_MODES.join(", ")}.`;
+  }
+  const panelHtml = (input.panelHtml ?? "").trim();
+  if (panelHtml && !safeCardHtml(panelHtml)) {
+    return (
+      "Page code must be plain HTML with inline CSS — no scripts, forms, " +
+      "iframes, or event handlers, and at most 40KB."
+    );
   }
   const classification = input.classification ?? "public";
   if (!(CLASSIFICATIONS as readonly string[]).includes(classification)) {
@@ -189,6 +199,7 @@ export async function saveIngestionSource(input: {
     uploadMethod: input.uploadMethod,
     storageKinds: input.storageKinds,
     splitMode,
+    panelHtml,
     classification,
     outputMethod: input.outputMethod.trim(),
     enabled: input.enabled ?? true,
@@ -231,7 +242,7 @@ export async function setIngestionSourceHidden(id: string, hidden: boolean): Pro
 export const STARTER_INGESTION_SOURCES: Array<
   Omit<
     IngestionSourceRow,
-    "id" | "enabled" | "builtin" | "classification" | "splitMode" | "createdAt" | "updatedAt"
+    "id" | "enabled" | "builtin" | "classification" | "splitMode" | "panelHtml" | "createdAt" | "updatedAt"
   > & { builtin: true }
 > = [
   {

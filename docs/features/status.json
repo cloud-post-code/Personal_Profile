@@ -321,6 +321,14 @@
       "priority": 12,
       "status": "passing",
       "notes": "Custom source tabs paginate their item lists: app/admin/Paginated.tsx (client, 10/page, Prev/Next, 'Page X of Y \u00b7 N items', clamped page index so deleting on the last page can't strand the view) wraps GenericIngestPanel's server-rendered rows \u2014 per-item server-action forms pass through the client boundary as rendered nodes, so Delete keeps working. One page or fewer renders the bare list, pixel-identical to before. Proof: 13 assertions red-first; live check: 14-item source showed 10 + 'Page 1 of 2 \u00b7 14 items', Next revealed 11\u201314; evaluator PASS (re-ran proof + tsc)."
+    },
+    {
+      "id": "custom-panel-code",
+      "feature_dir": "docs/features/custom-panel-code",
+      "proof": "docs/features/custom-panel-code/PROOF.md",
+      "priority": 13,
+      "status": "passing",
+      "notes": "Ingestion pages are vibe-codeable: IngestionSource.panelHtml holds custom HTML+inline-CSS for the tab, validated by the cards' safeCardHtml at every save (script/form/iframe/on*=/40KB rejected) and rendered in the same sealed sandbox as coded cards (CSP default-src 'none', no scripts, theme vars injected). {{items}} is substituted server-side with fully escaped item content (quotes incl.; images only from /api/uploads/; function-replacement so $-patterns in content can't splice the template). Empty = default page, byte-identical. Builder chat generates/refines it (only when asked; unsafe model output drops to ''; 8K-token budget), test pane previews live, edit-mode carries existing code, manual textareas on create/edit. Native ingest forms stay; item management folds into a drawer. Proof: 21 assertions red-first; live board-style page verified; evaluator PASS (re-ran proof), its two hardening suggestions applied."
     }
   ]
 }

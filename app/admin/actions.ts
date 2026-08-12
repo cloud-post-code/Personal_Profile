@@ -839,6 +839,7 @@ export async function createIngestionSourceAction(formData: FormData) {
     uploadMethod: String(formData.get("uploadMethod") ?? "generic"),
     storageKinds: String(formData.get("storageKinds") ?? "text"),
     splitMode: String(formData.get("splitMode") ?? "split"),
+    panelHtml: String(formData.get("panelHtml") ?? ""),
     classification: String(formData.get("classification") ?? "public"),
     outputMethod:
       String(formData.get("outputMethod") ?? "").trim() ||
@@ -915,6 +916,7 @@ export async function saveBuiltSourceAction(draft: {
   uploadMethod: string;
   storageKinds: string;
   splitMode?: string;
+  panelHtml?: string;
   classification?: string;
   outputMethod: string;
 }): Promise<{ ok: boolean; error?: string; key?: string }> {
@@ -927,6 +929,7 @@ export async function saveBuiltSourceAction(draft: {
     uploadMethod: draft.uploadMethod,
     storageKinds: draft.storageKinds,
     splitMode: draft.splitMode,
+    panelHtml: draft.panelHtml,
     classification: draft.classification,
     outputMethod: draft.outputMethod,
   });
@@ -953,6 +956,7 @@ export async function updateBuiltSourceAction(draft: {
   uploadMethod: string;
   storageKinds: string;
   splitMode?: string;
+  panelHtml?: string;
   classification?: string;
   outputMethod: string;
 }): Promise<{ ok: boolean; error?: string; key?: string }> {
@@ -971,6 +975,7 @@ export async function updateBuiltSourceAction(draft: {
     uploadMethod: draft.uploadMethod,
     storageKinds: draft.storageKinds,
     splitMode: draft.splitMode,
+    panelHtml: draft.panelHtml,
     classification: draft.classification,
     outputMethod: draft.outputMethod,
     enabled: existing.enabled,
@@ -1040,6 +1045,7 @@ export async function updateIngestionSourceAction(formData: FormData) {
     uploadMethod: String(formData.get("uploadMethod") ?? "generic"),
     storageKinds: String(formData.get("storageKinds") ?? "text"),
     splitMode: String(formData.get("splitMode") ?? "split"),
+    panelHtml: String(formData.get("panelHtml") ?? ""),
     classification: String(formData.get("classification") ?? "public"),
     outputMethod: String(formData.get("outputMethod") ?? ""),
     enabled: formData.get("enabled") === "on",

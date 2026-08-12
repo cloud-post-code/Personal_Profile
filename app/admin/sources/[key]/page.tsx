@@ -98,6 +98,7 @@ export default async function EditIngestionSourcePage({
               uploadMethod: row.uploadMethod,
               storageKinds: row.storageKinds,
               splitMode: row.splitMode,
+              panelHtml: row.panelHtml,
               classification: row.classification,
               outputMethod: row.outputMethod,
             }}
@@ -144,6 +145,14 @@ export default async function EditIngestionSourcePage({
               <option value="split">split — one item per point (default)</option>
               <option value="single">single — keep each upload as one item</option>
             </select>
+            <Label>Page code (advanced, optional — HTML with a {"{{items}}"} placeholder)</Label>
+            <textarea
+              name="panelHtml"
+              rows={6}
+              defaultValue={row.panelHtml}
+              placeholder="Custom HTML for this tab; leave empty for the default page."
+              style={field as React.CSSProperties}
+            />
                 <Label>Output (where ingested data lands)</Label>
                 <input name="outputMethod" defaultValue={row.outputMethod} style={field as React.CSSProperties} />
                 <Label>Display order (lower comes first in the tab strip)</Label>

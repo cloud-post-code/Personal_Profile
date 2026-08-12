@@ -86,6 +86,14 @@ export default async function NewIngestionSourcePage({
               <option value="split">split — one item per point (default)</option>
               <option value="single">single — keep each upload as one item</option>
             </select>
+            <Label>Page code (advanced, optional — HTML with a {"{{items}}"} placeholder)</Label>
+            <textarea
+              name="panelHtml"
+              rows={6}
+              defaultValue=""
+              placeholder="Custom HTML for this tab; leave empty for the default page."
+              style={field as React.CSSProperties}
+            />
             <Label>Output (where ingested data lands)</Label>
             <input
               name="outputMethod"

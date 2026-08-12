@@ -12,6 +12,7 @@ import {
   type SplitMode,
 } from "@/lib/ingestionSources";
 import { saveBuiltSourceAction, updateBuiltSourceAction } from "./actions";
+import { PanelHtml } from "./PanelHtml";
 import { ClassificationSelect } from "./ClassificationSelect";
 import { panel, field, btn, btnGhost, SectionTitle, Label } from "./ui";
 
@@ -41,6 +42,7 @@ export type SourceBuilderInitial = {
   uploadMethod: string;
   storageKinds: string;
   splitMode: string;
+  panelHtml: string;
   classification: string;
   outputMethod: string;
 };
@@ -61,6 +63,9 @@ function draftFrom(initial: SourceBuilderInitial): SourceDraft {
     splitMode: (SPLIT_MODES as readonly string[]).includes(initial.splitMode)
       ? (initial.splitMode as SplitMode)
       : "split",
+    // Stored page code was validated at save; carry it into the chat so
+    // "make the header bigger" refines rather than starts over.
+    panelHtml: initial.panelHtml,
     outputMethod: initial.outputMethod,
   };
 }
@@ -197,6 +202,28 @@ export function SourceBuilder({ initial }: { initial?: SourceBuilderInitial }) {
       ? "one item per upload — documents are kept whole"
       : "splits each upload into one item per point";
 
+  // Live preview of the draft's custom page code, with the TEST items
+  // substituted — same escaping rules as the real panel.
+  const esc = (v: string) =>
+    v
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  const testItemsHtml = testItems
+    .map((it) => {
+      const img = it.imageUrl
+        ? `<img src="${esc(it.imageUrl)}" alt="${esc(it.title)}" style="max-width:180px;border-radius:6px;display:block;margin-bottom:6px;">`
+        : "";
+      const text = it.text ? `<p style="margin:4px 0 0;">${esc(it.text)}</p>` : "";
+      return `<div style="margin-bottom:10px;">${img}<strong>${esc(it.title)}</strong>${text}</div>`;
+    })
+    .join("") || '<p style="opacity:.6">Ingested items will appear here.</p>';
+  const pagePreview = draft?.panelHtml
+    ? draft.panelHtml.replaceAll("{{items}}", () => testItemsHtml)
+    : "";
+
   return (
     <div
       style={{
@@ -278,6 +305,7 @@ export function SourceBuilder({ initial }: { initial?: SourceBuilderInitial }) {
           <div style={{ marginTop: 10 }}>
             <h3 style={{ fontSize: 18, marginBottom: 4 }}>{draft.label}</h3>
             <p style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>Mode: {modeNote}</p>
+            {pagePreview ? <PanelHtml html={pagePreview} height={360} /> : null}
             {draft.description ? (
               <p style={{ fontSize: 13, fontStyle: "italic", marginBottom: 8 }}>{draft.description}</p>
             ) : null}

@@ -55,7 +55,7 @@ async function main() {
       id: "x", key: "proof-pag", label: "Proof PAG", description: "", systemPrompt: "",
       uploadMethod: "generic", storageKinds: "text", outputMethod: "",
       builtin: false, enabled: true, order: 0, classification: "public",
-      splitMode: "split", createdAt: new Date(0), updatedAt: new Date(0),
+      splitMode: "split", panelHtml: "", createdAt: new Date(0), updatedAt: new Date(0),
     };
     const items = Array.from({ length: 25 }, (_, i) => ({
       kind: "text" as const, id: `source:it${i + 1}`, sourceKey: "proof-pag",

@@ -1,4 +1,5 @@
 import { claude, cardBuilderModel } from "@/lib/claude";
+import { safeCardHtml } from "@/lib/uiCards";
 import {
   UPLOAD_METHODS,
   STORAGE_KINDS,
@@ -29,6 +30,8 @@ export type SourceDraft = {
   uploadMethod: UploadMethod;
   storageKinds: StorageKinds;
   splitMode: SplitMode;
+  /** Optional custom page code for the tab; "" = the default page. */
+  panelHtml: string;
   outputMethod: string;
 };
 
@@ -65,6 +68,13 @@ a Content tab that ingests information for the site's chatbot. A source has:
   into one item per point) or "single" (each upload stays ONE item). Set
   "single" only when the admin says so ("keep each upload as one entry",
   "don't split these", "one card per document").
+- panelHtml: OPTIONAL custom page code for the tab — plain HTML with inline
+  CSS only, put {{items}} exactly where the ingested items should appear.
+  No <script>, <form>, <iframe>, event handlers, or external resources;
+  keep it under 40KB. Generate it ONLY when the admin asks for a custom
+  layout or design ("make it look like a clippings board"); otherwise send
+  "" — the default page is used. Refine the existing code when the admin
+  asks for tweaks.
 - storageKinds: one of ${STORAGE_KINDS.join(", ")} — every ingested piece is
   stored as text or as an image; default "text" unless images are wanted
 - outputMethod: where the data lands; custom sources use
@@ -100,6 +110,10 @@ function validateDraft(v: unknown): SourceDraft | null {
   const splitMode = (SPLIT_MODES as readonly string[]).includes(str(d.splitMode))
     ? (str(d.splitMode) as SplitMode)
     : "split";
+  // Generated page code is model output: anything unsafe drops to "" (the
+  // default page) rather than surviving to the save.
+  const rawPanel = str(d.panelHtml);
+  const panelHtml = rawPanel && safeCardHtml(rawPanel) ? rawPanel : "";
   return {
     label,
     key: str(d.key),
@@ -108,6 +122,7 @@ function validateDraft(v: unknown): SourceDraft | null {
     uploadMethod,
     storageKinds,
     splitMode,
+    panelHtml,
     outputMethod:
       str(d.outputMethod) || "Source/Photo rows, read back as unified text/image items",
   };
@@ -133,7 +148,8 @@ export async function draftIngestionSource(
   try {
     const res = await client.messages.create({
       model: cardBuilderModel(),
-      max_tokens: 1500,
+      // Page code (panelHtml) can be sizeable; give the JSON room.
+      max_tokens: 8000,
       system: SYSTEM,
       messages,
     });

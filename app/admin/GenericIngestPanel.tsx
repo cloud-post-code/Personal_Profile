@@ -3,6 +3,7 @@ import { panel, field, btn, SectionTitle, Label, Stamp } from "./ui";
 import { PendingButton } from "./PendingButton";
 import { ingestFormsFor, type IngestionSourceRow } from "@/lib/ingestionSources";
 import { Paginated } from "./Paginated";
+import { PanelHtml } from "./PanelHtml";
 import type { IngestedItem } from "@/lib/ingestedItems";
 
 /**
@@ -38,6 +39,82 @@ export function GenericIngestPanel({
   // The upload method decides which controls appear; storage kinds gate them.
   const forms = ingestFormsFor(row.uploadMethod, row.storageKinds);
   const noForms = !forms.url && !forms.docFile && !forms.textarea && !forms.image;
+
+  // Custom page code: substitute {{items}} server-side. Item text is
+  // HTML-escaped (the code is trusted-validated; the CONTENT never is), and
+  // images render only from our own uploads route.
+  const esc = (v: string) =>
+    v
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  const itemsHtml = items
+    .map((it) => {
+      const img =
+        it.kind === "image" && it.imageUrl && it.imageUrl.startsWith("/api/uploads/")
+          ? `<img src="${esc(it.imageUrl)}" alt="${esc(it.title)}" style="max-width:180px;border-radius:6px;display:block;margin-bottom:6px;">`
+          : "";
+      const text = it.text ? `<p style="margin:4px 0 0;">${esc(it.text)}</p>` : "";
+      return `<div class="ingested-item" style="margin-bottom:10px;">${img}<strong>${esc(it.title)}</strong>${text}</div>`;
+    })
+    .join("");
+  const customPage = row.panelHtml.trim()
+    ? row.panelHtml.replaceAll("{{items}}", () => itemsHtml)
+    : "";
+  const itemList =
+    items.length === 0 ? (
+          <p style={{ fontSize: 13, fontStyle: "italic", color: "var(--on-surface)" }}>
+            Nothing ingested yet.
+          </p>
+        ) : (
+          // Split ingests make long lists routine; Paginated shows 10 at a
+          // time and disappears entirely for short lists.
+          <Paginated>
+            {items.map((it) => (
+              <li
+                key={it.id}
+                style={{ border: "1px solid var(--line, #ccc)", borderRadius: 8, padding: 10 }}
+              >
+                {it.kind === "image" && it.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={it.imageUrl}
+                    alt={it.title}
+                    style={{ maxWidth: 180, maxHeight: 120, borderRadius: 6, display: "block", marginBottom: 6 }}
+                  />
+                ) : null}
+                <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
+                  <strong style={{ fontSize: 14 }}>{it.title}</strong>
+                  <Stamp date={it.createdAt} prefix="ingested" />
+                  <form action={deleteItemAction} style={{ marginLeft: "auto" }}>
+                    <input type="hidden" name="sourceKey" value={row.key} />
+                    <input type="hidden" name="itemId" value={it.id} />
+                    <PendingButton
+                      pendingLabel="Deleting…"
+                      style={{
+                        fontSize: 12,
+                        textDecoration: "underline",
+                        background: "none",
+                        border: "none",
+                        padding: 0,
+                        cursor: "pointer",
+                        color: "var(--danger, #b00020)",
+                      }}
+                    >
+                      Delete
+                    </PendingButton>
+                  </form>
+                </div>
+                {it.text ? (
+                  <p style={{ fontSize: 13, whiteSpace: "pre-wrap", marginTop: 4 }}>{it.text}</p>
+                ) : null}
+              </li>
+            ))}
+          </Paginated>
+        );
+
   return (
     <section data-fill="surface" style={panel}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
@@ -48,27 +125,34 @@ export function GenericIngestPanel({
           </a>
         ) : null}
       </div>
-      {row.description ? (
-        <p style={{ color: "var(--on-surface)", fontStyle: "italic", fontSize: 13, marginBottom: 10 }}>
-          {row.description}
-        </p>
-      ) : null}
-      {row.systemPrompt ? (
-        <p
-          style={{
-            fontSize: 12,
-            color: "var(--on-surface)",
-            opacity: 0.8,
-            border: "1px solid var(--line, #ccc)",
-            borderRadius: 6,
-            padding: "8px 10px",
-            marginBottom: 14,
-            whiteSpace: "pre-wrap",
-          }}
-        >
-          {row.systemPrompt}
-        </p>
-      ) : null}
+      {customPage ? (
+        // The source's own page code, sealed in the coded-card sandbox.
+        <PanelHtml html={customPage} />
+      ) : (
+        <>
+          {row.description ? (
+            <p style={{ color: "var(--on-surface)", fontStyle: "italic", fontSize: 13, marginBottom: 10 }}>
+              {row.description}
+            </p>
+          ) : null}
+          {row.systemPrompt ? (
+            <p
+              style={{
+                fontSize: 12,
+                color: "var(--on-surface)",
+                opacity: 0.8,
+                border: "1px solid var(--line, #ccc)",
+                borderRadius: 6,
+                padding: "8px 10px",
+                marginBottom: 14,
+                whiteSpace: "pre-wrap",
+              }}
+            >
+              {row.systemPrompt}
+            </p>
+          ) : null}
+        </>
+      )}
 
       {noForms ? (
         <p style={{ fontSize: 13, fontStyle: "italic", marginBottom: 14 }}>
@@ -138,55 +222,17 @@ export function GenericIngestPanel({
         </form>
       ) : null}
 
-      {items.length === 0 ? (
-        <p style={{ fontSize: 13, fontStyle: "italic", color: "var(--on-surface)" }}>
-          Nothing ingested yet.
-        </p>
+      {customPage ? (
+        // With a custom page showing the items, the native list (with its
+        // working Delete buttons) folds into a management drawer.
+        <details>
+          <summary style={{ cursor: "pointer", fontSize: 13, marginBottom: 8 }}>
+            Manage items ({items.length})
+          </summary>
+          {itemList}
+        </details>
       ) : (
-        // Split ingests make long lists routine; Paginated shows 10 at a
-        // time and disappears entirely for short lists.
-        <Paginated>
-          {items.map((it) => (
-            <li
-              key={it.id}
-              style={{ border: "1px solid var(--line, #ccc)", borderRadius: 8, padding: 10 }}
-            >
-              {it.kind === "image" && it.imageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={it.imageUrl}
-                  alt={it.title}
-                  style={{ maxWidth: 180, maxHeight: 120, borderRadius: 6, display: "block", marginBottom: 6 }}
-                />
-              ) : null}
-              <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
-                <strong style={{ fontSize: 14 }}>{it.title}</strong>
-                <Stamp date={it.createdAt} prefix="ingested" />
-                <form action={deleteItemAction} style={{ marginLeft: "auto" }}>
-                  <input type="hidden" name="sourceKey" value={row.key} />
-                  <input type="hidden" name="itemId" value={it.id} />
-                  <PendingButton
-                    pendingLabel="Deleting…"
-                    style={{
-                      fontSize: 12,
-                      textDecoration: "underline",
-                      background: "none",
-                      border: "none",
-                      padding: 0,
-                      cursor: "pointer",
-                      color: "var(--danger, #b00020)",
-                    }}
-                  >
-                    Delete
-                  </PendingButton>
-                </form>
-              </div>
-              {it.text ? (
-                <p style={{ fontSize: 13, whiteSpace: "pre-wrap", marginTop: 4 }}>{it.text}</p>
-              ) : null}
-            </li>
-          ))}
-        </Paginated>
+        itemList
       )}
     </section>
   );

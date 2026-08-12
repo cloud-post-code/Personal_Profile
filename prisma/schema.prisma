@@ -326,6 +326,10 @@ model IngestionSource {
   /// "split" (default): every text ingest splits into one item per point.
   /// "single": each upload stays one item — no split model call.
   splitMode    String   @default("split")
+  /// Optional custom HTML+inline-CSS for this source's Content tab, with a
+  /// {{items}} placeholder — validated like coded cards (safeCardHtml) and
+  /// rendered in the same sealed iframe. "" means the default page.
+  panelHtml    String   @default("") @db.Text
   /// Who this source's content is for: "public" | "contact" |
   /// "close-friends" | "personal". Only "public" is selectable today; the
   /// frontend still shows everything to everyone.

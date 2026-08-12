@@ -89,7 +89,7 @@ async function main() {
       id: "x", key: KEY, label: "Proof DII", description: "", systemPrompt: "",
       uploadMethod: "generic", storageKinds: "text+image", outputMethod: "",
       builtin: false, enabled: true, order: 0, classification: "public",
-      splitMode: "split", createdAt: new Date(0), updatedAt: new Date(0),
+      splitMode: "split", panelHtml: "", createdAt: new Date(0), updatedAt: new Date(0),
     };
     const items = [
       { kind: "text" as const, id: "source:a", sourceKey: KEY, title: "T1", text: "x", imageUrl: null, createdAt: new Date(0) },
