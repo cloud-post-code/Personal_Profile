@@ -313,6 +313,14 @@
       "priority": 11,
       "status": "passing",
       "notes": "Every item on a custom source's tab has a Delete button. deleteIngestedItem enforces ownership (id must name a row marked ingest:<sourceKey> \u2014 forged/cross-source/builtin/unknown ids refused), deletes the Source/Photo row (chunks cascade) and retracts graph claims via dropOrigin, matching deleteSource/deletePhoto semantics. Admin-auth action; panel prop keeps proofs offline. Proof: 16 assertions red-first; evaluator PASS (re-ran proof)."
+    },
+    {
+      "id": "ingested-items-pagination",
+      "feature_dir": "docs/features/ingested-items-pagination",
+      "proof": "docs/features/ingested-items-pagination/PROOF.md",
+      "priority": 12,
+      "status": "passing",
+      "notes": "Custom source tabs paginate their item lists: app/admin/Paginated.tsx (client, 10/page, Prev/Next, 'Page X of Y \u00b7 N items', clamped page index so deleting on the last page can't strand the view) wraps GenericIngestPanel's server-rendered rows \u2014 per-item server-action forms pass through the client boundary as rendered nodes, so Delete keeps working. One page or fewer renders the bare list, pixel-identical to before. Proof: 13 assertions red-first; live check: 14-item source showed 10 + 'Page 1 of 2 \u00b7 14 items', Next revealed 11\u201314; evaluator PASS (re-ran proof + tsc)."
     }
   ]
 }

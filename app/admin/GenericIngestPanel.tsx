@@ -2,6 +2,7 @@ import React from "react";
 import { panel, field, btn, SectionTitle, Label, Stamp } from "./ui";
 import { PendingButton } from "./PendingButton";
 import { ingestFormsFor, type IngestionSourceRow } from "@/lib/ingestionSources";
+import { Paginated } from "./Paginated";
 import type { IngestedItem } from "@/lib/ingestedItems";
 
 /**
@@ -142,7 +143,9 @@ export function GenericIngestPanel({
           Nothing ingested yet.
         </p>
       ) : (
-        <ul style={{ listStyle: "none", display: "grid", gap: 10, padding: 0 }}>
+        // Split ingests make long lists routine; Paginated shows 10 at a
+        // time and disappears entirely for short lists.
+        <Paginated>
           {items.map((it) => (
             <li
               key={it.id}
@@ -183,7 +186,7 @@ export function GenericIngestPanel({
               ) : null}
             </li>
           ))}
-        </ul>
+        </Paginated>
       )}
     </section>
   );
