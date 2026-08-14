@@ -39,6 +39,7 @@ import {
   DIRECTIVE_KINDS,
   type DirectiveKind,
 } from "@/lib/directives";
+import { saveAddressBookEntry, deleteAddressBookEntry } from "@/lib/addressBook";
 import { saveUiCard, deleteUiCard } from "@/lib/uiCards";
 import { saveIngestionSource, setIngestionSourceHidden } from "@/lib/ingestionSources";
 import { deleteIngestionSourceAndData } from "@/lib/ingestedItems";
@@ -774,6 +775,30 @@ export async function deleteDirectiveAction(formData: FormData) {
   await requireAuth();
   const id = String(formData.get("id") ?? "").trim();
   if (id) await deleteDirective(id);
+  revalidatePath("/admin/dashboard");
+}
+
+// ── Address book (Agent Behavior → Contacts tab) ────────────────────────────
+// Thin auth wrappers; the logic lives in lib/addressBook.ts so it stays testable.
+
+export async function saveAddressBookAction(formData: FormData) {
+  await requireAuth();
+  await saveAddressBookEntry({
+    id: String(formData.get("id") ?? "").trim() || undefined,
+    name: String(formData.get("name") ?? ""),
+    details: String(formData.get("details") ?? ""),
+    email: String(formData.get("email") ?? ""),
+    phone: String(formData.get("phone") ?? ""),
+    trust: String(formData.get("trust") ?? "public"),
+    order: Number(formData.get("order") ?? 0) || 0,
+  });
+  revalidatePath("/admin/dashboard");
+}
+
+export async function deleteAddressBookAction(formData: FormData) {
+  await requireAuth();
+  const id = String(formData.get("id") ?? "").trim();
+  if (id) await deleteAddressBookEntry(id);
   revalidatePath("/admin/dashboard");
 }
 

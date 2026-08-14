@@ -8,19 +8,22 @@ import React, { useState } from "react";
  * used for the Content section's Projects / Knowledge / Photos split and the
  * Graph section's Graph / Test / Entities / Relationships / Overviews split.
  * Labels may be nodes so a tab can carry a count badge. `trailing` renders
- * inside the strip after the last tab (e.g. a "new source" link) so it sits
- * on the same wrapping row as the tabs.
+ * inside the strip alongside the tabs (e.g. a "new source" link) so it sits
+ * on the same wrapping row as the tabs — before the tabs when
+ * `trailingFirst` is set, otherwise after the last tab.
  */
 export function SubTabs({
   tabs,
   initial,
   ariaLabel = "Content sections",
   trailing,
+  trailingFirst = false,
 }: {
   tabs: { key: string; label: React.ReactNode; content: React.ReactNode }[];
   initial?: string;
   ariaLabel?: string;
   trailing?: React.ReactNode;
+  trailingFirst?: boolean;
 }) {
   const [active, setActive] = useState(
     tabs.some((t) => t.key === initial) ? initial : tabs[0]?.key,
@@ -30,6 +33,9 @@ export function SubTabs({
   return (
     <div>
       <div className="admin-subtabs" role="tablist" aria-label={ariaLabel}>
+        {trailingFirst && trailing != null ? (
+          <React.Fragment key="trailing">{trailing}</React.Fragment>
+        ) : null}
         {tabs.map((t) => {
           const on = t.key === current?.key;
           return (
@@ -45,7 +51,7 @@ export function SubTabs({
             </button>
           );
         })}
-        {trailing != null ? (
+        {!trailingFirst && trailing != null ? (
           <React.Fragment key="trailing">{trailing}</React.Fragment>
         ) : null}
       </div>

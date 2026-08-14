@@ -345,6 +345,27 @@ model IngestionSource {
   updatedAt    DateTime @updatedAt
 }
 
+/// One person in Blake's address book, curated on the Agent Behavior →
+/// Contacts tab. Distinct from `Contact` (in-chat form submissions): these are
+/// people Blake adds by hand, each reachable by email or phone and carrying a
+/// trust tier that mirrors the ingestion classifications
+/// (public | co-worker | close-friend | personal).
+model AddressBookEntry {
+  id        String   @id @default(cuid())
+  name      String
+  /// Free-text notes about the person.
+  details   String   @default("") @db.Text
+  /// Email address; optional but at least one of email/phone is expected.
+  email     String   @default("")
+  /// Phone number; optional but at least one of email/phone is expected.
+  phone     String   @default("")
+  /// Trust tier: public | co-worker | close-friend | personal.
+  trust     String   @default("public")
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 /// A contact submission captured by the in-chat A2UI contact form.
 model Contact {
   id        String   @id @default(cuid())

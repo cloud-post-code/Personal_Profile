@@ -42,8 +42,8 @@ export const CLASSIFICATIONS = ["public", "contact", "close-friends", "personal"
 export type Classification = (typeof CLASSIFICATIONS)[number];
 export const CLASSIFICATION_LABELS: Record<Classification, string> = {
   public: "Public",
-  contact: "Contact",
-  "close-friends": "Close friends",
+  contact: "Co-worker",
+  "close-friends": "Close friend",
   personal: "Personal",
 };
 /**

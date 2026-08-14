@@ -21,8 +21,6 @@ import {
   uploadPhoto,
   updatePhoto,
   deletePhoto,
-  toggleContactHandled,
-  deleteContact,
   deleteChatSession,
   saveChatFeedback,
   ingestCustomTextAction,
@@ -39,6 +37,8 @@ import { AnswersPanel } from "../AnswersPanel";
 import { A2uiPanel } from "../A2uiPanel";
 import { DirectivesPanel } from "../DirectivesPanel";
 import { listDirectives } from "@/lib/directives";
+import { ContactsPanel } from "../ContactsPanel";
+import { listAddressBook } from "@/lib/addressBook";
 import { listUiCards } from "@/lib/uiCards";
 import { PersonaPrompt } from "../PersonaPrompt";
 import { personaExtractionPrompt } from "@/lib/personaPrompt";
@@ -78,7 +78,6 @@ export default async function Dashboard({
     projects,
     sources,
     photos,
-    contacts,
     chatSessions,
     gStats,
     gEntities,
@@ -90,6 +89,7 @@ export default async function Dashboard({
     ingestionSources,
     goalRows,
     ruleRows,
+    addressBook,
   ] = await Promise.all([
       getProfile(),
       prisma.project.findMany({ orderBy: { order: "asc" } }),
@@ -100,7 +100,6 @@ export default async function Dashboard({
         where: { NOT: { kind: { startsWith: "ingest:" } } },
         orderBy: { order: "asc" },
       }),
-      prisma.contact.findMany({ orderBy: { createdAt: "desc" } }),
       prisma.chatSession.findMany({
         orderBy: { updatedAt: "desc" },
         take: 100,
@@ -127,6 +126,7 @@ export default async function Dashboard({
       listIngestionSources(),
       listDirectives("goal"),
       listDirectives("rule"),
+      listAddressBook(),
     ]);
   // ?tab= deep links resolve against the live source keys so custom tabs
   // deep-link too; every non-content key targets its own nav entry.
@@ -135,7 +135,6 @@ export default async function Dashboard({
     ingestionSources.map((s) => s.key),
   );
   const metrics = chatMetrics(chatSessions);
-  const unhandled = contacts.filter((c) => !c.handled).length;
   const socials = safeSocials(profile.socials);
   const colors = safeJson<ThemeColors>(profile.themeColors, {});
   const experience = safeExperience(profile.experience);
@@ -472,43 +471,6 @@ export default async function Dashboard({
     </section>
   );
 
-  // ── CONTACTS TAB ──
-  const contactsTab = (
-    <section data-fill="surface" style={panel}>
-      <SectionTitle>Contact submissions{unhandled > 0 ? ` · ${unhandled} new` : ""}</SectionTitle>
-      {contacts.length === 0 && <Empty>No submissions yet. They arrive via the in-chat contact form.</Empty>}
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {contacts.map((c) => (
-          <div key={c.id} style={{ border: `1px solid ${c.handled ? "var(--border)" : "var(--primary)"}`, borderRadius: "var(--radius-sm)", padding: 14, opacity: c.handled ? 0.6 : 1 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start" }}>
-              <div style={{ minWidth: 0 }}>
-                <strong style={{ fontSize: 14 }}>{c.name}</strong>{" "}
-                <a href={`mailto:${c.email}`} style={{ fontSize: 13 }}>{c.email}</a>
-                <p style={{ color: "var(--on-surface)", fontSize: 14, marginTop: 6, whiteSpace: "pre-wrap" }}>{c.message}</p>
-                <span style={{ color: "var(--on-surface)", fontStyle: "italic", fontSize: 11 }}>{c.createdAt.toISOString().slice(0, 16).replace("T", " ")} UTC</span>
-              </div>
-              <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                <form action={toggleContactHandled}>
-                  <input type="hidden" name="id" value={c.id} />
-                  <input type="hidden" name="handled" value={String(c.handled)} />
-                  <PendingButton pendingLabel="Saving…" style={btnGhost as React.CSSProperties}>
-                    {c.handled ? "Reopen" : "Mark handled"}
-                  </PendingButton>
-                </form>
-                <form action={deleteContact}>
-                  <input type="hidden" name="id" value={c.id} />
-                  <PendingButton pendingLabel="Deleting…" style={btnDanger as React.CSSProperties}>
-                    Delete
-                  </PendingButton>
-                </form>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-
   // ── ACTIVITY TAB — what visitors are asking the chatbot ──
   const activityTab = (
     <section data-fill="surface" style={panel}>
@@ -767,6 +729,7 @@ export default async function Dashboard({
                 <SubTabs
                   initial={initialSub}
                   tabs={contentTabs}
+                  trailingFirst
                   trailing={
                     <Link href="/admin/sources/new" style={btnGhost as React.CSSProperties}>
                       + New ingestion source
@@ -790,21 +753,7 @@ export default async function Dashboard({
           {
             key: "activity",
             label: "Activity",
-            badge: unhandled,
-            content: (
-              <SubTabs
-                initial={initialSub}
-                ariaLabel="Activity sections"
-                tabs={[
-                  { key: "activity", label: "Conversations", content: activityTab },
-                  {
-                    key: "contacts",
-                    label: unhandled > 0 ? `Contacts · ${unhandled}` : "Contacts",
-                    content: contactsTab,
-                  },
-                ]}
-              />
-            ),
+            content: activityTab,
           },
           {
             key: "agent",
@@ -817,6 +766,7 @@ export default async function Dashboard({
                   { key: "answers", label: "Presets", content: <AnswersPanel rows={canned} /> },
                   { key: "goals", label: "Goals", content: goalsTab },
                   { key: "rules", label: "Rules", content: rulesTab },
+                  { key: "contacts", label: "Contacts", content: <ContactsPanel rows={addressBook} /> },
                   { key: "a2ui", label: "A2UI", content: <A2uiPanel rows={uiCards} /> },
                 ]}
               />
