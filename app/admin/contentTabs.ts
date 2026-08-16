@@ -11,11 +11,19 @@ export const CONTENT_TAB_KEYS = [
 export type ContentTabKey = (typeof CONTENT_TAB_KEYS)[number];
 
 /** Keys of the sub-tabs inside the combined Activity section. */
-export const ACTIVITY_TAB_KEYS = ["activity", "contacts"] as const;
+export const ACTIVITY_TAB_KEYS = ["activity"] as const;
 export type ActivityTabKey = (typeof ACTIVITY_TAB_KEYS)[number];
 
-/** Keys of the sub-tabs inside the Agent Behavior section. */
-export const AGENT_TAB_KEYS = ["answers", "goals", "rules", "a2ui"] as const;
+/**
+ * Keys of the sub-tabs inside the Agent Behavior section.
+ *
+ * `contacts` was listed under Activity when the address book lived there. The
+ * panel moved to Agent Behavior but the key did not, so `?tab=contacts`
+ * resolved to an Activity sub-tab that no longer exists — the sent-mail sync
+ * redirects here, so the key has to point at the panel that is actually
+ * mounted.
+ */
+export const AGENT_TAB_KEYS = ["answers", "goals", "rules", "contacts", "a2ui"] as const;
 export type AgentTabKey = (typeof AGENT_TAB_KEYS)[number];
 
 /** Keys of the sub-tabs inside the combined Me section. */

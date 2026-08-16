@@ -39,6 +39,7 @@ import { DirectivesPanel } from "../DirectivesPanel";
 import { listDirectives } from "@/lib/directives";
 import { ContactsPanel } from "../ContactsPanel";
 import { listAddressBook } from "@/lib/addressBook";
+import { gmailStatus } from "@/lib/gmail/client";
 import { listUiCards } from "@/lib/uiCards";
 import { PersonaPrompt } from "../PersonaPrompt";
 import { personaExtractionPrompt } from "@/lib/personaPrompt";
@@ -90,6 +91,7 @@ export default async function Dashboard({
     goalRows,
     ruleRows,
     addressBook,
+    gmail,
   ] = await Promise.all([
       getProfile(),
       prisma.project.findMany({ orderBy: { order: "asc" } }),
@@ -127,6 +129,7 @@ export default async function Dashboard({
       listDirectives("goal"),
       listDirectives("rule"),
       listAddressBook(),
+      gmailStatus(),
     ]);
   // ?tab= deep links resolve against the live source keys so custom tabs
   // deep-link too; every non-content key targets its own nav entry.
@@ -768,7 +771,13 @@ export default async function Dashboard({
                   { key: "answers", label: "Presets", content: <AnswersPanel rows={canned} /> },
                   { key: "goals", label: "Goals", content: goalsTab },
                   { key: "rules", label: "Rules", content: rulesTab },
-                  { key: "contacts", label: "Contacts", content: <ContactsPanel rows={addressBook} /> },
+                  {
+                    key: "contacts",
+                    label: "Contacts",
+                    content: (
+                      <ContactsPanel rows={addressBook} gmail={gmail} message={one("gmail")} />
+                    ),
+                  },
                   { key: "a2ui", label: "A2UI", content: <A2uiPanel rows={uiCards} /> },
                 ]}
               />

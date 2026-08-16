@@ -393,8 +393,52 @@ model AddressBookEntry {
   /// Trust tier: public | co-worker | close-friend | personal.
   trust     String   @default("public")
   order     Int      @default(0)
+  /// Identity key for sent-mail ingestion: the email lowercased, with dots and
+  /// +tags folded ONLY for gmail.com/googlemail.com. Unique, so a re-sync
+  /// enriches the existing person instead of adding a second row. Empty for
+  /// hand-added contacts with no email — "" would collide under a plain
+  /// @unique, so those store null.
+  canonicalEmail String? @unique
+  /// How this contact arrived: manual | gmail.
+  source         String  @default("manual")
+  /// Sent messages seen for this person; accumulates across syncs.
+  messageCount   Int     @default(0)
+  firstContacted DateTime?
+  lastContacted  DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+/// The stored Gmail authorization, a fixed-id singleton — this is a
+/// single-admin site, and a table that can hold exactly one row is simpler
+/// than one that pretends otherwise.
+///
+/// The refresh token lives here rather than in an env var so re-consent after
+/// a revoked or expired grant is a button in the dashboard instead of a
+/// redeploy. That matters more than usual here: Google's docs do not settle
+/// whether an unverified-but-Production app keeps a long-lived refresh token
+/// when a *restricted* scope (gmail.readonly) is involved.
+///
+/// Deliberately separate from the calendar credentials in env. Google issues
+/// one refresh token per OAuth client covering every consented scope, so a
+/// shared client would let a Gmail re-consent replace the token the booking
+/// flow depends on.
+model GmailAuth {
+  /// Always "singleton".
+  id           String    @id @default("singleton")
+  refreshToken String    @db.Text
+  /// The mailbox that granted access, for display in the admin panel.
+  emailAddress String    @default("")
+  /// Scopes actually granted, so a narrowed grant is visible rather than
+  /// surfacing later as a confusing API error.
+  scope        String    @default("") @db.Text
+  /// Incremental sync cursor: messages newer than this were already read.
+  /// Null means nothing has synced yet, and the next sync reads everything.
+  /// Advanced only after a fully successful pass, so a mid-sync failure
+  /// re-reads a window rather than silently skipping it.
+  lastSyncedAt DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 }
 
 /// A contact submission captured by the in-chat A2UI contact form.

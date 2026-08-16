@@ -783,7 +783,7 @@ export async function deleteDirectiveAction(formData: FormData) {
 
 export async function saveAddressBookAction(formData: FormData) {
   await requireAuth();
-  await saveAddressBookEntry({
+  const error = await saveAddressBookEntry({
     id: String(formData.get("id") ?? "").trim() || undefined,
     name: String(formData.get("name") ?? ""),
     details: String(formData.get("details") ?? ""),
@@ -793,6 +793,56 @@ export async function saveAddressBookAction(formData: FormData) {
     order: Number(formData.get("order") ?? 0) || 0,
   });
   revalidatePath("/admin/dashboard");
+  if (error) {
+    redirect(`/admin/dashboard?tab=contacts&gmail=${encodeURIComponent(error)}`);
+  }
+}
+
+/**
+ * Read sent mail and fold it into the address book. Synchronous inside the
+ * button press, like every other ingestion path here — one Claude call per
+ * new correspondent, bounded by MAX_CONTACTS_PER_SYNC.
+ *
+ * The outcome is reported through the same ?gmail= banner the OAuth routes
+ * use, including partial results: a pass that hit its cap says so rather than
+ * looking complete.
+ */
+export async function syncGmailContactsAction() {
+  await requireAuth();
+  const { gmailReader } = await import("@/lib/gmail/client");
+  const { syncSentContacts } = await import("@/lib/gmail/sync");
+
+  let message: string;
+  try {
+    const r = await syncSentContacts({ reader: gmailReader });
+    if (!r.ok) {
+      message = `Sync failed: ${r.error ?? "unknown error"}`;
+    } else {
+      const parts = [
+        `Read ${r.messages} sent message${r.messages === 1 ? "" : "s"}`,
+        `${r.created} new contact${r.created === 1 ? "" : "s"}`,
+        `${r.updated} updated`,
+      ];
+      if (r.notesFailed) parts.push(`${r.notesFailed} without a note`);
+      message = `${parts.join(" · ")}.${r.error ? ` ${r.error}` : ""}`;
+    }
+  } catch (e) {
+    message = `Sync failed: ${e instanceof Error ? e.message : String(e)}`;
+  }
+
+  revalidatePath("/admin/dashboard");
+  redirect(`/admin/dashboard?tab=contacts&gmail=${encodeURIComponent(message)}`);
+}
+
+export async function disconnectGmailAction() {
+  await requireAuth();
+  const { disconnectGmail } = await import("@/lib/gmail/client");
+  await disconnectGmail();
+  revalidatePath("/admin/dashboard");
+  redirect(
+    "/admin/dashboard?tab=contacts&gmail=" +
+      encodeURIComponent("Gmail disconnected. Contacts already saved are kept."),
+  );
 }
 
 export async function deleteAddressBookAction(formData: FormData) {
