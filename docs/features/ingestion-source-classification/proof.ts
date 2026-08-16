@@ -42,9 +42,13 @@ async function main() {
     "every classification has a display label",
     CLASSIFICATIONS.every((c: string) => !!CLASSIFICATION_LABELS[c as never]),
   );
+  // Superseded by docs/features/per-item-classification: all four tiers are
+  // selectable now, and a document can override its source's default. What
+  // survives from this feature is that the catalog is closed — an unknown
+  // value is still refused (asserted at 5 below).
   check(
-    "only public is enabled for now",
-    JSON.stringify(ENABLED_CLASSIFICATIONS) === JSON.stringify(["public"]),
+    "every catalogued classification is enabled",
+    JSON.stringify(ENABLED_CLASSIFICATIONS) === JSON.stringify(CLASSIFICATIONS),
     JSON.stringify(ENABLED_CLASSIFICATIONS),
   );
 
@@ -78,17 +82,33 @@ async function main() {
     const badRow = await prisma.ingestionSource.findUnique({ where: { key: "proof-isc-bad" } });
     check("unknown classification rejected", badErr !== null && !badRow, String(badErr));
 
-    // 5. In-catalog but not-yet-enabled statuses are rejected server-side.
+    // 5. The catalog is closed: an out-of-catalog status is rejected
+    // server-side. (In-catalog tiers are all accepted now — see the
+    // per-item-classification feature.)
     const lockedErr = await saveIngestionSource({
       key: "proof-isc-locked", label: "Proof ISC locked", description: "", systemPrompt: "",
       uploadMethod: "generic", storageKinds: "text", outputMethod: "x",
-      classification: "personal",
+      classification: "top-secret",
     });
     const lockedRow = await prisma.ingestionSource.findUnique({ where: { key: "proof-isc-locked" } });
     check(
-      "personal rejected while not enabled",
-      lockedErr !== null && /public/i.test(String(lockedErr)) && !lockedRow,
+      "an out-of-catalog classification is rejected",
+      lockedErr !== null && !lockedRow,
       String(lockedErr),
+    );
+    // …and every in-catalog tier now saves.
+    const personalErr = await saveIngestionSource({
+      key: "proof-isc-personal", label: "Proof ISC personal", description: "", systemPrompt: "",
+      uploadMethod: "generic", storageKinds: "text", outputMethod: "x",
+      classification: "personal",
+    });
+    const personalRow = await prisma.ingestionSource.findUnique({
+      where: { key: "proof-isc-personal" },
+    });
+    check(
+      "personal saves now that every tier is enabled",
+      personalErr === null && personalRow?.classification === "personal",
+      String(personalErr),
     );
 
     // 6. Edit round-trip keeps classification explicit.
@@ -132,10 +152,12 @@ async function main() {
     /saveBuiltSourceAction[\s\S]{0,900}classification/.test(actions),
   );
 
-  // 8. Statuses outside the enabled set render as disabled options.
+  // 8. The selector is driven by the enabled set, so anything outside it can
+  // never be chosen. (With every tier enabled today nothing renders disabled;
+  // the gate is the data, not the markup.)
   check(
-    "selector disables not-yet-enabled statuses",
-    selectSrc.includes("ENABLED_CLASSIFICATIONS") && selectSrc.includes("disabled"),
+    "selector is gated on ENABLED_CLASSIFICATIONS",
+    selectSrc.includes("ENABLED_CLASSIFICATIONS"),
   );
 
   console.log(failures ? `\n${failures} assertion(s) failed` : "\nAll assertions passed");

@@ -50,7 +50,7 @@ import { Tabs } from "../Tabs";
 import { SubTabs } from "../SubTabs";
 import { contentTabsFromSources, resolveAdminTab } from "../contentTabs";
 import { listIngestionSources } from "@/lib/ingestionSources";
-import { listIngestedItems } from "@/lib/ingestedItems";
+import { listIngestedItemsClassified } from "@/lib/ingestedItems";
 import { GenericIngestPanel } from "../GenericIngestPanel";
 import { PendingButton } from "../PendingButton";
 import { SaveButton } from "../SaveButton";
@@ -599,7 +599,9 @@ export default async function Dashboard({
   };
   // Custom sources render the generic panel over their own marked rows.
   const customRows = ingestionSources.filter((s) => !s.builtin && !builtinPanels[s.key]);
-  const customItems = await Promise.all(customRows.map((s) => listIngestedItems(s.key)));
+  const customItems = await Promise.all(
+    customRows.map((s) => listIngestedItemsClassified(s.key)),
+  );
   const contentPanels: Record<string, React.ReactNode> = { ...builtinPanels };
   customRows.forEach((s, i) => {
     contentPanels[s.key] = (

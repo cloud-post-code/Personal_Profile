@@ -4,7 +4,9 @@ import { safeCardHtml } from "@/lib/uiCards";
 /**
  * The ingestion-source catalog: one row per Content tab, holding the source's
  * code (key), how content gets in, the uniform storage rule (text/image),
- * where ingested data lands, and the source's own system prompt.
+ * where ingested data lands, the source's own system prompt, and the
+ * classification its ingests DEFAULT to (overridable per document — see
+ * lib/itemClassification.ts).
  *
  * Which ingestion sources exist is data, not code — the same principle the
  * A2UI card catalog (lib/uiCards.ts) follows. The dashboard renders the
@@ -47,11 +49,19 @@ export const CLASSIFICATION_LABELS: Record<Classification, string> = {
   personal: "Personal",
 };
 /**
- * The statuses selectable today. The frontend shows every source to
- * everyone, so only "public" is enabled until visibility rules exist —
- * widen this list to turn the rest on.
+ * All four tiers are selectable. NOTE: classification is currently RECORDED,
+ * not ENFORCED — retrieval does not yet filter by it, so a "Personal" item is
+ * still reachable by every visitor. The admin surfaces say so; treat this as
+ * curation ahead of the visibility rules, not as access control.
  */
-export const ENABLED_CLASSIFICATIONS: readonly Classification[] = ["public"];
+export const ENABLED_CLASSIFICATIONS: readonly Classification[] = CLASSIFICATIONS;
+
+/** Normalize an arbitrary string to a known classification, or null. */
+export function asClassification(v: string | null | undefined): Classification | null {
+  return (CLASSIFICATIONS as readonly string[]).includes(v ?? "")
+    ? (v as Classification)
+    : null;
+}
 
 export type IngestionSourceRow = {
   id: string;
@@ -161,11 +171,8 @@ export async function saveIngestionSource(input: {
     );
   }
   const classification = input.classification ?? "public";
-  if (!(CLASSIFICATIONS as readonly string[]).includes(classification)) {
-    return `Unknown classification "${classification}". One of: ${CLASSIFICATIONS.join(", ")}.`;
-  }
   if (!(ENABLED_CLASSIFICATIONS as readonly string[]).includes(classification)) {
-    return `Only Public is available for now; "${classification}" comes later.`;
+    return `Unknown classification "${classification}". One of: ${ENABLED_CLASSIFICATIONS.join(", ")}.`;
   }
 
   // The key anchors deep links and panel dispatch; a hand-typed one is

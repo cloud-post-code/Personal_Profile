@@ -1,6 +1,11 @@
 import { prisma } from "@/lib/db";
 import { dropOrigin } from "@/lib/retrieval/indexer";
 import { indexProfile, indexPersona } from "@/lib/retrieval/origins";
+import {
+  clearSourceClassifications,
+  resolveClassifications,
+} from "@/lib/itemClassification";
+import type { Classification } from "@/lib/ingestionSources";
 
 /**
  * The one uniform read path over everything the ingestion sources have
@@ -29,6 +34,14 @@ export type IngestedItem = {
   /** Non-null exactly when kind === "image". */
   imageUrl: string | null;
   createdAt: Date;
+};
+
+/** An IngestedItem plus the classification it resolves to. */
+export type ClassifiedItem = IngestedItem & {
+  /** Who the item is for — its override, or the source's default. */
+  classification: Classification;
+  /** True when set on the item itself, false when inherited from the source. */
+  classificationOverridden: boolean;
 };
 
 /** The mark custom sources put on Source.kind / Photo.kind rows they own. */
@@ -113,6 +126,10 @@ export async function deleteIngestionSourceAndData(id: string): Promise<void> {
  * and the admin read.
  */
 export async function deleteIngestedData(sourceKey: string): Promise<void> {
+  // Per-item classification overrides describe rows that are about to stop
+  // existing; cleared up front so every branch's early return still leaves
+  // none behind to be inherited by a later item reusing an id.
+  await clearSourceClassifications(sourceKey);
   const drop = async (kind: string, id: string) => {
     try {
       await dropOrigin(kind, id);
@@ -193,6 +210,29 @@ export async function deleteIngestedData(sourceKey: string): Promise<void> {
       return;
     }
   }
+}
+
+/**
+ * Everything a source has ingested, each item carrying the classification it
+ * resolves to — its own override when one was set at ingest time, otherwise
+ * the source's default.
+ */
+export async function listIngestedItemsClassified(
+  sourceKey: string,
+): Promise<ClassifiedItem[]> {
+  const items = await listIngestedItems(sourceKey);
+  const resolved = await resolveClassifications(
+    sourceKey,
+    items.map((i) => i.id),
+  );
+  return items.map((item) => {
+    const r = resolved.get(item.id);
+    return {
+      ...item,
+      classification: r?.classification ?? "public",
+      classificationOverridden: r?.overridden ?? false,
+    };
+  });
 }
 
 /** Everything a source has ingested, as uniform text/image items. */

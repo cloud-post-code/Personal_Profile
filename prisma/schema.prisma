@@ -331,8 +331,10 @@ model IngestionSource {
   /// rendered in the same sealed iframe. "" means the default page.
   panelHtml    String   @default("") @db.Text
   /// Who this source's content is for: "public" | "contact" |
-  /// "close-friends" | "personal". Only "public" is selectable today; the
-  /// frontend still shows everything to everyone.
+  /// "close-friends" | "personal". This is the DEFAULT applied to everything
+  /// ingested through the source; a single document can override it at ingest
+  /// time (see ItemClassification). The frontend still shows everything to
+  /// everyone — classification is recorded, not yet enforced at retrieval.
   classification String @default("public")
   /// Where ingested data lands (which model/store), recorded as data so the
   /// dashboard can show it ("Source + Chunk rows", "Photo + upload dir", …).
@@ -343,6 +345,35 @@ model IngestionSource {
   order        Int      @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+}
+
+/// A per-item override of its ingestion source's classification: "this one
+/// document is Personal even though the source defaults to Public".
+///
+/// Keyed by `itemId` — the composite "<model>:<rowid>" id that
+/// lib/ingestedItems.ts already assigns every ingested item ("source:<cuid>",
+/// "photo:<cuid>", "experience:3", "persona:voice"). A separate table rather
+/// than a column because ingested items live across four backing tables and
+/// two of them (Experience, Persona) are JSON inside Profile with no row of
+/// their own to carry a column. This keeps the override uniform for every
+/// source, matching the way IngestedItem is a read-time projection.
+///
+/// Absence of a row means "inherit the source's classification" — the default
+/// is never copied down, so re-classifying a source moves every item that
+/// hasn't been deliberately overridden.
+model ItemClassification {
+  id             String   @id @default(cuid())
+  /// "<model>:<rowid>", matching IngestedItem.id.
+  itemId         String   @unique
+  /// Which source ingested the item, so a source's overrides can be swept
+  /// when its data is deleted.
+  sourceKey      String
+  /// public | contact | close-friends | personal.
+  classification String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([sourceKey])
 }
 
 /// One person in Blake's address book, curated on the Agent Behavior →

@@ -8,9 +8,9 @@ import { field, Label } from "./ui";
 
 /**
  * The classification picker that sits next to Save on every ingestion
- * source form. All four statuses are listed so the coming tiers are
- * discoverable, but only the ENABLED_CLASSIFICATIONS set is choosable —
- * the server enforces the same rule in saveIngestionSource.
+ * source form. This sets the source's DEFAULT — the classification applied
+ * to everything ingested through it, which a single document can override at
+ * ingest time (IngestClassificationSelect).
  *
  * Server forms use `defaultValue` (posts as name="classification"); the
  * client-side builder passes `value` + `onChange` instead.
@@ -26,7 +26,7 @@ export function ClassificationSelect({
 }) {
   return (
     <div style={{ display: "grid", gap: 6, flex: "1 1 200px" }}>
-      <Label>Classification</Label>
+      <Label>Default classification</Label>
       <select
         name="classification"
         {...(onChange
@@ -39,11 +39,15 @@ export function ClassificationSelect({
           return (
             <option key={c} value={c} disabled={!enabled}>
               {CLASSIFICATION_LABELS[c]}
-              {enabled ? "" : " (coming soon)"}
             </option>
           );
         })}
       </select>
+      <p style={{ fontSize: 11, opacity: 0.7, margin: 0 }}>
+        Applied to everything ingested here; each document can override it.
+        Classification is recorded but not yet enforced — the chatbot still
+        answers from every item regardless of tier.
+      </p>
     </div>
   );
 }

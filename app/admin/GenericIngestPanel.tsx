@@ -4,7 +4,9 @@ import { PendingButton } from "./PendingButton";
 import { ingestFormsFor, type IngestionSourceRow } from "@/lib/ingestionSources";
 import { Paginated } from "./Paginated";
 import { PanelHtml } from "./PanelHtml";
-import type { IngestedItem } from "@/lib/ingestedItems";
+import { IngestClassificationSelect } from "./IngestClassificationSelect";
+import { CLASSIFICATION_LABELS } from "@/lib/ingestionSources";
+import type { ClassifiedItem, IngestedItem } from "@/lib/ingestedItems";
 
 /**
  * The Content tab for a custom ingestion source. Built-in sources have
@@ -13,6 +15,10 @@ import type { IngestedItem } from "@/lib/ingestedItems";
  * (text and/or image — the uniform rule, mirrored server-side by
  * lib/customIngest), and everything already ingested through the uniform
  * IngestedItem shape.
+ *
+ * Every ingest form carries a classification picker defaulting to the
+ * source's own classification, so one document can be filed differently from
+ * the rest of its source. Each listed item shows what it resolved to.
  *
  * The actions arrive as props so the panel stays renderable offline in the
  * feature proof.
@@ -28,7 +34,12 @@ export function GenericIngestPanel({
   editHref,
 }: {
   row: IngestionSourceRow;
-  items: IngestedItem[];
+  /**
+   * Classified items in the live admin. Plain IngestedItems are accepted too
+   * — the badge is display-only, and an item without a resolved
+   * classification simply falls back to the source's.
+   */
+  items: Array<IngestedItem | ClassifiedItem>;
   textAction?: (formData: FormData) => Promise<void>;
   imageAction?: (formData: FormData) => Promise<void>;
   urlAction?: (formData: FormData) => Promise<void>;
@@ -87,6 +98,34 @@ export function GenericIngestPanel({
                 ) : null}
                 <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
                   <strong style={{ fontSize: 14 }}>{it.title}</strong>
+                  {(() => {
+                    const c = "classification" in it ? it.classification : row.classification;
+                    const own = "classificationOverridden" in it && it.classificationOverridden;
+                    const label =
+                      (CLASSIFICATION_LABELS as Record<string, string>)[c] ??
+                      CLASSIFICATION_LABELS.public;
+                    return (
+                      <span
+                        title={
+                          own
+                            ? "Set on this item when it was ingested"
+                            : "Inherited from this source's classification"
+                        }
+                        style={{
+                          fontSize: 11,
+                          borderRadius: 999,
+                          padding: "1px 8px",
+                          border: "1px solid var(--line, #ccc)",
+                          // An override is the exception worth spotting in a
+                          // long list; inherited is the quiet default.
+                          opacity: own ? 1 : 0.6,
+                          fontWeight: own ? 600 : 400,
+                        }}
+                      >
+                        {label}
+                      </span>
+                    );
+                  })()}
                   <Stamp date={it.createdAt} prefix="ingested" />
                   <form action={deleteItemAction} style={{ marginLeft: "auto" }}>
                     <input type="hidden" name="sourceKey" value={row.key} />
@@ -171,6 +210,7 @@ export function GenericIngestPanel({
             placeholder="https://…"
             style={field as React.CSSProperties}
           />
+          <IngestClassificationSelect sourceDefault={row.classification} />
           <PendingButton pendingLabel="Scanning…" style={btn as React.CSSProperties}>
             Scan URL
           </PendingButton>
@@ -187,6 +227,7 @@ export function GenericIngestPanel({
             accept=".pdf,.docx,.txt,.md"
             style={field as React.CSSProperties}
           />
+          <IngestClassificationSelect sourceDefault={row.classification} />
           <PendingButton pendingLabel="Extracting…" style={btn as React.CSSProperties}>
             Ingest document
           </PendingButton>
@@ -204,6 +245,7 @@ export function GenericIngestPanel({
             placeholder="Paste or write the text to ingest…"
             style={field as React.CSSProperties}
           />
+          <IngestClassificationSelect sourceDefault={row.classification} />
           <PendingButton pendingLabel="Ingesting…" style={btn as React.CSSProperties}>
             Ingest text
           </PendingButton>
@@ -216,6 +258,7 @@ export function GenericIngestPanel({
           <Label>Add image</Label>
           <input type="file" name="file" accept="image/*" style={field as React.CSSProperties} />
           <input name="caption" placeholder="Caption (optional)" style={field as React.CSSProperties} />
+          <IngestClassificationSelect sourceDefault={row.classification} />
           <PendingButton pendingLabel="Uploading…" style={btn as React.CSSProperties}>
             Ingest image
           </PendingButton>

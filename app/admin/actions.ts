@@ -881,6 +881,7 @@ export async function ingestCustomTextAction(formData: FormData) {
   await ingestCustomText(String(formData.get("sourceKey") ?? ""), {
     title: String(formData.get("title") ?? ""),
     text: String(formData.get("text") ?? ""),
+    classification: String(formData.get("classification") ?? ""),
   });
   revalidateAll();
 }
@@ -891,6 +892,9 @@ export async function ingestCustomUrlAction(formData: FormData) {
   await ingestCustomUrl(
     String(formData.get("sourceKey") ?? ""),
     String(formData.get("url") ?? ""),
+    undefined,
+    undefined,
+    String(formData.get("classification") ?? ""),
   );
   revalidateAll();
 }
@@ -904,6 +908,9 @@ export async function ingestCustomFileAction(formData: FormData) {
     String(formData.get("sourceKey") ?? ""),
     Buffer.from(await file.arrayBuffer()),
     file.name,
+    undefined,
+    undefined,
+    String(formData.get("classification") ?? ""),
   );
   revalidateAll();
 }
@@ -928,6 +935,8 @@ export async function ingestCustomImageAction(formData: FormData) {
     Buffer.from(await file.arrayBuffer()),
     file.type,
     String(formData.get("caption") ?? ""),
+    undefined,
+    String(formData.get("classification") ?? ""),
   );
   revalidateAll();
 }
