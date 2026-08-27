@@ -1,6 +1,7 @@
 import { isAuthed } from "@/lib/auth";
 import { gmailConfigured, gmailConsentUrl } from "@/lib/gmail/client";
 import { issueState } from "@/lib/gmail/state";
+import { siteOrigin } from "@/lib/util";
 
 export const runtime = "nodejs";
 
@@ -11,26 +12,21 @@ export const runtime = "nodejs";
  * verifies — without one, a crafted callback URL could write someone else's
  * grant into the database.
  *
- * The redirect URI is built from this request's own origin so localhost and
- * the deployed domain both work, as long as both are registered on the OAuth
- * client.
+ * The redirect URI comes from siteOrigin(), never req.url: behind Railway's
+ * proxy, req.url's host is the server's own bind address (localhost:PORT),
+ * which Google rejects as a redirect_uri_mismatch.
  */
 export async function GET(req: Request) {
   if (!(await isAuthed())) return new Response("Unauthorized", { status: 401 });
 
+  const origin = siteOrigin(req.headers);
   if (!gmailConfigured()) {
     return Response.redirect(
-      new URL(
-        "/admin/dashboard?tab=contacts&gmail=" +
-          encodeURIComponent(
-            "Set GOOGLE_GMAIL_CLIENT_ID and GOOGLE_GMAIL_CLIENT_SECRET first.",
-          ),
-        req.url,
-      ),
+      `${origin}/admin/dashboard?tab=contacts&gmail=` +
+        encodeURIComponent("Set GOOGLE_GMAIL_CLIENT_ID and GOOGLE_GMAIL_CLIENT_SECRET first."),
       303,
     );
   }
 
-  const origin = new URL(req.url).origin;
   return Response.redirect(gmailConsentUrl(origin, issueState()), 303);
 }
